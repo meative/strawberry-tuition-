@@ -1067,6 +1067,12 @@ function lookmeeGuard(){ // チェック済みなのに担当者未設定の園�
  const bad=rows.filter(needsInput).filter(r=>store[r.name]&&store[r.name].done&&!store[r.name].by).map(r=>r.name);
  return bad.length?bad:null;
 }
+function initSaleGuard(){ // 入金確認済みなのに担当事務が未設定の園児があれば名前を返す（全施設横断）
+ const bad=roster.filter(r=>r.isNew&&r.name)
+   .filter(r=>initSaleLog[r.name]&&initSaleLog[r.name].paid&&!initSaleLog[r.name].by)
+   .map(r=>r.name);
+ return bad.length?bad:null;
+}
 function renderLookmee(){let rows=visible().filter(r=>r.status==='在園中'||calc(r).isNew);
  const k=ymKey();
  if(!lookmeeCheck[k])lookmeeCheck[k]={};
@@ -1632,7 +1638,7 @@ function renderInitSale(){
   setCard('初回売上管理','新規入園の初回入金チェック','新規入園の初回請求が入金されたら、入金日を入れてチェックします。チェックした金額は現金出納帳・本部集計の収入に反映されます。','none');
   return;
  }
- h+='<div class="tablewrap"><table><thead><tr><th>施設</th><th>クラス</th><th>園児名</th><th>枠区分</th><th>入園日</th><th class="r">初回請求額</th><th style="text-align:center">入金確認</th><th>入金日</th><th>状態</th></tr></thead><tbody>';
+ h+='<div class="tablewrap"><table><thead><tr><th>施設</th><th>クラス</th><th>園児名</th><th>枠区分</th><th>入園日</th><th class="r">初回請求額</th><th style="text-align:center">入金確認</th><th>入金日</th><th>担当事務</th><th>状態</th></tr></thead><tbody>';
  cand.forEach(p=>{
   const amt=initSaleAmount(p);
   const rec=initSaleLog[p.name]||{};
@@ -1647,6 +1653,7 @@ function renderInitSale(){
     `<td class="num total">¥${amt.toLocaleString()}</td>`+
     `<td style="text-align:center"><input type="checkbox" data-ischk="${encodeURIComponent(p.name)}" ${paid?'checked':''} style="width:18px;height:18px;accent-color:var(--leaf2);cursor:pointer"></td>`+
     `<td><input type="date" data-isdate="${encodeURIComponent(p.name)}" value="${rec.paidDate||''}" ${paid?'':'disabled'} class="inp" style="width:auto;padding:3px 6px;font-size:12px;${paid?'':'opacity:.45'}"></td>`+
+    `<td><select data-isby="${encodeURIComponent(p.name)}" class="inp" ${paid?'':'disabled'} style="width:auto;padding:3px 6px;font-size:12px;${paid?(rec.by?'':'border-color:var(--berry);background:var(--berrysoft)'):'opacity:.45'}"><option value="">${paid?'担当者…':'（先にチェック）'}</option>${STAFF.map(s=>`<option ${rec.by===s?'selected':''}>${s}</option>`).join('')}</select></td>`+
     `<td>${paid?`<span style="background:var(--leaf);color:#fff;padding:2px 10px;border-radius:10px;font-size:11px;font-weight:700">✓ 入金済み</span>`:`<span style="color:var(--mut);font-size:12px">未入金</span>`}</td>`+
     `</tr>`;
  });
@@ -1658,7 +1665,7 @@ function renderInitSale(){
    if(!initSaleLog[nm])initSaleLog[nm]={};
    initSaleLog[nm].paid=e.target.checked;
    if(e.target.checked){if(!initSaleLog[nm].paidDate)initSaleLog[nm].paidDate=today;}
-   else{initSaleLog[nm].paidDate='';}
+   else{initSaleLog[nm].paidDate='';initSaleLog[nm].by='';}
    render();
  };});
  // 入金日の変更
@@ -1668,16 +1675,27 @@ function renderInitSale(){
    initSaleLog[nm].paidDate=e.target.value;
    render();
  };});
- // CSV出力（入金済みのみ・現金出納帳の入金欄に転記する形）
+ // 担当事務の選択
+ document.querySelectorAll('[data-isby]').forEach(el=>{el.onchange=e=>{
+   const nm=decodeURIComponent(e.target.dataset.isby);
+   if(!initSaleLog[nm])initSaleLog[nm]={};
+   initSaleLog[nm].by=e.target.value;
+   render();
+ };});
+ // CSV出力（月報形式：日付順に「何月何日・誰・いくら」。現金出納帳の入金欄へ転記）
  const csvBtn=document.getElementById('isCsv');if(csvBtn)csvBtn.onclick=()=>{
-   const rows=[['入金日','施設','クラス','園児名','枠区分','摘要','金額']];
-   cand.filter(p=>initSaleLog[p.name]&&initSaleLog[p.name].paid).forEach(p=>{
-     rows.push([initSaleLog[p.name].paidDate||'', p.park||'', p.cls||'', p.name, p.waku||'', '新規入園 初回月謝', initSaleAmount(p)]);
+   const paid=cand.filter(p=>initSaleLog[p.name]&&initSaleLog[p.name].paid)
+     .slice().sort((a,b)=>String(initSaleLog[a.name].paidDate||'').localeCompare(String(initSaleLog[b.name].paidDate||'')));
+   if(paid.length===0){alert('入金済みの園児がいません。チェックを入れてから出力してください。');return;}
+   const rows=[['入金日','区分','施設','園児名','摘要','金額','担当事務']];
+   let sum=0;
+   paid.forEach(p=>{const amt=initSaleAmount(p);sum+=amt;
+     rows.push([initSaleLog[p.name].paidDate||'', '新規入園', p.park||'', p.name, '新規入園 初回月謝', amt, initSaleLog[p.name].by||'']);
    });
-   if(rows.length===1){alert('入金済みの園児がいません。チェックを入れてから出力してください。');return;}
-   downloadCsv(`初回売上_${park}_${today}.csv`, rows);
+   rows.push(['合計','','','','',sum,'']);
+   downloadCsv(`初回売上_月報_${park}_${today}.csv`, rows);
  };
- setCard('初回売上管理','新規入園の初回入金チェック','新規入園の初回請求が入金されたら、入金日を入れてチェックします。チェックすると入金日（未入力なら当日）が記録され、金額が入金済み合計に計上されます。CSV出力は現金出納帳への転記に使えます。施設はタブ上部の「現在の園」で切り替えます。','none');
+ setCard('初回売上管理','新規入園の初回入金チェック','新規入園の初回請求が入金されたら、入金日を入れてチェックし、担当事務を選びます。担当が未設定だと他タブへ移動できません。CSVは日付順の月報形式（入金日・園児名・金額・担当）で出力され、現金出納帳の入金欄への転記に使えます。','none');
 }
 // CSVダウンロード共通（BOM付きUTF-8でExcel文字化け防止）
 function downloadCsv(filename, rows){
@@ -1736,6 +1754,7 @@ function syncTabs(){const el=document.getElementById('tabs');el.innerHTML='';
  TABS.filter(([k])=>tabVisible(k)).forEach(([k,label,live])=>{const t=document.createElement('div');t.className='tab'+(k===tab?' active':'');
   t.innerHTML=label+(live?'<span class="mini">連動</span>':'');t.onclick=()=>{
    if(tab==='lookmee'&&k!=='lookmee'){const bad=lookmeeGuard();if(bad){alert('ルクミー出力で、チェック済みなのに担当者が未設定の園児がいます：\n\n'+bad.join('、')+'\n\n担当者を設定してから移動してください。');return;}}
+   if(tab==='initsale'&&k!=='initsale'){const bad=initSaleGuard();if(bad){alert('初回売上管理で、入金確認済みなのに担当事務が未設定の園児がいます：\n\n'+bad.join('、')+'\n\n担当事務を選んでから移動してください。');return;}}
    tab=k;syncTabs();render();};el.appendChild(t);});}
 const FAC_COLORS={'月寒園':'#3d7355','白石園':'#4a5a82','サッポロファクトリー園':'#a8466a','幼稚舎':'#9a6b2f','資生館保育園':'#6a548c','全施設':'var(--leaf)'};
 function applyParkColor(){const sel=document.getElementById('park');const c=FAC_COLORS[park]||'var(--leaf)';
