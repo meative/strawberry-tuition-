@@ -1,0 +1,1663 @@
+<!DOCTYPE html>
+<html lang="ja"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>STRAWBERRY FIELD ｜ 月謝管理</title>
+<link href="https://fonts.googleapis.com/css2?family=Zen+Old+Mincho:wght@600;700;900&family=Zen+Kaku+Gothic+New:wght@400;500;700&family=Spline+Sans+Mono:wght@500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<style>
+:root,[data-theme="garden"]{
+ --bg:#f3f6f2; --panel:#ffffff; --panel2:#f7faf6; --line:#dde6df; --line2:#ccdace;
+ --ink:#1c2c22; --mut:#65786c; --leaf:#2f6b46; --leaf2:#3fa86a; --leafsoft:#e9f2eb;
+ --berry:#c2185b; --berry2:#e8417a; --berrysoft:#fce4ec; --gold:#b8860b; --goldsoft:#fbf3dc;
+ --cream:#fbfaf4; --shadow:rgba(40,60,46,.14); --rowalt:#f5f9f5;
+ --chip:#eef4ef; --headbg:#14281c; --headtxt:#f4f1e8; --yellow:#fff6cc;
+}
+[data-theme="dark"]{
+ --bg:#0e1a13; --panel:#15281c; --panel2:#1b3324; --line:#2c4a35; --line2:#3a5d44;
+ --ink:#e8f0ea; --mut:#8fae9b; --leaf:#3fa86a; --leaf2:#5fc98a; --leafsoft:#16301f;
+ --berry:#e8417a; --berry2:#ff6b9d; --berrysoft:#2a1620; --gold:#e8c547; --goldsoft:#2a2410;
+ --cream:#f4f1e8; --shadow:rgba(0,0,0,.6); --rowalt:#193020;
+ --chip:#1b3324; --headbg:#0a160e; --headtxt:#f4f1e8; --yellow:#3a3410;
+}
+[data-theme="cream"]{
+ --bg:#f7f1e6; --panel:#fffdf8; --panel2:#faf5ea; --line:#e6dcc8; --line2:#d8cbb0;
+ --ink:#3a3228; --mut:#8a7d68; --leaf:#9a6b3f; --leaf2:#c08a52; --leafsoft:#f3e8d6;
+ --berry:#c2185b; --berry2:#e8417a; --berrysoft:#f9e3ea; --gold:#b8860b; --goldsoft:#f6edd4;
+ --cream:#fffdf8; --shadow:rgba(90,70,40,.16); --rowalt:#faf4e8;
+ --chip:#f2e9d8; --headbg:#5a4632; --headtxt:#fdf8ec; --yellow:#fff2c4;
+}
+/* クリーム系① ラテ：ミルクティー寄りの柔らかい茶 */
+[data-theme="latte"]{
+ --bg:#f5ede0; --panel:#fffaf2; --panel2:#f8f1e4; --line:#e4d8c2; --line2:#d4c4a6;
+ --ink:#403525; --mut:#917f64; --leaf:#a9784a; --leaf2:#c79a68; --leafsoft:#f1e5d2;
+ --berry:#bf5a6a; --berry2:#d97f8c; --berrysoft:#f6e5e6; --gold:#bb8b3a; --goldsoft:#f5ecd5;
+ --cream:#fffaf2; --shadow:rgba(100,75,45,.16); --rowalt:#f8f0e2;
+ --chip:#f0e6d3; --headbg:#604a33; --headtxt:#fdf7ec; --yellow:#ffefbc;
+}
+/* クリーム系② ハニー：黄み・蜂蜜トーンで明るい */
+[data-theme="honey"]{
+ --bg:#faf3df; --panel:#fffdf6; --panel2:#fbf5e3; --line:#ecdfbe; --line2:#dccd9e;
+ --ink:#42371f; --mut:#998a5e; --leaf:#a6802a; --leaf2:#c99f44; --leafsoft:#f5ecce;
+ --berry:#c2185b; --berry2:#e8417a; --berrysoft:#f9e3ea; --gold:#b8860b; --goldsoft:#f6edcf;
+ --cream:#fffdf6; --shadow:rgba(110,90,40,.16); --rowalt:#fbf4e1;
+ --chip:#f5ebcf; --headbg:#5e4e22; --headtxt:#fdfae8; --yellow:#fff0b8;
+}
+/* クリーム系③ ローズベージュ：苺をやや前に出した上品系 */
+[data-theme="rose"]{
+ --bg:#f7efe9; --panel:#fffbf7; --panel2:#faf3ed; --line:#e8d9cf; --line2:#dac6b8;
+ --ink:#3e3029; --mut:#917b6f; --leaf:#a36a55; --leaf2:#c48b76; --leafsoft:#f3e5dc;
+ --berry:#c2185b; --berry2:#e8417a; --berrysoft:#fbe3ec; --gold:#b1803a; --goldsoft:#f4ead4;
+ --cream:#fffbf7; --shadow:rgba(95,65,55,.16); --rowalt:#f9f1ea;
+ --chip:#f3e7df; --headbg:#5a3f37; --headtxt:#fdf6f0; --yellow:#fff0c2;
+}
+/* クリーム系④ セージ：クリーム×ほんのり緑で落ち着き */
+[data-theme="sage"]{
+ --bg:#f3f1e5; --panel:#fefdf7; --panel2:#f7f5ea; --line:#dfdcc8; --line2:#cecbb0;
+ --ink:#363528; --mut:#807f66; --leaf:#6f7a4a; --leaf2:#929c69; --leafsoft:#ecedd6;
+ --berry:#bd4f63; --berry2:#d97f8c; --berrysoft:#f5e4e6; --gold:#b08a32; --goldsoft:#f3edd2;
+ --cream:#fefdf7; --shadow:rgba(80,80,45,.15); --rowalt:#f7f5e8;
+ --chip:#eeecd9; --headbg:#494a30; --headtxt:#fbf9ec; --yellow:#fff0bc;
+}
+/* クリーム系⑤ モカ・ダーク：クリームの夜版（濃茶ベース） */
+[data-theme="mocha"]{
+ --bg:#221b13; --panel:#2d251a; --panel2:#352c20; --line:#473a29; --line2:#5a4a35;
+ --ink:#f0e6d4; --mut:#b09a7c; --leaf:#d2a566; --leaf2:#e3bd84; --leafsoft:#352a1c;
+ --berry:#e8839a; --berry2:#f5a3b5; --berrysoft:#2e1d22; --gold:#e8c547; --goldsoft:#2e2813;
+ --cream:#f0e6d4; --shadow:rgba(0,0,0,.5); --rowalt:#332a1e;
+ --chip:#352c20; --headbg:#191309; --headtxt:#f0e6d4; --yellow:#3a3216;
+}
+/* 北欧：青みのクール系 */
+[data-theme="nordic"]{
+ --bg:#eef2f5; --panel:#ffffff; --panel2:#f6f9fb; --line:#dae3ea; --line2:#c4d2dd;
+ --ink:#1e2c36; --mut:#637585; --leaf:#2f6e8c; --leaf2:#4a93b3; --leafsoft:#e3eef3;
+ --berry:#c0405f; --berry2:#e0667f; --berrysoft:#f7e4e8; --gold:#b08020; --goldsoft:#f5eed8;
+ --cream:#fbfcfd; --shadow:rgba(30,50,70,.15); --rowalt:#f4f8fa;
+ --chip:#eaf0f4; --headbg:#1b3140; --headtxt:#eef6fa; --yellow:#fff3c8;
+}
+/* モノトーン：上品なグレー × 苺アクセント */
+[data-theme="mono"]{
+ --bg:#f4f4f3; --panel:#ffffff; --panel2:#f8f8f7; --line:#e0e0de; --line2:#cececb;
+ --ink:#242422; --mut:#76746f; --leaf:#3a3a37; --leaf2:#5c5c57; --leafsoft:#ececea;
+ --berry:#c2185b; --berry2:#e8417a; --berrysoft:#fae0ea; --gold:#9a7b2e; --goldsoft:#f2ecda;
+ --cream:#fcfcfb; --shadow:rgba(20,20,18,.14); --rowalt:#f6f6f5;
+ --chip:#eeeeec; --headbg:#1f1f1d; --headtxt:#f4f4f2; --yellow:#fdf0bf;
+}
+/* 濃紺：落ち着いたダーク */
+[data-theme="midnight"]{
+ --bg:#0f1420; --panel:#19202f; --panel2:#1f2738; --line:#2e384c; --line2:#3c4760;
+ --ink:#e4e9f2; --mut:#8a96ac; --leaf:#5b8def; --leaf2:#7aa6f5; --leafsoft:#1a2336;
+ --berry:#f06595; --berry2:#ff85ad; --berrysoft:#2a1a26; --gold:#e8c547; --goldsoft:#2a2613;
+ --cream:#eef2f8; --shadow:rgba(0,0,0,.55); --rowalt:#1d2536;
+ --chip:#1f2738; --headbg:#0a0e18; --headtxt:#e4e9f2; --yellow:#3a3410;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:"Zen Kaku Gothic New",sans-serif;background:var(--bg);color:var(--ink);
+ transition:background .4s,color .4s;min-height:100vh;
+ background-image:radial-gradient(circle at 12% 8%,color-mix(in srgb,var(--leaf2) 8%,transparent),transparent 42%),
+  radial-gradient(circle at 88% 92%,color-mix(in srgb,var(--berry) 6%,transparent),transparent 46%);}
+.app{max-width:1280px;margin:0 auto;padding:0 18px 70px;}
+header{padding:26px 0 18px;display:flex;align-items:flex-end;gap:18px;flex-wrap:wrap;}
+.brand{display:flex;flex-direction:column;}
+h1{font-family:"Zen Old Mincho",serif;font-weight:900;font-size:25px;letter-spacing:.04em;color:var(--ink);}
+.tagline{font-size:11px;color:var(--mut);letter-spacing:.24em;text-transform:uppercase;margin-top:4px;}
+.theme-tog{margin-left:auto;display:flex;align-items:center;gap:6px;background:var(--panel);
+ border:1px solid var(--line);border-radius:30px;padding:6px 8px;box-shadow:0 6px 18px -10px var(--shadow);}
+.theme-tog button{border:none;background:transparent;cursor:pointer;font-size:13px;padding:7px 14px;
+ border-radius:20px;color:var(--mut);font-family:inherit;font-weight:700;transition:.2s;}
+.theme-tog{flex-wrap:wrap;max-width:560px;justify-content:flex-end;}
+.theme-tog button.on{background:var(--leaf);color:#fff;}
+.controls{display:flex;flex-wrap:wrap;gap:16px;align-items:flex-end;
+ background:linear-gradient(150deg,var(--panel),var(--panel2));border:1px solid var(--line);
+ border-radius:18px;padding:18px 22px;box-shadow:0 18px 44px -26px var(--shadow);margin-bottom:18px;}
+.fld{display:flex;flex-direction:column;gap:6px;}
+.fld label{font-size:10px;letter-spacing:.16em;color:var(--mut);text-transform:uppercase;font-weight:700;}
+select{font-family:inherit;background:var(--panel);border:1.5px solid var(--line2);color:var(--ink);
+ padding:10px 14px;border-radius:11px;font-size:14.5px;font-weight:600;cursor:pointer;transition:.2s;}
+select:focus{outline:none;border-color:var(--leaf);box-shadow:0 0 0 3px color-mix(in srgb,var(--leaf) 22%,transparent);}
+.park-sel{font-family:"Zen Old Mincho",serif;font-weight:700;font-size:17px;color:var(--leaf);min-width:210px;}
+.stats{display:flex;gap:11px;margin-left:auto;flex-wrap:wrap;}
+.stat{background:var(--chip);border:1px solid var(--line);border-radius:14px;padding:10px 18px;text-align:right;min-width:118px;position:relative;overflow:hidden;}
+.stat::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--leaf);}
+.stat.berry::before{background:var(--berry);} .stat.gold::before{background:var(--gold);}
+.stat .k{font-size:9.5px;letter-spacing:.13em;color:var(--mut);text-transform:uppercase;font-weight:700;}
+.stat .v{font-family:"Spline Sans Mono",monospace;font-size:20px;font-weight:700;color:var(--ink);margin-top:2px;}
+.stat .v small{font-size:11px;color:var(--mut);font-weight:500;}
+.stat.berry .v{color:var(--berry);} .stat.gold .v{color:var(--gold);}
+.tabs{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:-1px;position:relative;z-index:2;}
+.tab{padding:10px 15px;font-size:12.5px;font-weight:700;cursor:pointer;border-radius:11px 11px 0 0;
+ background:var(--chip);color:var(--mut);border:1px solid var(--line);border-bottom:none;transition:.2s;display:flex;align-items:center;gap:6px;}
+.tab:hover{color:var(--leaf);}
+.tab.active{background:var(--panel);color:var(--leaf);box-shadow:0 -3px 0 var(--leaf) inset;}
+.tab .mini{font-size:8.5px;background:var(--berry);color:#fff;padding:1px 6px;border-radius:8px;letter-spacing:.03em;}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:0 16px 16px 16px;
+ box-shadow:0 20px 50px -30px var(--shadow);overflow:hidden;}
+.card-head{padding:16px 22px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:12px;flex-wrap:wrap;}
+.card-head h2{font-family:"Zen Old Mincho",serif;font-size:17px;font-weight:700;color:var(--ink);display:flex;align-items:center;gap:10px;}
+.card-head h2 .dot{width:8px;height:8px;border-radius:50%;background:var(--berry);box-shadow:0 0 9px var(--berry);}
+.card-head .meta{font-size:12px;color:var(--mut);margin-left:auto;}
+.tablewrap{overflow:auto;max-height:62vh;}
+table{border-collapse:collapse;width:100%;font-size:13.5px;}
+th{position:sticky;top:0;background:var(--headbg);color:var(--headtxt);font-size:10px;letter-spacing:.08em;
+ text-transform:uppercase;font-weight:700;padding:12px 13px;text-align:left;white-space:nowrap;z-index:3;}
+th.r{text-align:right;}
+td{padding:10px 13px;border-bottom:1px solid var(--line);white-space:nowrap;vertical-align:middle;}
+tbody tr:nth-child(even) td{background:var(--rowalt);}
+tbody tr:hover td{background:color-mix(in srgb,var(--leaf) 8%,transparent);}
+.name{font-family:"Zen Old Mincho",serif;font-weight:700;font-size:15px;color:var(--ink);}
+.cls{font-family:"Spline Sans Mono",monospace;font-size:12px;color:var(--leaf);letter-spacing:.03em;}
+.waku{font-size:12.5px;color:var(--mut);} .koza{font-size:12.5px;color:var(--mut);}
+.num{font-family:"Spline Sans Mono",monospace;text-align:right;font-weight:600;color:var(--ink);}
+.num.total{color:var(--leaf);font-size:15px;font-weight:700;}
+.num.minus{color:var(--berry);} .num.zero{color:var(--mut);font-weight:400;}
+.ptag{font-size:11px;font-weight:700;padding:3px 11px;border-radius:20px;letter-spacing:.03em;display:inline-block;}
+.pt-月寒園{background:#e8f0e9;color:#3d7355;}
+.pt-白石園{background:#eef0f5;color:#4a5a82;}
+.pt-サッポロファクトリー園{background:#f7e7ec;color:#a8466a;}
+.pt-幼稚舎{background:#f5ecdc;color:#9a6b2f;}
+.pt-資生館保育園{background:#ece7f2;color:#6a548c;}
+[data-theme="dark"] .pt-月寒園,[data-theme="midnight"] .pt-月寒園,[data-theme="mocha"] .pt-月寒園{background:#1d3326;color:#7cc99a;}
+[data-theme="dark"] .pt-白石園,[data-theme="midnight"] .pt-白石園,[data-theme="mocha"] .pt-白石園{background:#1f2740;color:#8fa6d8;}
+[data-theme="dark"] .pt-サッポロファクトリー園,[data-theme="midnight"] .pt-サッポロファクトリー園,[data-theme="mocha"] .pt-サッポロファクトリー園{background:#3a1f2a;color:#e88aa8;}
+[data-theme="dark"] .pt-幼稚舎,[data-theme="midnight"] .pt-幼稚舎,[data-theme="mocha"] .pt-幼稚舎{background:#3a2e1a;color:#e0b46a;}
+[data-theme="dark"] .pt-資生館保育園,[data-theme="midnight"] .pt-資生館保育園,[data-theme="mocha"] .pt-資生館保育園{background:#2a2438;color:#b59ad8;}
+.flagdot{color:var(--berry);font-weight:700;font-size:15px;}
+tr.changed td{background:color-mix(in srgb,var(--gold) 14%,transparent)!important;}
+tr.changed:hover td{background:color-mix(in srgb,var(--gold) 22%,transparent)!important;}
+.chgmark{display:inline-block;background:var(--gold);color:#fff;font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;letter-spacing:.03em;margin-right:6px;}
+.reason{font-size:11px;color:var(--berry);}
+[contenteditable]{cursor:text;border-radius:5px;}
+[contenteditable]:focus{outline:2px solid var(--leaf);outline-offset:1px;background:color-mix(in srgb,var(--leaf) 10%,transparent);}
+.inp{font-family:inherit;background:var(--panel);border:1px solid var(--line2);color:var(--ink);padding:7px 9px;border-radius:8px;font-size:13px;width:100%;}
+.inp:focus{outline:none;border-color:var(--leaf);}
+.actions{display:flex;gap:12px;margin-top:20px;flex-wrap:wrap;align-items:center;}
+.btn{font-family:inherit;font-weight:700;font-size:14px;border:none;padding:13px 26px;border-radius:12px;
+ cursor:pointer;letter-spacing:.03em;transition:transform .15s,box-shadow .15s;display:inline-flex;align-items:center;gap:8px;}
+.btn:hover{transform:translateY(-2px);}
+.btn-primary{background:linear-gradient(120deg,var(--leaf),var(--leaf2));color:#fff;box-shadow:0 12px 26px -12px var(--leaf);}
+.btn-ghost{background:transparent;color:var(--ink);border:1.5px solid var(--line2);}
+.hint{font-size:12px;color:var(--mut);line-height:1.7;margin-top:14px;}
+.editbadge{font-size:11px;color:var(--gold);font-weight:700;}
+/* settings panel */
+.setgrid{padding:20px 22px;display:grid;gap:22px;}
+.setblock h3{font-family:"Zen Old Mincho",serif;font-size:15px;color:var(--leaf);margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid var(--line);}
+.bankcol th:first-child{text-align:left;}
+.yellow{background:var(--yellow);}
+/* PDF preview */
+.pdfpaper{background:var(--cream);color:#1a1a1a;max-width:600px;margin:22px auto;padding:40px 46px;
+ border-radius:8px;box-shadow:0 20px 50px -20px var(--shadow);font-family:"Zen Old Mincho",serif;line-height:1.9;}
+[data-theme="dark"] .pdfpaper{color:#1a1a1a;}
+.pdfpaper h3{text-align:center;font-size:20px;letter-spacing:.3em;margin:18px 0;border-bottom:2px solid #2f6b46;padding-bottom:10px;}
+.pdfpaper .sec{font-weight:700;color:#2f6b46;border-left:4px solid #2f6b46;padding-left:8px;margin:18px 0 8px;}
+.pdfpaper table{font-family:"Zen Kaku Gothic New";font-size:13px;}
+.pdfpaper td{border:none;padding:5px 8px;color:#333;background:none!important;}
+.readme{padding:22px 26px;font-size:13.5px;line-height:1.95;white-space:pre-wrap;}
+.readme b{color:var(--leaf);}
+.foot{text-align:center;font-size:11px;color:var(--mut);letter-spacing:.05em;margin-top:34px;}
+@media print{
+ body.printing-reissue *{visibility:hidden!important;}
+ body.printing-reissue #reissueDoc,body.printing-reissue #reissueDoc *{visibility:visible!important;}
+ body.printing-reissue #reissueDoc{position:absolute;left:0;top:0;width:100%;margin:0!important;box-shadow:none!important;border:none!important;}
+ body.printing-reissue .noprint{display:none!important;}
+ @page{margin:12mm;}
+}
+</style></head>
+<body data-theme="rose">
+<div class="app">
+<header>
+ <div class="brand"><h1>STRAWBERRY FIELD 月謝管理</h1>
+  <div class="tagline">Multi-Garden Tuition System</div></div>
+ <div class="theme-tog" id="themeTog"></div>
+</header>
+<div class="controls">
+ <div class="fld"><label>現在の園 / Garden</label><select class="park-sel" id="park"></select></div>
+ <div class="fld"><label>対象年</label><select id="yy"><option>2026</option><option>2027</option></select></div>
+ <div class="fld"><label>対象月</label><select id="mm"></select></div>
+ <div class="stats" id="stats"></div>
+</div>
+<div class="tabs" id="tabs"></div>
+<div class="card">
+ <div class="card-head"><h2><span class="dot"></span><span id="cardTitle"></span></h2><span class="meta" id="cardMeta"></span></div>
+ <div id="body"></div>
+ <div id="confirmOverlay" style="display:none;position:fixed;inset:0;background:rgba(20,12,16,.45);z-index:9999;align-items:center;justify-content:center;backdrop-filter:blur(2px)">
+  <div style="background:var(--panel);border:1px solid var(--line);border-radius:18px;max-width:380px;width:90%;padding:28px 26px 22px;box-shadow:0 12px 48px rgba(0,0,0,.25);text-align:center">
+   <div id="confirmTitle" style="font-size:16px;font-weight:700;color:var(--ink);margin-bottom:12px">確認</div>
+   <div id="confirmMsg" style="font-size:13.5px;color:var(--mut);line-height:1.8;margin-bottom:22px;white-space:pre-line"></div>
+   <div style="display:flex;gap:10px;justify-content:center">
+    <button id="confirmCancel" style="padding:10px 24px;border:1px solid var(--line);background:var(--panel2);color:var(--ink);border-radius:24px;font-size:13.5px;cursor:pointer;font-family:inherit;font-weight:600">キャンセル</button>
+    <button id="confirmOK" style="padding:10px 24px;border:none;background:var(--berry);color:#fff;border-radius:24px;font-size:13.5px;cursor:pointer;font-family:inherit;font-weight:600">削除する</button>
+   </div>
+  </div>
+ </div>
+</div>
+<div class="actions">
+ <button class="btn btn-primary" onclick="exportXlsx()">📊 スプレッドシート(xlsx)に出力</button>
+ <button class="btn btn-ghost" id="addBtn" onclick="addAction()"></button>
+ <span class="editbadge" id="editBadge"></span>
+</div>
+<div class="hint" id="hint"></div>
+<div class="foot">STRAWBERRY FIELD Children's Garden ／ ハイアイランド株式会社　—　月謝管理アプリ（方式B連動版）</div>
+</div>
+<script>
+const M = {"prices": {"地域枠": {"getsu": 35000, "kyozai": 10000, "mat": 2000, "tesu": 110}, "旧地域枠": {"getsu": 25000, "kyozai": 10000, "mat": 2000, "tesu": 110}, "企業提携枠": {"getsu": 25000, "kyozai": 10000, "mat": 2000, "tesu": 110}, "旧企業提携枠": {"getsu": 15000, "kyozai": 10000, "mat": 2000, "tesu": 110}, "従業員(Number9)": {"getsu": 0, "kyozai": 10000, "mat": 0, "tesu": 110}, "従業員(ハイアイランド)": {"getsu": 0, "kyozai": 10000, "mat": 0, "tesu": 110}, "従業員(アドバイザー)": {"getsu": 0, "kyozai": 10000, "mat": 0, "tesu": 110}, "従業員(保育士)": {"getsu": 0, "kyozai": 5000, "mat": 0, "tesu": 110}}, "sibling": -8000, "half_day": 15, "year": 2026, "parks": ["全園", "月寒園", "白石園", "サッポロファクトリー園"], "bank": [{"label": "園名（正式名称）", "月寒園": "STRAWBERRY FIELD Children's garden（月寒園）", "白石園": "STRAWBERRY FIELD Children's garden（白石園）", "サッポロファクトリー園": "STRAWBERRY FIELD Children's garden（サッポロファクトリー園）", "幼稚舎": "STRAWBERRY FIELD 幼稚舎", "資生館保育園": "Children's Garden 資生館保育園"}, {"label": "園住所", "月寒園": null, "白石園": null, "サッポロファクトリー園": "〒000-0000 ○○県○○市○○町1-2-3", "幼稚舎": "", "資生館保育園": ""}, {"label": "園電話番号", "月寒園": null, "白石園": null, "サッポロファクトリー園": "000-0000-0000", "幼稚舎": "", "資生館保育園": "011-552-0015"}, {"label": "園代表者", "月寒園": "代表取締役 髙嶋 英憲", "白石園": "代表取締役 髙嶋 英憲", "サッポロファクトリー園": "代表取締役 髙嶋 英憲", "幼稚舎": "代表取締役 髙嶋 英憲", "資生館保育園": "代表取締役 髙嶋 英憲"}, {"label": "振込先銀行名", "月寒園": "北海道銀行", "白石園": "北海道銀行", "サッポロファクトリー園": "北海道銀行", "幼稚舎": "北海道銀行", "資生館保育園": "北海道銀行"}, {"label": "振込先支店名", "月寒園": "月寒支店（支店コード：108）", "白石園": "月寒支店（支店コード：108）", "サッポロファクトリー園": "月寒支店（支店コード：108）", "幼稚舎": "月寒支店（支店コード：108）", "資生館保育園": "月寒支店（支店コード：108）"}, {"label": "口座種別", "月寒園": "普通", "白石園": "普通", "サッポロファクトリー園": "普通", "幼稚舎": "普通", "資生館保育園": "普通"}, {"label": "口座番号", "月寒園": "1170558", "白石園": "1170567", "サッポロファクトリー園": "1170576", "幼稚舎": "1206768", "資生館保育園": "1243654"}, {"label": "口座名義(カナ)", "月寒園": "ハイアイランド(カ)ストロベリーフイールドツキサムエン", "白石園": "ハイアイランド(カ)ストロベリーフイールドシロイシエン", "サッポロファクトリー園": "ハイアイランド(カ)ストロベリーフイールドサツポロファクトリーエン", "幼稚舎": "ハイアイランド(カ", "資生館保育園": "カ)ナンバーナイン"}, {"label": "振込期限(毎月)", "月寒園": "毎月27日", "白石園": "毎月27日", "サッポロファクトリー園": "毎月27日", "幼稚舎": "毎月27日", "資生館保育園": "毎月27日"}], "goods": [{"id": "U-01", "cat": "制服", "name": "ニット帽", "size": "フリー", "price": 3850, "sizes": ["フリー"], "facs": ["幼稚舎", "月寒園", "白石園", "サッポロファクトリー園", "資生館保育園"]}, {"id": "U-02", "cat": "制服", "name": "パーカー", "size": "90/100/110/120/130cm", "price": 4400, "sizes": ["110", "130"], "facs": ["幼稚舎", "月寒園", "白石園", "サッポロファクトリー園", "資生館保育園"]}, {"id": "U-03", "cat": "制服", "name": "キャップ", "size": "フリー", "price": 3850, "sizes": ["フリー"], "facs": ["幼稚舎", "月寒園", "白石園", "サッポロファクトリー園", "資生館保育園"]}, {"id": "U-04", "cat": "制服", "name": "デニムジャケット", "size": "90/100/110/120/130cm", "price": 22000, "sizes": ["110", "120"], "facs": ["幼稚舎"]}, {"id": "O-01", "cat": "その他", "name": "マットレス交換", "size": "-", "price": 2000, "sizes": [], "facs": []}, {"id": "O-02", "cat": "その他", "name": "おむつまとめ買い", "size": "S/M/L", "price": 1900, "sizes": ["S", "M", "L"], "facs": []}, {"id": "O-03", "cat": "その他", "name": "おしりふき(10個パック)", "size": "-", "price": 1500, "sizes": [], "facs": []}, {"id": "O-05", "cat": "その他", "name": "その他", "size": "-", "price": 0, "sizes": [], "facs": ["幼稚舎", "月寒園", "白石園", "サッポロファクトリー園", "資生館保育園"]}], "irreg": [{"name": "新入園準備金不足分", "type": "個別調整"}, {"name": "月謝不足分", "type": "個別調整"}, {"name": "バス遠足代", "type": "イベント費"}, {"name": "プール用品代", "type": "用品費"}, {"name": "夏祭り参加費", "type": "イベント費"}, {"name": "発表会衣装代", "type": "用品費"}, {"name": "クリスマス会費", "type": "イベント費"}, {"name": "節分行事費", "type": "イベント費"}, {"name": "卒園記念品代", "type": "用品費"}], "roster": [{"id": 68, "status": "在園中", "waku": "一般", "cls": "LEAF", "name": "遠藤 瑚青", "sib": "なし", "koza": "得地 景子", "lid": "", "park": "幼稚舎", "nyuen": "", "bus": "", "birth": "2023-03-16", "jugyoOverride": 45000}, {"id": 69, "status": "在園中", "waku": "一般", "cls": "LEAF", "name": "岡本 翔空", "sib": "なし", "koza": "伊賀 美弓", "lid": "", "park": "幼稚舎", "nyuen": "", "bus": "", "jugyoOverride": 45000}, {"id": 70, "status": "在園中", "waku": "一般", "cls": "LEAF", "name": "喜田 匠真", "sib": "あり", "koza": "喜田 武昭", "lid": "", "park": "幼稚舎", "nyuen": "", "bus": "", "birth": "2022-08-05", "jugyoOverride": 45000}, {"id": 71, "status": "在園中", "waku": "一般", "cls": "LEAF", "name": "木戸 悠吏", "sib": "なし", "koza": "西陰 敏晴", "lid": "", "park": "幼稚舎", "nyuen": "", "bus": "", "jugyoOverride": 45000}, {"id": 72, "status": "在園中", "waku": "一般", "cls": "LEAF", "name": "小島 空河", "sib": "あり", "koza": "小島 恭平", "lid": "", "park": "幼稚舎", "nyuen": "", "bus": "", "birth": "2023-02-01", "jugyoOverride": 45000}, {"id": 73, "status": "在園中", "waku": "一般", "cls": "LEAF", "name": "佐藤 杏", "sib": "あり", "koza": "佐藤 夏絵", "lid": "", "park": "幼稚舎", "nyuen": "", "bus": "", "birth": "2022-10-22", "jugyoOverride": 45000}, {"id": 74, "status": "在園中", "waku": "一般", "cls": "LEAF", "name": "縄手 優橙", "sib": "あり", "koza": "縄手 陵湖", "lid": "", "park": "幼稚舎", "nyuen": "", "bus": "", "birth": "2022-06-15", "jugyoOverride": 45000}, {"id": 75, "status": "在園中", "waku": "一般", "cls": "LEAF", "name": "西陰 緋那", "sib": "あり", "koza": "西陰 敏晴", "lid": "", "park": "幼稚舎", "nyuen": "", "bus": "", "birth": "2022-11-15", "jugyoOverride": 45000}, {"id": 76, "status": "在園中", "waku": "一般", "cls": "LEAF", "name": "新田 美來", "sib": "なし", "koza": "橋本 優希", "lid": "", "park": "幼稚舎", "nyuen": "", "bus": "", "jugyoOverride": 45000}, {"id": 77, "status": "在園中", "waku": "一般", "cls": "LEAF", "name": "早崎 麦", "sib": "あり", "koza": "早崎 友一朗", "lid": "", "park": "幼稚舎", "nyuen": "", "bus": "", "birth": "2023-01-09", "jugyoOverride": 45000}, {"id": 78, "status": "在園中", "waku": "一般", "cls": "LEAF", "name": "平野 蒼晴", "sib": "あり", "koza": "名村 麗奈", "lid": "", "park": "幼稚舎", "nyuen": "2025-04-01", "bus": "", "birth": "2023-01-26"}, {"id": 79, "status": "在園中", "waku": "一般", "cls": "LEAF", "name": "町田 陽彩", "sib": "なし", "koza": "中村 麻衣", "lid": "", "park": "幼稚舎", "nyuen": "", "bus": "", "birth": "2023-03-14", "jugyoOverride": 45000}, {"id": 80, "status": "在園中", "waku": "一般", "cls": "LEAF", "name": "村山 青嶺", "sib": "なし", "koza": "喜田 武昭", "lid": "", "park": "幼稚舎", "nyuen": "", "bus": "", "jugyoOverride": 45000}, {"id": 81, "status": "在園中", "waku": "一般", "cls": "LEAF", "name": "吉田 怜華", "sib": "あり", "koza": "縄手 陵湖", "lid": "", "park": "幼稚舎", "nyuen": "", "bus": "", "birth": "2022-09-06", "jugyoOverride": 45000}, {"id": 82, "status": "在園中", "waku": "一般", "cls": "LEAF", "name": "渡部 瑛介", "sib": "あり", "koza": "小島 恭平", "lid": "", "park": "幼稚舎", "nyuen": "", "bus": "", "birth": "2023-03-08", "jugyoOverride": 45000}, {"id": 83, "status": "在園中", "waku": "一般", "cls": "BLOSSOM", "name": "岡野 智穂", "sib": "あり", "koza": "吉田 貴子", "lid": "", "park": "幼稚舎", "nyuen": "", "bus": "", "birth": "2022-02-26", "jugyoOverride": 45000}, {"id": 84, "status": "在園中", "waku": "一般", "cls": "BLOSSOM", "name": "鈴木 葵莉乃", "sib": "あり", "koza": "早崎 友一朗", "lid": "", "park": "幼稚舎", "nyuen": "", "bus": "", "birth": "2021-04-30", "jugyoOverride": 45000}, {"id": 85, "status": "在園中", "waku": "一般", "cls": "BLOSSOM", "name": "常軒 芽亜梨", "sib": "あり", "koza": "平野 淑恵", "lid": "", "park": "幼稚舎", "nyuen": "", "bus": "", "birth": "2021-06-23", "jugyoOverride": 45000}, {"id": 86, "status": "在園中", "waku": "一般", "cls": "BLOSSOM", "name": "中井 麻里江", "sib": "なし", "koza": "大槌 眞鈴", "lid": "", "park": "幼稚舎", "nyuen": "", "bus": "", "birth": "2022-02-01", "jugyoOverride": 45000}, {"id": 87, "status": "在園中", "waku": "一般", "cls": "BLOSSOM", "name": "中村 望花", "sib": "あり", "koza": "佐藤 夏絵", "lid": "", "park": "幼稚舎", "nyuen": "", "bus": "", "birth": "2021-09-25", "jugyoOverride": 45000}, {"id": 88, "status": "在園中", "waku": "一般", "cls": "BLOSSOM", "name": "名村 幸人", "sib": "あり", "koza": "佐藤 夏絵", "lid": "", "park": "幼稚舎", "nyuen": "", "bus": "", "birth": "2022-03-12", "jugyoOverride": 45000}, {"id": 89, "status": "在園中", "waku": "一般", "cls": "BLOSSOM", "name": "新沼 楓花", "sib": "なし", "koza": "河原 直樹", "lid": "", "park": "幼稚舎", "nyuen": "", "bus": "", "jugyoOverride": 45000}, {"id": 90, "status": "在園中", "waku": "一般", "cls": "BLOSSOM", "name": "橋本 恵", "sib": "あり", "koza": "常軒 健太", "lid": "", "park": "幼稚舎", "nyuen": "", "bus": "", "birth": "2021-07-05", "jugyoOverride": 45000}, {"id": 91, "status": "在園中", "waku": "一般", "cls": "BLOSSOM", "name": "吉野 結惺", "sib": "あり", "koza": "", "lid": "", "park": "幼稚舎", "nyuen": "", "bus": "", "birth": "2021-11-28", "jugyoOverride": 45000}, {"id": 92, "status": "在園中", "waku": "一般", "cls": "HARVEST", "name": "伊賀 正宗", "sib": "あり", "koza": "", "lid": "", "park": "幼稚舎", "nyuen": "", "bus": "", "birth": "2020-06-07", "jugyoOverride": 45000}, {"id": 93, "status": "在園中", "waku": "一般", "cls": "HARVEST", "name": "大槌 凌右", "sib": "あり", "koza": "", "lid": "", "park": "幼稚舎", "nyuen": "", "bus": "", "birth": "2020-10-21", "jugyoOverride": 45000}, {"id": 94, "status": "在園中", "waku": "一般", "cls": "HARVEST", "name": "尾崎 玄悟", "sib": "あり", "koza": "", "lid": "", "park": "幼稚舎", "nyuen": "", "bus": "", "birth": "2020-12-23", "jugyoOverride": 45000}, {"id": 95, "status": "在園中", "waku": "一般", "cls": "HARVEST", "name": "金澤 果鈴", "sib": "なし", "koza": "", "lid": "", "park": "幼稚舎", "nyuen": "", "bus": "", "jugyoOverride": 45000}, {"id": 96, "status": "在園中", "waku": "一般", "cls": "HARVEST", "name": "河原 フミナ", "sib": "あり", "koza": "", "lid": "", "park": "幼稚舎", "nyuen": "", "bus": "", "birth": "2021-03-01", "jugyoOverride": 45000}, {"id": 97, "status": "在園中", "waku": "一般", "cls": "HARVEST", "name": "佐藤 花", "sib": "あり", "koza": "", "lid": "", "park": "幼稚舎", "nyuen": "", "bus": "", "birth": "2020-07-22", "jugyoOverride": 45000}, {"id": 98, "status": "在園中", "waku": "一般", "cls": "HARVEST", "name": "得地 梨花", "sib": "あり", "koza": "", "lid": "", "park": "幼稚舎", "nyuen": "", "bus": "", "birth": "2020-06-26", "jugyoOverride": 45000}, {"id": 99, "status": "在園中", "waku": "一般", "cls": "HARVEST", "name": "西陰 晴翔", "sib": "あり", "koza": "", "lid": "", "park": "幼稚舎", "nyuen": "", "bus": "", "birth": "2020-06-03", "jugyoOverride": 45000}, {"id": 100, "status": "在園中", "waku": "一般", "cls": "HARVEST", "name": "服部 心芭", "sib": "なし", "koza": "", "lid": "", "park": "幼稚舎", "nyuen": "", "bus": "", "jugyoOverride": 45000}, {"id": 101, "status": "在園中", "waku": "一般", "cls": "HARVEST", "name": "村山 冬芽", "sib": "なし", "koza": "", "lid": "", "park": "幼稚舎", "nyuen": "", "bus": "", "jugyoOverride": 45000}, {"id": 102, "status": "在園中", "waku": "一般", "cls": "HARVEST", "name": "渡部 衣織", "sib": "あり", "koza": "", "lid": "", "park": "幼稚舎", "nyuen": "", "bus": "", "birth": "2020-11-07", "jugyoOverride": 45000}, {"id": 131, "status": "在園中", "waku": "企業提携枠", "cls": "SEED-0", "name": "砂子田 梨月", "sib": "なし", "koza": "斉藤 さやか", "lid": "", "park": "月寒園", "nyuen": "", "birth": "2025-05-11"}, {"id": 132, "status": "在園中", "waku": "企業提携枠", "cls": "SEED-0", "name": "三浦 叶愛", "sib": "なし", "koza": "三浦 梢", "lid": "", "park": "月寒園", "nyuen": "", "birth": "2025-08-05"}, {"id": 133, "status": "在園中", "waku": "従業員(Number9)", "cls": "SEED-0", "name": "岡本 望空", "sib": "あり", "koza": "岡本 理賀", "lid": "", "park": "月寒園", "nyuen": "", "birth": "2025-08-07"}, {"id": 134, "status": "在園中", "waku": "地域枠", "cls": "SEED-1", "name": "森田 海音", "sib": "なし", "koza": "森田 惟", "lid": "", "park": "月寒園", "nyuen": "", "birth": "2024-09-17"}, {"id": 135, "status": "在園中", "waku": "地域枠", "cls": "SEED-1", "name": "平岡 礼都", "sib": "なし", "koza": "平岡 那実", "lid": "", "park": "月寒園", "nyuen": "", "birth": "2024-04-21"}, {"id": 136, "status": "在園中", "waku": "地域枠", "cls": "SEED-1", "name": "澤岡 寿々永", "sib": "なし", "koza": "澤岡 仁", "lid": "", "park": "月寒園", "nyuen": "", "birth": "2024-08-11"}, {"id": 137, "status": "在園中", "waku": "地域枠", "cls": "SEED-1", "name": "鴨田 愛佳", "sib": "なし", "koza": "鴨田 知未", "lid": "", "park": "月寒園", "nyuen": "", "birth": "2025-03-25"}, {"id": 138, "status": "在園中", "waku": "従業員(Number9)", "cls": "SEED-1", "name": "服部 環大", "sib": "あり", "koza": "服部 昌那", "lid": "", "park": "月寒園", "nyuen": "", "birth": "2024-12-23"}, {"id": 139, "status": "在園中", "waku": "地域枠", "cls": "SPROUT", "name": "吉野 碧桜", "sib": "あり", "koza": "吉野 幹悠", "lid": "", "park": "月寒園", "nyuen": "", "birth": "2023-04-14"}, {"id": 140, "status": "在園中", "waku": "地域枠", "cls": "SPROUT", "name": "山﨑 怜", "sib": "なし", "koza": "山﨑 賢", "lid": "", "park": "月寒園", "nyuen": "", "birth": "2023-04-16"}, {"id": 141, "status": "在園中", "waku": "地域枠", "cls": "SPROUT", "name": "小池 陽梛", "sib": "なし", "koza": "小池 夏海", "lid": "", "park": "月寒園", "nyuen": "", "birth": "2024-01-08"}, {"id": 142, "status": "在園中", "waku": "地域枠", "cls": "SPROUT", "name": "大崎 那菜", "sib": "なし", "koza": "大崎 晃", "lid": "", "park": "月寒園", "nyuen": "", "birth": "2023-09-07"}, {"id": 143, "status": "在園中", "waku": "地域枠", "cls": "SPROUT", "name": "坂下 千隼", "sib": "なし", "koza": "坂下 もも", "lid": "", "park": "月寒園", "nyuen": "", "birth": "2023-10-31"}, {"id": 144, "status": "在園中", "waku": "地域枠", "cls": "SPROUT", "name": "小島 凪礼", "sib": "なし", "koza": "小島 礼士", "lid": "", "park": "月寒園", "nyuen": "", "birth": "2024-01-02"}, {"id": 145, "status": "在園中", "waku": "地域枠", "cls": "SPROUT", "name": "小林 叶和", "sib": "なし", "koza": "小林 巧明", "lid": "", "park": "月寒園", "nyuen": "", "birth": "2023-08-14"}, {"id": 146, "status": "在園中", "waku": "企業提携枠", "cls": "SPROUT", "name": "竿崎 柊花", "sib": "なし", "koza": "竿崎 栞", "lid": "", "park": "月寒園", "nyuen": "", "birth": "2023-11-27"}, {"id": 147, "status": "在園中", "waku": "従業員(Number9)", "cls": "SPROUT", "name": "魚津 蒼舞", "sib": "なし", "koza": "魚津 彩香", "lid": "", "park": "月寒園", "nyuen": "", "birth": "2023-04-12"}, {"id": 148, "status": "在園中", "waku": "地域枠", "cls": "SEED-1", "name": "原谷 清華", "sib": "なし", "koza": "原谷", "lid": "", "park": "月寒園", "nyuen": "", "birth": "2024-12-26"}, {"id": 149, "status": "在園中", "waku": "地域枠", "cls": "SPROUT", "name": "中西 咲良", "sib": "なし", "koza": "中西 夕貴", "lid": "", "park": "白石園", "nyuen": "", "birth": "2024-03-15"}, {"id": 150, "status": "在園中", "waku": "地域枠", "cls": "SPROUT", "name": "西野 想七", "sib": "なし", "koza": "西野 翔", "lid": "", "park": "白石園", "nyuen": "", "birth": "2023-10-28"}, {"id": 151, "status": "在園中", "waku": "地域枠", "cls": "SPROUT", "name": "藤本 一千翔", "sib": "なし", "koza": "藤本 隆寛", "lid": "", "park": "白石園", "nyuen": "", "birth": "2023-07-01"}, {"id": 152, "status": "在園中", "waku": "地域枠", "cls": "SPROUT", "name": "坂口 華羽", "sib": "なし", "koza": "坂口 圭一", "lid": "", "park": "白石園", "nyuen": "", "birth": "2023-07-07"}, {"id": 153, "status": "在園中", "waku": "地域枠", "cls": "SEED-1", "name": "本間 心紬", "sib": "なし", "koza": "本間 由佳", "lid": "", "park": "白石園", "nyuen": "", "birth": "2024-07-05"}, {"id": 154, "status": "在園中", "waku": "企業提携枠", "cls": "SPROUT", "name": "池田 禮", "sib": "なし", "koza": "池田 ひとみ", "lid": "", "park": "白石園", "nyuen": "", "birth": "2023-11-27"}, {"id": 155, "status": "在園中", "waku": "従業員(アドバイザー)", "cls": "SEED-1", "name": "松谷 咲茉", "sib": "なし", "koza": "松谷 結香", "lid": "", "park": "白石園", "nyuen": "", "birth": "2024-05-15"}, {"id": 156, "status": "在園中", "waku": "地域枠", "cls": "SPROUT", "name": "南 恒成", "sib": "なし", "koza": "南 ひかり", "lid": "", "park": "サッポロファクトリー園", "nyuen": "", "birth": "2023-04-25"}, {"id": 157, "status": "在園中", "waku": "地域枠", "cls": "SPROUT", "name": "盧 世潤", "sib": "なし", "koza": "盧 哲成", "lid": "", "park": "サッポロファクトリー園", "nyuen": "", "birth": "2023-08-23"}, {"id": 158, "status": "在園中", "waku": "地域枠", "cls": "SEED-1", "name": "鈴木 楓真", "sib": "なし", "koza": "鈴木 伸也", "lid": "", "park": "サッポロファクトリー園", "nyuen": "", "birth": "2024-05-30"}, {"id": 159, "status": "在園中", "waku": "地域枠", "cls": "SEED-1", "name": "秋川 瑛翔", "sib": "なし", "koza": "秋川 まどか", "lid": "", "park": "サッポロファクトリー園", "nyuen": "", "birth": "2024-04-11"}, {"id": 160, "status": "在園中", "waku": "地域枠", "cls": "SEED-1", "name": "廣澤 紗叶", "sib": "なし", "koza": "廣澤 紗叶", "lid": "", "park": "サッポロファクトリー園", "nyuen": "", "birth": "2024-09-11"}, {"id": 161, "status": "在園中", "waku": "地域枠", "cls": "SEED-1", "name": "佐藤 帆夏", "sib": "なし", "koza": "佐藤 信之介", "lid": "", "park": "サッポロファクトリー園", "nyuen": "", "birth": "2024-12-04"}, {"id": 162, "status": "在園中", "waku": "地域枠", "cls": "SEED-1", "name": "早川 紫乃", "sib": "なし", "koza": "早川 郁美", "lid": "", "park": "サッポロファクトリー園", "nyuen": "", "birth": "2025-03-31"}, {"id": 163, "status": "在園中", "waku": "旧企業枠", "cls": "SPROUT", "name": "敦谷 みな美", "sib": "なし", "koza": "敦谷 ひかる", "lid": "", "park": "サッポロファクトリー園", "nyuen": "", "birth": "2024-03-08"}, {"id": 164, "status": "在園中", "waku": "企業提携枠", "cls": "SPROUT", "name": "川人 真宙", "sib": "あり", "koza": "川人 絵里香", "lid": "", "park": "サッポロファクトリー園", "nyuen": "", "birth": "2023-11-28"}, {"id": 165, "status": "在園中", "waku": "企業提携枠", "cls": "SEED-0", "name": "川人 晴流", "sib": "あり", "koza": "川人 絵里香", "lid": "", "park": "サッポロファクトリー園", "nyuen": "", "birth": "2025-05-15"}, {"id": 166, "status": "在園中", "waku": "企業提携枠", "cls": "SEED-1", "name": "縄手 暖橙", "sib": "あり", "koza": "縄手 陵湖", "lid": "", "park": "サッポロファクトリー園", "nyuen": "", "birth": "2024-06-26"}, {"id": 167, "status": "在園中", "waku": "企業提携枠", "cls": "SEED-1", "name": "中村 風李", "sib": "あり", "koza": "中村 麻衣", "lid": "", "park": "サッポロファクトリー園", "nyuen": "", "birth": "2024-05-23"}, {"id": 168, "status": "在園中", "waku": "企業提携枠", "cls": "SEED-1", "name": "横山 瑳一", "sib": "なし", "koza": "横山 舜", "lid": "", "park": "サッポロファクトリー園", "nyuen": "", "birth": "2025-01-08"}, {"id": 169, "status": "在園中", "waku": "企業提携枠", "cls": "SEED-1", "name": "鈴木 志", "sib": "なし", "koza": "鈴木 汐里", "lid": "", "park": "サッポロファクトリー園", "nyuen": "", "birth": "2025-01-13"}, {"id": 170, "status": "在園中", "waku": "企業提携枠", "cls": "SEED-0", "name": "西陰 湊翔", "sib": "あり", "koza": "西陰 敏晴", "lid": "", "park": "サッポロファクトリー園", "nyuen": "", "birth": "2025-06-09"}, {"id": 171, "status": "在園中", "waku": "企業提携枠", "cls": "SEED-0", "name": "橋本 怜", "sib": "あり", "koza": "橋本 優希", "lid": "", "park": "サッポロファクトリー園", "nyuen": "", "birth": "2025-04-24"}, {"id": 172, "status": "在園中", "waku": "地域無償化", "cls": "HARVEST", "name": "田代 柚乃", "sib": "なし", "koza": "田代 徹志", "lid": "", "park": "資生館保育園", "nyuen": "", "birth": "2020-12-18"}, {"id": 173, "status": "在園中", "waku": "旧企業提携枠", "cls": "HARVEST", "name": "田村 茉那", "sib": "なし", "koza": "田村 恵", "lid": "", "park": "資生館保育園", "nyuen": "", "birth": "2021-03-11"}, {"id": 174, "status": "在園中", "waku": "地域無償化", "cls": "HARVEST", "name": "松葉 大透", "sib": "なし", "koza": "松葉 朱莉", "lid": "", "park": "資生館保育園", "nyuen": "", "birth": "2020-10-31"}, {"id": 175, "status": "在園中", "waku": "旧企業提携枠", "cls": "BLOSSOM", "name": "飯田 美桜", "sib": "なし", "koza": "飯田 航平", "lid": "", "park": "資生館保育園", "nyuen": "", "birth": "2021-05-11"}, {"id": 176, "status": "在園中", "waku": "旧企業提携枠", "cls": "BLOSSOM", "name": "大谷 環奈", "sib": "なし", "koza": "大谷 香織", "lid": "", "park": "資生館保育園", "nyuen": "", "birth": "2021-08-05"}, {"id": 177, "status": "在園中", "waku": "旧企業提携枠", "cls": "BLOSSOM", "name": "小原 将人", "sib": "なし", "koza": "小原 一馬", "lid": "", "park": "資生館保育園", "nyuen": "", "birth": "2021-06-30"}, {"id": 178, "status": "在園中", "waku": "旧企業提携枠", "cls": "BLOSSOM", "name": "佐々木 蒼空", "sib": "あり", "koza": "佐々木 明徳", "lid": "", "park": "資生館保育園", "nyuen": "", "birth": "2021-06-24"}, {"id": 179, "status": "在園中", "waku": "旧企業提携枠", "cls": "BLOSSOM", "name": "篠原 結衣", "sib": "なし", "koza": "篠原 実香", "lid": "", "park": "資生館保育園", "nyuen": "", "birth": "2021-08-04"}, {"id": 180, "status": "在園中", "waku": "地域無償化", "cls": "BLOSSOM", "name": "原 唯夏", "sib": "なし", "koza": "原 幸弘", "lid": "", "park": "資生館保育園", "nyuen": "", "birth": "2021-07-07"}, {"id": 181, "status": "在園中", "waku": "旧企業提携枠", "cls": "BLOSSOM", "name": "藤田 楓禾", "sib": "なし", "koza": "藤田 洸介", "lid": "", "park": "資生館保育園", "nyuen": "", "birth": "2021-09-19"}, {"id": 182, "status": "在園中", "waku": "地域無償化", "cls": "BLOSSOM", "name": "水井 詩乃", "sib": "なし", "koza": "水井 寛", "lid": "", "park": "資生館保育園", "nyuen": "", "birth": "2021-11-05"}, {"id": 183, "status": "在園中", "waku": "地域無償化", "cls": "LEAF", "name": "青木 優志郎", "sib": "なし", "koza": "青木 仁美", "lid": "", "park": "資生館保育園", "nyuen": "", "birth": "2022-07-19"}, {"id": 184, "status": "在園中", "waku": "地域無償化", "cls": "LEAF", "name": "市丸 楓理", "sib": "なし", "koza": "市丸 諒", "lid": "", "park": "資生館保育園", "nyuen": "", "birth": "2022-07-15"}, {"id": 185, "status": "在園中", "waku": "従業員(アドバイザー)", "cls": "LEAF", "name": "小川 衣杜", "sib": "なし", "koza": "小川 真侑", "lid": "", "park": "資生館保育園", "nyuen": "", "birth": "2022-06-18"}, {"id": 186, "status": "在園中", "waku": "地域無償化", "cls": "LEAF", "name": "木村 玲生", "sib": "なし", "koza": "澤田 優香", "lid": "", "park": "資生館保育園", "nyuen": "", "birth": "2023-03-04"}, {"id": 187, "status": "在園中", "waku": "旧企業提携枠", "cls": "LEAF", "name": "佐藤 仁", "sib": "なし", "koza": "佐藤 祐基", "lid": "", "park": "資生館保育園", "nyuen": "", "birth": "2023-01-27"}, {"id": 188, "status": "在園中", "waku": "旧企業提携枠", "cls": "LEAF", "name": "髙田 怜", "sib": "なし", "koza": "髙田 天音", "lid": "", "park": "資生館保育園", "nyuen": "", "birth": "2023-03-07"}, {"id": 189, "status": "在園中", "waku": "地域無償化", "cls": "LEAF", "name": "辻岡 伶珠", "sib": "なし", "koza": "辻岡 暁郎", "lid": "", "park": "資生館保育園", "nyuen": "", "birth": "2022-04-18"}, {"id": 190, "status": "在園中", "waku": "旧企業提携枠", "cls": "LEAF", "name": "林田 連理", "sib": "なし", "koza": "林田 愛梨", "lid": "", "park": "資生館保育園", "nyuen": "", "birth": "2022-06-10"}, {"id": 191, "status": "在園中", "waku": "地域枠", "cls": "SPROUT", "name": "菅野 想", "sib": "なし", "koza": "菅野 桃花", "lid": "", "park": "資生館保育園", "nyuen": "", "birth": "2023-07-22"}, {"id": 192, "status": "在園中", "waku": "地域枠", "cls": "SPROUT", "name": "佐々木 乃愛", "sib": "あり", "koza": "佐々木 明徳", "lid": "", "park": "資生館保育園", "nyuen": "", "birth": "2023-05-17"}, {"id": 193, "status": "在園中", "waku": "企業提携枠", "cls": "SPROUT", "name": "山本 和", "sib": "なし", "koza": "山本 聡", "lid": "", "park": "資生館保育園", "nyuen": "", "birth": "2023-05-18"}, {"id": 194, "status": "在園中", "waku": "旧企業提携枠", "cls": "SPROUT", "name": "吉田 凪", "sib": "なし", "koza": "吉田 めぐみ", "lid": "", "park": "資生館保育園", "nyuen": "", "birth": "2023-11-24"}, {"id": 195, "status": "在園中", "waku": "地域枠", "cls": "SEED-1", "name": "鎌田 琴葉", "sib": "なし", "koza": "鎌田 剛史", "lid": "", "park": "資生館保育園", "nyuen": "", "birth": "2025-03-06"}, {"id": 196, "status": "在園中", "waku": "地域枠", "cls": "SEED-0", "name": "石原 翠", "sib": "なし", "koza": "石原 丞", "lid": "", "park": "資生館保育園", "nyuen": "", "birth": "2026-01-05"}, {"id": 197, "status": "在園中", "waku": "地域枠", "cls": "SEED-0", "name": "植木 琴", "sib": "なし", "koza": "植木 悠介", "lid": "", "park": "資生館保育園", "nyuen": "", "birth": "2025-10-02"}, {"id": 198, "status": "在園中", "waku": "地域枠", "cls": "SEED-0", "name": "浦田 珠翠", "sib": "なし", "koza": "浦田 淳貴", "lid": "", "park": "資生館保育園", "nyuen": "", "birth": "2025-08-21"}, {"id": 199, "status": "在園中", "waku": "地域枠", "cls": "SEED-0", "name": "村山 愛茉", "sib": "なし", "koza": "村山 広典", "lid": "", "park": "資生館保育園", "nyuen": "", "birth": "2025-10-16"}], "sched": [{"year": 2026, "month": 4, "item": "進級費（幼稚舎）", "cls": "幼稚舎", "pupil": "", "plan": 20000, "fix": 20000, "state": "予定"}, {"year": 2026, "month": 6, "item": "バス遠足", "cls": "全員", "pupil": "", "plan": 0, "fix": 0, "state": "予定"}, {"year": 2026, "month": 7, "item": "お泊まり会", "cls": "BLOSSOM", "pupil": "", "plan": 0, "fix": 0, "state": "予定"}, {"year": 2026, "month": 7, "item": "お泊まり会", "cls": "HARVEST", "pupil": "", "plan": 0, "fix": 0, "state": "予定"}, {"year": 2026, "month": 9, "item": "運動会", "cls": "全員", "pupil": "", "plan": 0, "fix": 0, "state": "予定"}, {"year": 2027, "month": 2, "item": "STRAWBERRY FIELD COLLECTION", "cls": "全員", "pupil": "", "plan": 0, "fix": 0, "state": "予定"}], "classes": ["SEED-0", "SEED-1", "SPROUT", "LEAF", "BLOSSOM", "HARVEST"], "facilities": [{"name": "全施設", "type": "all", "capacity": null}, {"name": "月寒園", "type": "A", "capacity": 30}, {"name": "白石園", "type": "A", "capacity": 19}, {"name": "サッポロファクトリー園", "type": "A", "capacity": 19}, {"name": "幼稚舎", "type": "B", "capacity": null}, {"name": "資生館保育園", "type": "C", "capacity": 60}], "youchisha": {"nyugaku": 50000, "jugyo": 65000, "futai": 10000, "lesson": 14000, "monthly_total": 89000, "kyushoku": 6000, "reidanbo": 4000, "bus": 4300, "shinkyu": 20000, "soso": 5000, "choshoku_m": 5000, "hojokin": 37000, "early_discount": {"0": 20000, "1": 15000, "2": 10000}, "early_cutoff": "2026-04-01", "futai_breakdown": {"教材費": 2000, "おやつ代": 2000, "設備費": 2000, "普通傷害保険": 2000, "賠償責任保険": 2000}, "tesu": 110}, "shiseikan": {"age02": {"地域枠": 30000, "企業提携枠": 20000, "旧企業提携枠": 12500, "旧地域枠": 25000, "従業員(Number9)": 10000, "従業員(ハイアイランド)": 10000, "従業員(他園)": 10000, "従業員(アドバイザー)": 10000, "地域無償化": 30000, "従業員(保育士)": 5000}, "sib02": 15000, "fukushoku": 4500, "class_age": {"LEAF": 3, "BLOSSOM": 4, "HARVEST": 5}, "age02_classes": ["SEED-0", "SEED-1", "SPROUT"], "temp_hour": 1000}, "sibling_scope": "group", "mealfee": {"lunch": 500, "bread": 100}, "options": {"mattress": 2000, "bus": 4300, "diaper": 2000, "uniform": {"knit": 250, "cap": 160, "parka": 290}}};
+let park='全施設', yy=2026, mm=5, tab='settings';
+let roster=JSON.parse(JSON.stringify(M.roster));
+let newcomers=[]; // 新規入園
+let addons=[];    // 追加申込み
+let meals=[];     // 給食記録（幼稚舎）: {date:'YYYY-MM-DD', name, lunch:bool, bread:bool}
+let sched=JSON.parse(JSON.stringify(M.sched)); // 年間スケジュール（編集可能）
+let schedMemo=M.schedMemo||''; // 年間スケジュールのメモ欄
+// 共通の確認ダイアログ（削除・確定など）
+function confirmDialog(msg,onOK,title,okLabel){
+ const ov=document.getElementById('confirmOverlay');
+ document.getElementById('confirmTitle').textContent=title||'削除の確認';
+ document.getElementById('confirmMsg').textContent=msg;
+ const okBtn=document.getElementById('confirmOK'),cnBtn=document.getElementById('confirmCancel');
+ okBtn.textContent=okLabel||'削除する';
+ ov.style.display='flex';
+ const close=()=>{ov.style.display='none';okBtn.onclick=null;cnBtn.onclick=null;ov.onclick=null;};
+ okBtn.onclick=()=>{close();onOK();};
+ cnBtn.onclick=close;
+ ov.onclick=e=>{if(e.target===ov)close();};
+}
+// 基本情報の変更ログ：園児名→{ 'YYYY-M': [{field,label,from,to}] }。台帳を変えた対象月にだけ記録
+let changeLog={};
+// ルクミー手入力の確認チェック：'YYYY-M' → { 園児名: {done:true, by:'氏名', at:'日時'} }
+let lookmeeCheck={};
+// 事務員（受領者・アドバイザー）一覧
+const STAFF=['細野','佐藤','伊藤','小野','水野','小林'];
+// 台帳変更を記録（現在の対象年月の変更として）。元の値に戻したらその月のログを消す
+let rosterBase=JSON.parse(JSON.stringify(M.roster)); // 直近で「確定」された基準状態（前月扱い）
+function ymKey(){return yy+'-'+mm;}
+function logChange(name,field,label,fromVal,toVal){
+ const k=ymKey();
+ if(!changeLog[k])changeLog[k]={};
+ if(!changeLog[k][name])changeLog[k][name]=[];
+ let arr=changeLog[k][name];
+ // 同じfieldの既存ログは置き換え
+ arr=arr.filter(x=>x.field!==field);
+ // 基準値（rosterBase）と同じに戻ったら記録しない
+ const base=rosterBase.find(x=>x.name===name);
+ const baseVal=base?base[field]:undefined;
+ if(toVal!==baseVal){arr.push({field,label,from:baseVal,to:toVal});}
+ changeLog[k][name]=arr;
+ if(arr.length===0)delete changeLog[k][name];
+}
+function changesFor(p){ // 対象年月にこの園児に記録された変更
+ const k=ymKey();return (changeLog[k]&&changeLog[k][p.name])?changeLog[k][p.name]:[];
+}
+let bank=JSON.parse(JSON.stringify(M.bank)); // 振込先(編集可)
+// 引落不能者への再請求に加算する事務手数料（施設別の既定値）
+const REISSUE_FEE_DEFAULT={'資生館保育園':550};
+let reissueFeeByPark={}; // 施設ごとの手数料（手動編集を保持）
+// ===== 端末内保存（localStorage）：閉じても残る。Firebase移行時もこのデータ構造を流用 =====
+const STORE_KEY='sf_tuition_v1';
+let __saveTimer=null;
+function saveState(){ // 入力データをまとめて端末に保存（連打防止のため少し遅延）
+ if(__saveTimer)clearTimeout(__saveTimer);
+ __saveTimer=setTimeout(()=>{
+  try{
+   const data={v:1, savedAt:new Date().toISOString(),
+    roster, changeLog, lookmeeCheck, rosterBase, bank, reissueFeeByPark};
+   localStorage.setItem(STORE_KEY, JSON.stringify(data));
+  }catch(e){console.warn('保存に失敗:',e);}
+ },300);
+}
+function loadState(){ // 起動時に端末から復元
+ try{
+  const raw=localStorage.getItem(STORE_KEY);if(!raw)return false;
+  const d=JSON.parse(raw);if(!d)return false;
+  if(d.roster)roster=d.roster;
+  if(d.changeLog)changeLog=d.changeLog;
+  if(d.lookmeeCheck)lookmeeCheck=d.lookmeeCheck;
+  if(d.rosterBase)rosterBase=d.rosterBase;
+  if(d.bank)bank=d.bank;
+  if(d.reissueFeeByPark)reissueFeeByPark=d.reissueFeeByPark;
+  return true;
+ }catch(e){console.warn('復元に失敗:',e);return false;}
+}
+function exportBackup(){ // データをファイルに書き出し（バックアップ・受け渡し用）
+ const data={v:1, savedAt:new Date().toISOString(), app:'STRAWBERRY_FIELD月謝管理',
+  roster, changeLog, lookmeeCheck, rosterBase, bank, reissueFeeByPark};
+ const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+ const url=URL.createObjectURL(blob);const a=document.createElement('a');
+ const d=new Date();const stamp=`${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}_${String(d.getHours()).padStart(2,'0')}${String(d.getMinutes()).padStart(2,'0')}`;
+ a.href=url;a.download=`月謝データ_${stamp}.json`;a.click();URL.revokeObjectURL(url);
+}
+function importBackup(file){ // 書き出したファイルを読み込み（受け渡し・復元用）
+ const r=new FileReader();
+ r.onload=()=>{
+  try{
+   const d=JSON.parse(r.result);
+   if(!d||!d.roster){alert('このファイルは月謝データではないようです。');return;}
+   if(!confirm('読み込むと、今この端末にあるデータは上書きされます。よろしいですか？\n（不安な場合は先に「データ書き出し」でバックアップを取ってください）'))return;
+   if(d.roster)roster=d.roster;
+   if(d.changeLog)changeLog=d.changeLog;
+   if(d.lookmeeCheck)lookmeeCheck=d.lookmeeCheck;
+   if(d.rosterBase)rosterBase=d.rosterBase;
+   if(d.bank)bank=d.bank;
+   if(d.reissueFeeByPark)reissueFeeByPark=d.reissueFeeByPark;
+   saveState();render();
+   alert('読み込みました。'+(d.savedAt?'\n（書き出し日時：'+new Date(d.savedAt).toLocaleString()+'）':''));
+  }catch(e){alert('読み込みに失敗しました。ファイルが壊れている可能性があります。');}
+ };
+ r.readAsText(file);
+}
+function getReissueFee(pk){
+ if(reissueFeeByPark[pk]!==undefined)return reissueFeeByPark[pk];
+ return REISSUE_FEE_DEFAULT[pk]!==undefined?REISSUE_FEE_DEFAULT[pk]:660;
+}
+// 納入方法ヘルパー：未設定は「引落」既定
+function payMethod(p){return p.pay==='振込'?'振込':'引落';}
+
+const THEMES=[['rose','🌷 ローズ'],['cream','🍦 クリーム'],['latte','☕ ラテ'],['honey','🍯 ハニー'],['sage','🌿 セージ'],['mocha','🌰 モカ(夜)'],['garden','緑'],['dark','緑(夜)']];
+let curTheme='rose';
+function buildThemeTog(){const el=document.getElementById('themeTog');el.innerHTML='';
+ THEMES.forEach(([k,label])=>{const b=document.createElement('button');b.textContent=label;
+  b.className=(k===curTheme?'on':'');b.onclick=()=>setTheme(k);el.appendChild(b);});}
+function setTheme(t){curTheme=t;document.body.dataset.theme=t;buildThemeTog();}
+
+// ===== 計算ロジック（3体系対応：A保育園 / B幼稚舎 / C資生館）=====
+function facType(name){const f=M.facilities.find(x=>x.name===name);return f?f.type:'A';}
+function hasSibling(p){return p.sib==='あり';} // グループ全体判定（兄弟ありフラグで表現）
+function eventsFor(p){let out=[];sched.forEach(s=>{
+ if(s.state!=='確定'||s.year!=yy||s.month!=mm)return;const amt=s.fix||0;if(!amt)return;
+ // 除外園児に含まれていればスキップ
+ if(s.exclude&&s.exclude.includes(p.name))return;
+ let hit=false;
+ if(s.cls==='全員'||s.cls==='全園')hit=true;
+ else if(s.cls==='個別'){if((s.pupil||'').trim()===p.name.trim())hit=true;}
+ else if(M.facilities.some(f=>f.name===s.cls)){if(s.cls===p.park)hit=true;} // 施設対象（幼稚舎など）
+ else if(s.cls===p.cls)hit=true;
+ if(hit)out.push({item:s.item,amt});});return out;}
+function addonsFor(p){return addons.filter(a=>a.name===p.name&&+a.ry===yy&&+a.rm===mm).map(a=>{
+ const raw=(a.price||0)*(a.qty||1);
+ const isRefund=a.kind==='返金';
+ return {item:(isRefund?'返金:':'')+(a.goods||'項目'),amt:isRefund?-Math.abs(raw):raw};});}
+// 給食実費（幼稚舎・末締め翌末払い）：対象年月の請求には「前月」の利用を集計して乗せる
+function prevMonth(y,m){return m===1?{y:y-1,m:12}:{y:y,m:m-1};}
+function mealsFor(p){
+ if(facType(p.park)!=='B')return null; // 幼稚舎のみ
+ const pm=prevMonth(yy,mm); const tag=pm.y+'-'+('0'+pm.m).slice(-2);
+ let lunch=0,bread=0;
+ meals.forEach(r=>{ if(r.name===p.name && r.date.startsWith(tag)){ if(r.lunch)lunch++; if(r.bread)bread++; }});
+ const amt=lunch*M.mealfee.lunch+bread*M.mealfee.bread;
+ return {lunch,bread,amt,tag:pm.y+'年'+pm.m+'月分'};
+}
+
+// 台帳オプション（園児ごとのあり・なし）の月額合計。施設の体系で対象が異なる
+function optionsFor(p){
+ const t=facType(p.park);const O=M.options;let items=[],amt=0;
+ if(t==='B'){ // 幼稚舎：バスのみ（バスはcalc内で別途加算するためここでは扱わない）
+  return {items:[],amt:0};
+ }
+ if(t==='A' && p.optMattress){items.push({item:'マットレス',amt:O.mattress});amt+=O.mattress;} // 保育園3園のみ
+ if(t==='C'){ // 資生館のみ：おむつサブスク・制服レンタル
+  if(p.optDiaper){items.push({item:'おむつサブスク',amt:O.diaper});amt+=O.diaper;}
+  if(p.optKnit){items.push({item:'制服ﾚﾝﾀﾙ:ニット',amt:O.uniform.knit});amt+=O.uniform.knit;}
+  if(p.optCap){items.push({item:'制服ﾚﾝﾀﾙ:キャップ',amt:O.uniform.cap});amt+=O.uniform.cap;}
+  if(p.optParka){items.push({item:'制服ﾚﾝﾀﾙ:パーカー',amt:O.uniform.parka});amt+=O.uniform.parka;}
+ }
+ return {items,amt};
+}
+function calc(p,asNyuenMonth){
+ const t=facType(p.park);
+ const evs=eventsFor(p),ads=addonsFor(p);
+ const opt=optionsFor(p); // 台帳オプション（マットレス・おむつ・制服レンタル）
+ const allOpt=evs.concat(ads).concat(opt.items);
+ const evSum=allOpt.reduce((a,e)=>a+e.amt,0);
+
+ // 非課税世帯：無償化対象。保育料・教材費・手数料・割引など基本部分は0、オプション（台帳OP・追加申込み・イベント費）のみ請求
+ if(p.waku==='非課税世帯'){
+  return {type:t,getsu:0,kyozai:0,sib:0,half:0,evs:allOpt,evSum,sub:evSum,fee:0,total:evSum,flag:allOpt.length>0,changed:false,reason:['非課税世帯（無償化）'].concat(allOpt.map(e=>'OP:'+e.item)).join(' / '),isNew:false,muso:true};
+ }
+
+ if(t==='B'){ // 幼稚舎：授業料 + 付帯費(内訳合算) + レッスン費 + 給食 + 冷暖房 + バス + 給食実費 - 早割
+  const Y=M.youchisha;
+  // 従業員枠の判定（保育士 or それ以外の従業員）
+  const isHoikushi=(p.waku==='従業員(保育士)');
+  const isEmployeeB=/^従業員\(/.test(p.waku||'');
+  // 授業料：従業員枠は¥45,000固定、それ以外は jugyoOverride > マスター値
+  const hasOverride=(p.jugyoOverride!==undefined&&p.jugyoOverride!==null&&p.jugyoOverride!=='');
+  let jugyo;
+  if(isEmployeeB){jugyo=37000;} // 従業員（保育士・Number9・ハイアイランド等）は¥37,000固定
+  else if(hasOverride){jugyo=+p.jugyoOverride||0;}
+  else{jugyo=Y.jugyo||0;}
+  // 付帯費・レッスン費：従業員枠は¥0
+  const fb=Y.futai_breakdown||{};
+  const futai=isEmployeeB?0:(Object.values(fb).reduce((a,b)=>a+(Number(b)||0),0)||(Y.futai||0));
+  const lesson=isEmployeeB?0:(Y.lesson||0);
+  // 給食費：全員満額。冷暖房費：保育士は¥0、それ以外の従業員は満額
+  const kyushoku=Y.kyushoku||0;
+  const reidanbo=isHoikushi?0:(Y.reidanbo||0);
+  const bus=(p.optBus||p.bus==='利用')?(Y.bus||0):0;
+  const mf=mealsFor(p); const mealAmt=mf?mf.amt:0;
+  // 早割：jugyoOverride / 従業員枠の園児は適用しない
+  //       それ以外は入園時年齢で自動計算（0/1/2歳ならそれぞれの値引き）
+  let early=0,earlyTag='';
+  if(!hasOverride && !isEmployeeB && Y.early_discount){
+   const a=ageAtEnroll(p.birth,p.nyuen);
+   if(a!==null&&[0,1,2].includes(a)&&Y.early_discount[String(a)]){early=-Y.early_discount[String(a)];earlyTag=`${a}歳入園`;}
+  }
+  // 月謝合計（授業料+付帯費+レッスン）→ 基本料金として表示。早割は別途調整列へ
+  const getsu=jugyo+futai+lesson;
+  // 付帯費の月別（給食+冷暖房+バス）→ 表示上は付帯費列に
+  const kyozai=kyushoku+reidanbo;
+  // 振込手数料
+  const tesu=Y.tesu||0;
+  const sub=getsu+kyozai+bus+evSum+mealAmt+early;
+  const fee=(sub===0)?0:tesu;
+  const total=sub+fee;
+  const flag=allOpt.length>0||mealAmt>0||early!==0;
+  const changed=(bus!==0)||allOpt.length>0||mealAmt>0||early!==0;
+  let reason=[];if(bus)reason.push('バス');if(early)reason.push(`早割(${earlyTag})`);if(isEmployeeB)reason.push(isHoikushi?'従業員割引(保育士)':'従業員割引');allOpt.forEach(e=>reason.push('OP:'+e.item));
+  if(mealAmt>0)reason.push(`給食実費(${mf.tag} 昼${mf.lunch}/パン${mf.bread})`);
+  return {type:'B',getsu,kyozai,sib:0,half:0,bus,early,evs:allOpt,evSum,mealAmt,mf,sub,fee,total,flag,changed,reason:reason.join(' / '),isNew:false,
+   _detail:{授業料:jugyo,付帯費:futai,レッスン:lesson,給食:kyushoku,冷暖房:reidanbo,バス:bus,給食実費:mealAmt,早割:early,手数料:fee}};
+ }
+ if(t==='C'){ // 資生館：3-5歳は無償(副食4500のみ)、0-2歳は30000/兄弟15000
+  const S=M.shiseikan;
+  const is35 = (p.cls in S.class_age); // LEAF/BLOSSOM/HARVEST
+  if(is35){
+   const fukushoku=S.fukushoku;
+   const sub=fukushoku+evSum;
+   const flag=allOpt.length>0;
+   const changed=allOpt.length>0; // 副食費のみが基本。OP/イベントがあれば変動
+   let reason=['無償化(保育料0)'];allOpt.forEach(e=>reason.push('OP:'+e.item));
+   return {type:'C',getsu:0,kyozai:fukushoku,sib:0,half:0,evs:allOpt,evSum,sub,fee:0,total:sub,flag:true,changed,reason:reason.join(' / '),isNew:false,muso:true};
+  }else{ // 0-2歳（年齢差なし・一律）
+   let base = S.age02[p.waku] || S.age02['地域枠'];
+   // 兄弟割引：従業員枠は対象外（Number9/ハイアイランド/アドバイザー/他園/保育士）
+   const isEmployeeC=/^従業員\(/.test(p.waku||'');
+   const getsu_calc = (hasSibling(p)&&!isEmployeeC)? S.sib02 : base; // 兄弟ありで15000
+   const sib = (hasSibling(p)&&!isEmployeeC)? (getsu_calc-base) : 0; // 表示用の差額
+   // 従業員枠は付帯費列に表示・手数料¥110を加算
+   const dispGetsu = isEmployeeC? 0 : getsu_calc;
+   const dispKyozai = isEmployeeC? getsu_calc : 0;
+   const tesuC = isEmployeeC? 110 : 0;
+   const sub=getsu_calc+evSum;
+   const total=sub+tesuC;
+   const flag=(hasSibling(p)&&!isEmployeeC)||allOpt.length>0;
+   const changed=(hasSibling(p)&&!isEmployeeC)||allOpt.length>0; // 兄弟割引・OP・イベントがあれば変動
+   let reason=[];if(hasSibling(p)&&!isEmployeeC)reason.push('兄弟割引(¥15,000)');if(isEmployeeC)reason.push(p.waku==='従業員(保育士)'?'従業員割引(保育士)':'従業員割引');allOpt.forEach(e=>reason.push('OP:'+e.item));
+   return {type:'C',getsu:dispGetsu,kyozai:dispKyozai,sib,half:0,evs:allOpt,evSum,sub,fee:tesuC,total,flag,changed,reason:reason.join(' / '),isNew:false};
+  }
+ }
+ // 体系A：保育園3園（既存ロジック）
+ const pr=M.prices[p.waku]||{getsu:0,kyozai:0,tesu:0};
+ const getsu=pr.getsu||0,kyozai=pr.kyozai||0,tesu=pr.tesu||0;
+ // 兄弟割引：従業員枠は対象外（Number9/ハイアイランド/アドバイザー/他園）
+ const isEmployee=/^従業員\(/.test(p.waku||'');
+ const sib=(hasSibling(p)&&!isEmployee)?(M.sibling||0):0;
+ let half=0,isNew=false;
+ if(p.nyuen){const d=new Date(p.nyuen);
+   // 通常は対象年月(yy/mm)と入園月が一致する月のみ半額判定。
+   // asNyuenMonth=true（新規入園の初月合計・初回案内PDF）のときは入園月そのもので判定。
+   const match = asNyuenMonth ? true : (d.getFullYear()==yy&&(d.getMonth()+1)==mm);
+   if(match){isNew=true;if(d.getDate()>M.half_day)half=-(getsu+kyozai)/2;} // 保育料＋教材費を半額、手数料は満額
+ }
+ const sub=getsu+kyozai+sib+half+evSum;
+ const fee=(sub===0)?0:tesu;const total=sub+fee;
+ const flag=isNew||allOpt.length>0;
+ const changed=(sib!==0)||(half!==0)||isNew||allOpt.length>0; // 基本額と違う
+ let reason=[];if(isNew)reason.push('途中入園');if(half)reason.push('半額補正');if(sib)reason.push('兄弟割引');allOpt.forEach(e=>reason.push('OP:'+e.item));
+ return {type:'A',getsu,kyozai,sib,half,evs:allOpt,evSum,sub,fee,total,flag,changed,reason:reason.join(' / '),isNew};
+}
+function allPupils(){ // 園児台帳のみ（新規入園は「確定」で台帳に移動する方式）
+ return roster.slice();}
+const CLS_ORDER=['SEED-0','SEED-1','SPROUT','LEAF','BLOSSOM','HARVEST'];
+// 生年月日と対象年度から、その年度の4月2日時点での満年齢→クラスを返す
+// 年度: 4月2日〜翌年4月1日（例：2026年度=2026/4/2〜2027/4/1）
+// 入園時年齢（生年月日と入園年月日から計算）
+function ageAtEnroll(birth,nyuen){
+ if(!birth||!nyuen)return null;
+ const b=new Date(birth),n=new Date(nyuen);
+ if(isNaN(b)||isNaN(n))return null;
+ let age=n.getFullYear()-b.getFullYear();
+ const m=n.getMonth()-b.getMonth();
+ if(m<0||(m===0&&n.getDate()<b.getDate()))age--;
+ return age<0?null:age;
+}
+function classByBirth(birth,yy){
+ if(!birth)return '';
+ // 対象年度の4月1日終了時点（=4月2日午前0時）の満年齢を求める
+ // 「年度の4月1日終了時点で何歳か」を計算（4月1日が誕生日の子は前年度扱い）
+ const b=new Date(birth);
+ // 基準日：その年度の4月1日（年度の最終日：基準日=年度初日4月1日とすると、誕生日が4月1日の子は前年度扱いになる）
+ // 実務的には「4月1日時点で満N歳」=「年度開始時点で満N歳」
+ const ref=new Date(yy,3,1); // yy年4月1日
+ let age=ref.getFullYear()-b.getFullYear();
+ const m=ref.getMonth()-b.getMonth();
+ if(m<0||(m===0&&ref.getDate()<b.getDate()))age--;
+ if(age<0||age>5)return '';
+ return CLS_ORDER[age];
+}
+let sortMode='ageAsc'; // ageAsc(年齢順 0歳→年長) / ageDesc(年長→0歳) / kana(五十音) / regist(登録順) / class(クラス順)
+let wakuFilter='すべて'; // すべて / 地域枠 / 企業提携枠 / 旧企業枠 / 従業員(Number9) / 従業員(ハイアイランド) / 地域無償化
+let clsFilter='すべて'; // すべて / SEED-0 / SEED-1 / SPROUT / LEAF / BLOSSOM / HARVEST
+let monthlyPayFilter='すべて'; // すべて / 振込のみ / 再請求のみ（月次計算タブの絞り込み）
+function visible(){
+ let list=allPupils().filter(r=>park==='全施設'||r.park===park);
+ // 未確定の新規入園は、台帳・月次計算・ルクミー・集計には表示しない（新規入園タブでのみ扱う）
+ list=list.filter(r=>!(r.isNew&&!r.confirmed));
+ if(wakuFilter!=='すべて')list=list.filter(r=>r.waku===wakuFilter);
+ if(clsFilter!=='すべて')list=list.filter(r=>r.cls===clsFilter);
+ if(sortMode==='regist')return list; // 登録順（並び替えなし）
+ return list.slice().sort((a,b)=>{
+  // 全施設のときは施設ごとにまとめる
+  if(park==='全施設'){
+   const pa=M.facilities.findIndex(f=>f.name===a.park);
+   const pb=M.facilities.findIndex(f=>f.name===b.park);
+   if(pa!==pb)return pa-pb;
+  }
+  if(sortMode==='kana'){
+   return (a.name||'').localeCompare(b.name||'','ja');
+  }
+  // クラス順（SEED-0 → HARVEST、同クラス内は五十音）
+  if(sortMode==='class'){
+   const ca=CLS_ORDER.indexOf(a.cls), cb=CLS_ORDER.indexOf(b.cls);
+   const ka=ca<0?99:ca, kb=cb<0?99:cb;
+   if(ka!==kb)return ka-kb;
+   return (a.name||'').localeCompare(b.name||'','ja');
+  }
+  // 年齢順
+  const ca=CLS_ORDER.indexOf(a.cls), cb=CLS_ORDER.indexOf(b.cls);
+  const ka=ca<0?99:ca, kb=cb<0?99:cb;
+  const diff = (sortMode==='ageDesc')? (kb-ka) : (ka-kb);
+  if(diff!==0)return diff;
+  return (a.name||'').localeCompare(b.name||'','ja');
+ });
+}
+
+// ===== レンダリング =====
+function renderStats(){const rows=visible();let cnt=0,total=0,flag=0;
+ rows.forEach(r=>{const c=calc(r);if(r.status==='在園中'||c.isNew){cnt++;total+=c.total;}if(c.flag)flag++;});
+ // 定員：単一施設ならその施設、全施設なら定員のある施設合計
+ const facData=M.facilities.filter(f=>f.capacity);
+ const cap=(park==='全施設')?facData.reduce((a,f)=>a+f.capacity,0):(M.facilities.find(f=>f.name===park)||{}).capacity;
+ const capText=cap?`<small style="color:var(--mut)"> / 定員 ${cap}</small>`:'';
+ document.getElementById('stats').innerHTML=
+  `<div class="stat"><div class="k">在園</div><div class="v">${cnt}<small> 名</small>${capText}</div></div>`+
+  `<div class="stat berry"><div class="k">合計請求額</div><div class="v">¥${total.toLocaleString()}</div></div>`+
+  `<div class="stat gold"><div class="k">フラグ</div><div class="v">${flag}<small> 件</small></div></div>`;}
+function fmt(n,cls){if(n===0||n==='')return `<td class="num zero">—</td>`;const m=n<0?' minus':'';return `<td class="num${m} ${cls||''}">${n<0?'-':''}¥${Math.abs(n).toLocaleString()}</td>`;}
+function bindEdit(){document.querySelectorAll('[contenteditable]').forEach(el=>{
+ el.onblur=e=>{const t=e.target,arr=t.dataset.arr,i=+t.dataset.i,f=t.dataset.f;
+  if(arr==='roster')roster[i][f]=t.textContent.trim();
+  render();};
+ el.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();e.target.blur();}};});}
+
+function renderSettings(){
+ let h='<div class="setgrid">';
+ // データ保存・バックアップ
+ let savedInfo='—';
+ try{const raw=localStorage.getItem(STORE_KEY);if(raw){const d=JSON.parse(raw);if(d&&d.savedAt)savedInfo=new Date(d.savedAt).toLocaleString();}}catch(e){}
+ h+='<div class="setblock" style="background:var(--leafsoft);border:1.5px solid var(--leaf);border-radius:14px;padding:18px"><h3 style="color:var(--leaf);border-color:var(--leaf)">💾 データの保存・バックアップ</h3>'+
+   `<div style="font-size:13px;color:var(--ink);line-height:1.8;margin-bottom:12px">入力したデータは、この端末（ブラウザ）に自動で保存されます。閉じても残ります。<br><span style="color:var(--mut)">最終保存：${savedInfo}</span></div>`+
+   `<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">`+
+   `<button id="btnExport" class="btn btn-primary" style="padding:8px 18px;font-size:13px">⬇️ データ書き出し（バックアップ）</button>`+
+   `<button id="btnImport" class="btn btn-ghost" style="padding:8px 18px;font-size:13px">⬆️ データ読み込み</button>`+
+   `<input id="fileImport" type="file" accept="application/json,.json" style="display:none">`+
+   `</div>`+
+   `<div style="font-size:12px;color:var(--mut);margin-top:10px;line-height:1.7">・「書き出し」で、データをファイルに保存できます（他のPC・iPadへの受け渡しや、万一に備えたバックアップ用）。<br>・「読み込み」で、書き出したファイルを取り込めます（今ある内容は上書きされます）。</div>`+
+ `</div>`;
+ // 運用パラメータ（編集可能）
+ h+='<div class="setblock"><h3>運用パラメータ</h3>'+
+   `<div style="display:flex;gap:24px;flex-wrap:wrap;font-size:13.5px;align-items:center">`+
+   `<div>現在の園：<b style="color:var(--leaf)">${park}</b></div>`+
+   `<div>対象年月：<b>${yy}年 ${mm}月</b></div>`+
+   `<div>途中入園 半額境界日：<input class="inp" type="number" data-param="half_day" value="${M.half_day}" style="width:60px;display:inline">日</div>`+
+   `<div>兄弟割引：¥<input class="inp" type="number" data-param="sibling" value="${M.sibling}" style="width:90px;display:inline"></div></div></div>`;
+ // 幼稚舎の早割編集パネル（独立配置・確実に編集可能）
+ const Yp=M.youchisha;
+ // 旧授業料（jugyoOverride）を持つ園児数
+ const overrideCnt=roster.filter(r=>r.park==='幼稚舎'&&r.jugyoOverride).length;
+ h+='<div class="setblock" style="background:var(--berrysoft);border:1.5px solid var(--berry);border-radius:14px;padding:18px"><h3 style="color:var(--berry);border-color:var(--berry)">🎓 幼稚舎 早割の編集</h3>'+
+   `<div style="display:flex;gap:20px;flex-wrap:wrap;font-size:14px;align-items:center;padding:8px 0">`+
+   `<div style="background:var(--panel);padding:10px 14px;border-radius:10px;border:1px solid var(--line)"><div style="font-size:11px;color:var(--mut);margin-bottom:4px">早割：0歳で入園</div>¥<input class="inp" type="number" data-yoe="0" value="${(Yp.early_discount&&Yp.early_discount['0'])||0}" style="width:90px;text-align:right;display:inline;font-size:14px;font-weight:600;color:var(--berry)"></div>`+
+   `<div style="background:var(--panel);padding:10px 14px;border-radius:10px;border:1px solid var(--line)"><div style="font-size:11px;color:var(--mut);margin-bottom:4px">早割：1歳で入園</div>¥<input class="inp" type="number" data-yoe="1" value="${(Yp.early_discount&&Yp.early_discount['1'])||0}" style="width:90px;text-align:right;display:inline;font-size:14px;font-weight:600;color:var(--berry)"></div>`+
+   `<div style="background:var(--panel);padding:10px 14px;border-radius:10px;border:1px solid var(--line)"><div style="font-size:11px;color:var(--mut);margin-bottom:4px">早割：2歳で入園</div>¥<input class="inp" type="number" data-yoe="2" value="${(Yp.early_discount&&Yp.early_discount['2'])||0}" style="width:90px;text-align:right;display:inline;font-size:14px;font-weight:600;color:var(--berry)"></div>`+
+   `</div>`+
+   `<div style="font-size:12px;color:var(--mut);margin-top:8px;line-height:1.7">・通常ルール：生年月日と入園年月日から入園時年齢を判定し、0歳/1歳/2歳の園児にそれぞれの値引きを適用<br>・現在の幼稚舎在籍のうち、<b style="color:var(--berry)">${overrideCnt}名</b> は旧授業料(¥45,000など)を個別設定中（早割は適用されません）</div>`+
+ `</div>`;
+ // 単価表（編集可能）
+ h+='<div class="setblock"><h3>基本月謝単価表（保育園3園共通）<span style="font-size:12px;color:var(--mut);font-weight:400;margin-left:8px">数値を直接編集できます</span></h3><div class="tablewrap"><table><thead><tr><th>枠区分</th><th class="r">月謝</th><th class="r">教材費</th><th class="r">マットレス</th><th class="r">手数料</th></tr></thead><tbody>';
+ Object.entries(M.prices).forEach(([k,v])=>{
+  h+=`<tr><td style="font-weight:700;padding:6px 10px">${k}</td>`+
+   `<td class="num" style="padding:4px 8px"><input class="inp num" type="number" data-price="${k}" data-pf="getsu" value="${v.getsu||0}" style="text-align:right;width:90px;padding:4px 8px;font-size:13px"></td>`+
+   `<td class="num" style="padding:4px 8px"><input class="inp num" type="number" data-price="${k}" data-pf="kyozai" value="${v.kyozai||0}" style="text-align:right;width:90px;padding:4px 8px;font-size:13px"></td>`+
+   `<td class="num" style="padding:4px 8px"><input class="inp num" type="number" data-price="${k}" data-pf="mat" value="${v.mat||0}" style="text-align:right;width:80px;padding:4px 8px;font-size:13px"></td>`+
+   `<td class="num" style="padding:4px 8px"><input class="inp num" type="number" data-price="${k}" data-pf="tesu" value="${v.tesu||0}" style="text-align:right;width:70px;padding:4px 8px;font-size:13px"></td></tr>`;});
+ h+='</tbody></table></div></div>';
+ // 幼稚舎・資生館の料金（編集可能）
+ // 幼稚舎料金体系（内訳ベース）
+ const Y=M.youchisha;
+ const fb=Y.futai_breakdown||{};
+ const futaiTotal=Object.values(fb).reduce((a,b)=>a+(Number(b)||0),0);
+ const monthlyTotal=(Y.jugyo||0)+futaiTotal+(Y.lesson||0);
+ h+='<div class="setblock"><h3>幼稚舎 料金体系</h3>'+
+   // 月謝合計サマリー
+   `<div style="background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:12px 18px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:center">`+
+     `<div style="font-size:13px;color:var(--mut)">月謝合計（授業料＋付帯費＋レッスン費）</div>`+
+     `<div style="font-family:'Zen Old Mincho';font-size:22px;color:var(--berry);font-weight:700">¥${monthlyTotal.toLocaleString()}</div>`+
+   `</div>`+
+   `<div class="tablewrap"><table><thead><tr><th>項目</th><th class="r">金額</th></tr></thead><tbody>`+
+   `<tr><td><b>① 授業料</b></td><td class="num"><input class="inp num" type="number" data-yo="jugyo" value="${Y.jugyo||0}" step="100" style="text-align:right;width:120px"></td></tr>`+
+   `<tr><td colspan="2" style="background:var(--berrysoft);padding:6px 12px;font-size:12px;color:var(--berry);font-weight:600">② 付帯費の内訳（合計 ¥${futaiTotal.toLocaleString()}）</td></tr>`+
+   Object.keys(fb).map(k=>`<tr><td style="padding-left:24px">　${k}</td><td class="num"><input class="inp num" type="number" data-yofb="${k}" value="${fb[k]||0}" step="100" style="text-align:right;width:120px"></td></tr>`).join('')+
+   `<tr><td colspan="2" style="background:var(--berrysoft);padding:6px 12px;font-size:12px;color:var(--berry);font-weight:600">③ 各レッスン費の内訳（合計 ¥${(Y.lesson||0).toLocaleString()}）</td></tr>`+
+   `<tr><td><b>レッスン費合計</b><br><small style="color:var(--mut);font-size:11px">英語・音楽・体育・ダンス・ウォーキング</small></td><td class="num"><input class="inp num" type="number" data-yo="lesson" value="${Y.lesson||0}" step="100" style="text-align:right;width:120px"></td></tr>`+
+   `<tr><td colspan="2" style="background:var(--panel2);padding:6px 12px;font-size:12px;color:var(--ink);font-weight:600">毎月別途費用</td></tr>`+
+   `<tr><td>給食費</td><td class="num"><input class="inp num" type="number" data-yo="kyushoku" value="${Y.kyushoku||0}" step="100" style="text-align:right;width:120px"></td></tr>`+
+   `<tr><td>冷暖房費</td><td class="num"><input class="inp num" type="number" data-yo="reidanbo" value="${Y.reidanbo||0}" step="100" style="text-align:right;width:120px"></td></tr>`+
+   `<tr><td>バス代（利用者のみ）</td><td class="num"><input class="inp num" type="number" data-yo="bus" value="${Y.bus||0}" step="100" style="text-align:right;width:120px"></td></tr>`+
+   `<tr><td>振込手数料</td><td class="num"><input class="inp num" type="number" data-yo="tesu" value="${Y.tesu||0}" step="10" style="text-align:right;width:120px"></td></tr>`+
+   `<tr><td colspan="2" style="background:var(--panel2);padding:6px 12px;font-size:12px;color:var(--ink);font-weight:600">入学時・進級時</td></tr>`+
+   `<tr><td>入学金</td><td class="num"><input class="inp num" type="number" data-yo="nyugaku" value="${Y.nyugaku||0}" step="100" style="text-align:right;width:120px"></td></tr>`+
+   `<tr><td>進級費（年1回4月）</td><td class="num"><input class="inp num" type="number" data-yo="shinkyu" value="${Y.shinkyu||0}" step="100" style="text-align:right;width:120px"></td></tr>`+
+   `</tbody></table></div></div>`;
+ const S=M.shiseikan;
+ h+='<div class="setblock"><h3>資生館保育園 料金体系</h3><div class="tablewrap"><table><thead><tr><th>項目</th><th class="r">金額</th></tr></thead><tbody>'+
+   Object.keys(S.age02).map(w=>`<tr><td>0〜2歳 ${w}</td><td class="num"><input class="inp num" type="number" data-si="age02-${w}" value="${S.age02[w]}" style="text-align:right;width:120px"></td></tr>`).join('')+
+   `<tr><td>0〜2歳 兄弟あり</td><td class="num"><input class="inp num" type="number" data-si="sib02" value="${S.sib02}" style="text-align:right;width:120px"></td></tr>`+
+   `<tr><td>3〜5歳 副食費（無償化）</td><td class="num"><input class="inp num" type="number" data-si="fukushoku" value="${S.fukushoku}" style="text-align:right;width:120px"></td></tr>`+
+   `</tbody></table></div></div>`;
+ // 台帳オプション単価
+ const O=M.options;
+ h+='<div class="setblock"><h3>台帳オプション 月額単価</h3><div class="tablewrap"><table><thead><tr><th>項目</th><th>対象施設</th><th class="r">月額</th></tr></thead><tbody>'+
+   `<tr><td>マットレスレンタル</td><td style="font-size:12px;color:var(--mut)">保育園3園</td><td class="num"><input class="inp num" type="number" data-opt2="mattress" value="${O.mattress}" style="text-align:right;width:100px"></td></tr>`+
+   `<tr><td>バス</td><td style="font-size:12px;color:var(--mut)">幼稚舎</td><td class="num"><input class="inp num" type="number" data-opt2="bus" value="${O.bus}" style="text-align:right;width:100px"></td></tr>`+
+   `<tr><td>おむつサブスク</td><td style="font-size:12px;color:var(--mut)">資生館</td><td class="num"><input class="inp num" type="number" data-opt2="diaper" value="${O.diaper}" style="text-align:right;width:100px"></td></tr>`+
+   `<tr><td>制服ﾚﾝﾀﾙ:ニット</td><td style="font-size:12px;color:var(--mut)">資生館</td><td class="num"><input class="inp num" type="number" data-uni="knit" value="${O.uniform.knit}" style="text-align:right;width:100px"></td></tr>`+
+   `<tr><td>制服ﾚﾝﾀﾙ:キャップ</td><td style="font-size:12px;color:var(--mut)">資生館</td><td class="num"><input class="inp num" type="number" data-uni="cap" value="${O.uniform.cap}" style="text-align:right;width:100px"></td></tr>`+
+   `<tr><td>制服ﾚﾝﾀﾙ:パーカー</td><td style="font-size:12px;color:var(--mut)">資生館</td><td class="num"><input class="inp num" type="number" data-uni="parka" value="${O.uniform.parka}" style="text-align:right;width:100px"></td></tr>`+
+   `</tbody></table></div></div>`;
+ // 振込先(園別)
+ const FACS=['月寒園','白石園','サッポロファクトリー園','幼稚舎','資生館保育園'];
+ h+='<div class="setblock"><h3>振込先口座（施設別・初回案内PDFに反映）</h3><div class="tablewrap"><table class="bankcol"><thead><tr><th>項目</th>'+FACS.map(f=>`<th>${f}</th>`).join('')+'</tr></thead><tbody>';
+ bank.forEach((b,i)=>{
+  h+=`<tr><td style="font-weight:700">${b.label}</td>`+
+   FACS.map(f=>`<td contenteditable data-bank="${i}" data-pk="${f}" class="${b[f]?'':'yellow'}">${b[f]||''}</td>`).join('')+`</tr>`;});
+ h+='</tbody></table></div><div class="hint">黄色＝未入力（住所・電話など）。クリックして編集できます。「現在の施設」に応じた口座が初回案内PDFに反映されます。</div></div>';
+ h+='</div>';
+ document.getElementById('body').innerHTML=h;
+ // データ保存・バックアップのボタン
+ const be=document.getElementById('btnExport');if(be)be.onclick=exportBackup;
+ const bi=document.getElementById('btnImport');const fi=document.getElementById('fileImport');
+ if(bi&&fi){bi.onclick=()=>fi.click();fi.onchange=e=>{if(e.target.files&&e.target.files[0])importBackup(e.target.files[0]);e.target.value='';};}
+ // 編集ハンドラ
+ document.querySelectorAll('[data-bank]').forEach(el=>{el.onblur=e=>{const i=+e.target.dataset.bank,pk=e.target.dataset.pk;bank[i][pk]=e.target.textContent.trim();saveState();};});
+ document.querySelectorAll('[data-param]').forEach(el=>{el.onchange=e=>{M[e.target.dataset.param]=+e.target.value;render();};});
+ document.querySelectorAll('[data-price]').forEach(el=>{el.onchange=e=>{M.prices[e.target.dataset.price][e.target.dataset.pf]=+e.target.value;render();};});
+ document.querySelectorAll('[data-yo]').forEach(el=>{el.onchange=function(e){M.youchisha[this.dataset.yo]=+this.value;render();};});
+ document.querySelectorAll('[data-yofb]').forEach(el=>{el.onchange=function(e){if(!M.youchisha.futai_breakdown)M.youchisha.futai_breakdown={};M.youchisha.futai_breakdown[this.dataset.yofb]=+this.value;render();};});
+ document.querySelectorAll('[data-yoe]').forEach(el=>{el.onchange=function(e){if(!M.youchisha.early_discount)M.youchisha.early_discount={};M.youchisha.early_discount[this.dataset.yoe]=+this.value;render();};});
+ document.querySelectorAll('[data-yoct]').forEach(el=>{el.onchange=function(e){M.youchisha[this.dataset.yoct]=this.value;render();};});
+ document.querySelectorAll('[data-si]').forEach(el=>{el.onchange=e=>{const f=e.target.dataset.si;
+   if(f.startsWith('age02-')){M.shiseikan.age02[f.slice(6)]=+e.target.value;}else{M.shiseikan[f]=+e.target.value;}render();};});
+ document.querySelectorAll('[data-opt2]').forEach(el=>{el.onchange=e=>{M.options[e.target.dataset.opt2]=+e.target.value;render();};});
+ document.querySelectorAll('[data-uni]').forEach(el=>{el.onchange=e=>{M.options.uniform[e.target.dataset.uni]=+e.target.value;render();};});
+ setCard('設定','料金体系・施設別振込先','料金は枠ごと/施設ごとに編集できます。変更すると月次計算・ルクミー・本部集計に自動反映されます。','none');
+}
+function renderRoster(){const rows=visible();
+ const showOpt = park!=='全施設';
+ const sortOpts=[
+  {k:'ageAsc',label:'年齢順（0歳→年長）'},
+  {k:'ageDesc',label:'年齢順（年長→0歳）'},
+  {k:'class',label:'クラス順'},
+  {k:'kana',label:'五十音順'},
+  {k:'regist',label:'登録順'},
+ ];
+ // 枠区分・クラスの人数を集計（現在の施設で）
+ const baseList=allPupils().filter(r=>park==='全施設'||r.park===park);
+ const wakuCount={};baseList.forEach(r=>{wakuCount[r.waku]=(wakuCount[r.waku]||0)+1;});
+ const clsCount={};baseList.forEach(r=>{if(r.cls)clsCount[r.cls]=(clsCount[r.cls]||0)+1;});
+ const allWakus=['地域枠','企業枠','企業提携枠','旧企業枠','旧企業提携枠','旧地域枠','早割','一般','従業員(Number9)','従業員(ハイアイランド)','従業員(アドバイザー)','従業員(他園)','地域無償化','非課税世帯'];
+ const availWakus=allWakus.filter(w=>wakuCount[w]); // 実在する枠のみ表示
+ const availCls=CLS_ORDER.filter(c=>clsCount[c]); // 実在するクラスのみ表示
+ // 並び替えタブ
+ let h='<div style="padding:12px 22px 6px;border-bottom:1px solid var(--line);display:flex;gap:8px;align-items:center;flex-wrap:wrap">'+
+  '<span style="font-size:12px;color:var(--mut);margin-right:6px;min-width:60px">並び替え</span>'+
+  sortOpts.map(o=>`<button data-sort="${o.k}" style="padding:6px 14px;border:1px solid ${sortMode===o.k?'var(--leaf)':'var(--line)'};background:${sortMode===o.k?'var(--leaf)':'var(--paper)'};color:${sortMode===o.k?'#fff':'var(--ink)'};border-radius:18px;font-size:12px;cursor:pointer;font-family:inherit">${o.label}</button>`).join('')+
+  '</div>';
+ // 枠区分フィルタタブ
+ if(availWakus.length>0){
+  h+='<div style="padding:8px 22px 6px;border-bottom:1px solid var(--line);display:flex;gap:8px;align-items:center;flex-wrap:wrap">'+
+   '<span style="font-size:12px;color:var(--mut);margin-right:6px;min-width:60px">枠区分</span>'+
+   `<button data-waku="すべて" style="padding:6px 14px;border:1px solid ${wakuFilter==='すべて'?'var(--berry)':'var(--line)'};background:${wakuFilter==='すべて'?'var(--berry)':'var(--paper)'};color:${wakuFilter==='すべて'?'#fff':'var(--ink)'};border-radius:18px;font-size:12px;cursor:pointer;font-family:inherit">すべて <span style="opacity:.75">${baseList.length}名</span></button>`+
+   availWakus.map(w=>`<button data-waku="${w}" style="padding:6px 14px;border:1px solid ${wakuFilter===w?'var(--berry)':'var(--line)'};background:${wakuFilter===w?'var(--berry)':'var(--paper)'};color:${wakuFilter===w?'#fff':'var(--ink)'};border-radius:18px;font-size:12px;cursor:pointer;font-family:inherit">${w} <span style="opacity:.75">${wakuCount[w]}名</span></button>`).join('')+
+   '</div>';
+ }
+ // クラス絞り込みタブ
+ if(availCls.length>0){
+  h+='<div style="padding:8px 22px 12px;border-bottom:1px solid var(--line);display:flex;gap:8px;align-items:center;flex-wrap:wrap">'+
+   '<span style="font-size:12px;color:var(--mut);margin-right:6px;min-width:60px">クラス</span>'+
+   `<button data-cls="すべて" style="padding:6px 14px;border:1px solid ${clsFilter==='すべて'?'var(--leaf)':'var(--line)'};background:${clsFilter==='すべて'?'var(--leaf)':'var(--paper)'};color:${clsFilter==='すべて'?'#fff':'var(--ink)'};border-radius:18px;font-size:12px;cursor:pointer;font-family:inherit">すべて <span style="opacity:.75">${baseList.length}名</span></button>`+
+   availCls.map(c=>`<button data-cls="${c}" style="padding:6px 14px;border:1px solid ${clsFilter===c?'var(--leaf)':'var(--line)'};background:${clsFilter===c?'var(--leaf)':'var(--paper)'};color:${clsFilter===c?'#fff':'var(--ink)'};border-radius:18px;font-size:12px;cursor:pointer;font-family:inherit">${c} <span style="opacity:.75">${clsCount[c]}名</span></button>`).join('')+
+   '</div>';
+ }
+ h+='<div class="tablewrap"><table><thead><tr><th style="width:42px;text-align:center">No.</th><th>所属園</th><th>生年月日</th><th>クラス<br><small style="color:var(--mut);font-weight:400;font-size:10px">自動</small></th><th>枠区分</th><th>園児名</th><th>口座名義</th><th>兄弟</th><th>納入方法</th>'+(showOpt?'<th>オプション（月額・あり/なし）</th>':'')+'<th class="r">ルクミーID</th><th></th></tr></thead><tbody>';
+ rows.forEach((r,idx)=>{const i=roster.indexOf(r);const ed=i>=0;const t=facType(r.park);
+  // 生年月日があればクラスを自動計算（プルダウン編集なし）
+  const autoCls=r.birth?classByBirth(r.birth,yy):'';
+  if(ed&&autoCls&&r.cls!==autoCls)roster[i].cls=autoCls; // 表示時に同期
+  let optCell='';
+  if(showOpt&&ed){
+   const cb=(f,label,amt)=>`<label style="display:inline-flex;align-items:center;gap:4px;margin-right:12px;font-size:12px;cursor:pointer;white-space:nowrap"><input type="checkbox" data-opt="${i}" data-of="${f}" ${r[f]?'checked':''} style="width:16px;height:16px;accent-color:var(--leaf);cursor:pointer">${label}<span style="color:var(--mut)">¥${amt.toLocaleString()}</span></label>`;
+   if(t==='A') optCell+=cb('optMattress','マット',M.options.mattress);
+   if(t==='B') optCell+=cb('optBus','バス',M.options.bus);
+   if(t==='C'){optCell+=cb('optDiaper','おむつ',M.options.diaper);
+     optCell+=cb('optKnit','ニット',M.options.uniform.knit);
+     optCell+=cb('optCap','キャップ',M.options.uniform.cap);
+     optCell+=cb('optParka','パーカー',M.options.uniform.parka);}
+   if(!optCell)optCell='<span style="color:var(--mut);font-size:12px">—</span>';
+  }
+  h+=`<tr><td style="text-align:center;color:var(--mut);font-size:12px;font-weight:600">${idx+1}</td><td><span class="ptag pt-${r.park}">${r.park||'—'}</span></td>`+
+   `<td><span style="font-size:12px;color:var(--mut);font-family:'Spline Sans Mono',monospace">${r.birth||'—'}</span></td>`+
+   `<td><span class="cls" style="${r.birth?'background:#fdf6e9;padding:3px 10px;border-radius:10px;display:inline-block;min-width:64px;text-align:center':''}">${r.cls||'—'}</span></td>`+
+   `<td>${ed?`<select class="inp" data-arr2="roster" data-i="${i}" data-f="waku" style="width:auto;padding:4px 8px;font-size:12px;color:var(--berry)">${(facType(r.park)==='C'?['地域枠','企業提携枠','旧企業提携枠','旧地域枠','地域無償化','非課税世帯','従業員(保育士)','従業員(アドバイザー)','従業員(ハイアイランド)','従業員(Number9)','従業員(他園)']:facType(r.park)==='B'?['早割','一般','従業員(保育士)','従業員(Number9)','従業員(ハイアイランド)','従業員(アドバイザー)']:Object.keys(M.prices).concat(['非課税世帯'])).map(w=>`<option ${r.waku===w?'selected':''}>${w}</option>`).join('')}</select>`:`<span class="waku">${r.waku||''}</span>`}</td>`+
+   `<td class="name" ${ed?`contenteditable data-arr="roster" data-i="${i}" data-f="name"`:''}>${r.name||''}</td>`+
+   `<td class="koza" ${ed?`contenteditable data-arr="roster" data-i="${i}" data-f="koza"`:''}>${r.koza||''}</td>`+
+   `<td>${ed?`<select data-sib="${i}" class="inp" style="width:auto;padding:4px 8px;font-size:12px;color:${r.sib==='あり'?'var(--berry)':'var(--mut)'}"><option ${r.sib!=='あり'?'selected':''}>なし</option><option ${r.sib==='あり'?'selected':''}>あり</option></select>`:(r.sib||'なし')}</td>`+
+   `<td>${ed?`<select data-pay="${i}" class="inp" style="width:auto;padding:4px 8px;font-size:12px;font-weight:700;color:${payMethod(r)==='振込'?'#fff':'var(--mut)'};background:${payMethod(r)==='振込'?'var(--berry)':'var(--paper)'};border-color:${payMethod(r)==='振込'?'var(--berry)':'var(--line)'}"><option ${payMethod(r)!=='振込'?'selected':''}>引落</option><option ${payMethod(r)==='振込'?'selected':''}>振込</option></select>`:`<span class="paytag" style="display:inline-block;padding:3px 10px;border-radius:10px;font-size:11px;font-weight:700;${payMethod(r)==='振込'?'background:var(--berry);color:#fff':'background:var(--paper);color:var(--mut);border:1px solid var(--line)'}">${payMethod(r)}</span>`}</td>`+
+   (showOpt?`<td>${optCell}</td>`:'')+
+   `<td class="num" style="color:var(--mut)">${r.lid||'—'}</td>`+
+   `<td>${ed?`<button data-pupildel="${i}" title="この園児を削除" style="background:none;border:1px solid var(--line);border-radius:8px;color:var(--berry);cursor:pointer;font-size:13px;padding:5px 10px">削除</button>`:''}</td></tr>`;});
+ h+='</tbody></table></div>';
+ document.getElementById('body').innerHTML=h;bindEdit();
+ // 兄弟プルダウン
+ document.querySelectorAll('[data-sort]').forEach(el=>{el.onclick=e=>{sortMode=e.currentTarget.dataset.sort;render();};});
+ document.querySelectorAll('[data-waku]').forEach(el=>{el.onclick=e=>{wakuFilter=e.currentTarget.dataset.waku;render();};});
+ document.querySelectorAll('[data-cls]').forEach(el=>{el.onclick=e=>{clsFilter=e.currentTarget.dataset.cls;render();};});
+ document.querySelectorAll('[data-arr2]').forEach(el=>{el.onchange=e=>{const i=+e.target.dataset.i,f=e.target.dataset.f;
+   roster[i][f]=e.target.value;
+   if(f==='birth'){const c=classByBirth(e.target.value,yy);if(c)roster[i].cls=c;}
+   render();};});
+ document.querySelectorAll('[data-sib]').forEach(el=>{el.onchange=e=>{const i=+e.target.dataset.sib;const v=e.target.value;
+   const label=v==='あり'?'兄弟割引が適用':'兄弟割引が外れた';
+   roster[i].sib=v;logChange(roster[i].name,'sib',label,null,v);render();};});
+ document.querySelectorAll('[data-pay]').forEach(el=>{el.onchange=e=>{const i=+e.target.dataset.pay;const v=e.target.value;
+   roster[i].pay=v;logChange(roster[i].name,'pay','納入方法を'+v+'に変更',null,v);render();};});
+ // オプションチェックボックス
+ document.querySelectorAll('[data-opt]').forEach(el=>{el.onchange=e=>{const i=+e.target.dataset.opt,f=e.target.dataset.of;const v=e.target.checked;
+   const names={optMattress:'マットレス',optBus:'バス',optDiaper:'おむつサブスク',optKnit:'制服ﾚﾝﾀﾙ:ニット',optCap:'制服ﾚﾝﾀﾙ:キャップ',optParka:'制服ﾚﾝﾀﾙ:パーカー'};
+   const label=(names[f]||f)+(v?'を追加':'を解約');
+   roster[i][f]=v;logChange(roster[i].name,f,label,null,v);render();};});
+ // 園児削除（確認ポップアップ）
+ document.querySelectorAll('[data-pupildel]').forEach(el=>{el.onclick=e=>{const i=+e.currentTarget.dataset.pupildel;
+   const nm=roster[i].name||'この園児';
+   confirmDialog(`「${nm}」さんを園児台帳から削除します。\nこの操作は取り消せません。本当に削除しますか？`,()=>{roster.splice(i,1);render();});};});
+ const note = (park==='全施設')?'全施設表示中。オプション（マットレス・バス・おむつ・制服レンタル）は各施設を選ぶと編集できます。園児の追加は「新規入園」タブから行ってください。'
+  :'青字セルとオプションのチェックを編集すると、月次計算・ルクミー出力・本部集計が自動再計算されます。園児の追加は「新規入園」タブから。削除は各行の「削除」ボタンから行えます。';
+ setCard('園児台帳',`${rows.length}件 ／ ${park}`,note,'none');
+}
+function initOptsSum(n){ // 新規入園の初回オプション合計
+ if(!n.initOpts)return 0;
+ return n.initOpts.reduce((s,o)=>s+(Number(o.price)||0)*(Number(o.qty)||0),0);
+}
+function renderNew(){
+ // roster内の「新規入園」フラグの園児を登録順（regSeq）に表示。確定後も残る。
+ const list=roster.map((r,i)=>({r,i})).filter(x=>x.r.isNew)
+   .sort((a,b)=>(a.r.regSeq||0)-(b.r.regSeq||0));
+ // 販売単価表（制服・その他）
+ const goodsList=M.goods.filter(g=>g.facs.length===0||true); // 全商品を選択可
+ let h='<div style="display:flex;flex-direction:column;gap:16px">';
+ if(list.length===0)h+='<div style="text-align:center;color:var(--mut);padding:32px;border:1px dashed var(--line);border-radius:14px">「＋ 新規入園を追加」から途中入園者を入力してください。入力後「確定」を押すと月次計算・ルクミー出力・本部集計に反映されます。確定後も記録として一覧に残ります。</div>';
+ list.forEach(({r,i})=>{const n=r;
+  const c=n.name?calc(n,true):null;
+  const optSum=initOptsSum(n);
+  const grand=c?c.total+optSum:null;
+  const isConf=n.confirmed;
+  const canConfirm=!!n.name;
+  const optCount=(n.initOpts||[]).length;
+  const isOpen=window.__newOptOpen===i;
+  const fld=(label,inner)=>`<div style="display:flex;flex-direction:column;gap:4px"><label style="font-size:11px;color:var(--mut);letter-spacing:.04em">${label}</label>${inner}</div>`;
+  h+=`<div style="border:1px solid var(--line);border-radius:14px;overflow:hidden;background:${isConf?'color-mix(in srgb,var(--leaf) 5%,var(--panel))':'var(--panel)'}">`+
+   // ヘッダー帯：状態＋初月合計
+   `<div style="display:flex;justify-content:space-between;align-items:center;padding:12px 18px;border-bottom:1px solid var(--line);background:${isConf?'color-mix(in srgb,var(--leaf) 8%,transparent)':'var(--panel2)'}">`+
+     `<div style="display:flex;align-items:center;gap:10px">`+
+       `${isConf?'<span class="ptag pt-月寒園" style="font-size:11px">確定済</span>':'<span style="font-size:11px;color:var(--mut);border:1px solid var(--line);border-radius:10px;padding:3px 10px">未確定</span>'}`+
+       `<span style="font-size:15px;font-weight:600;color:var(--ink)">${n.name||'（園児名を入力してください）'}</span>`+
+     `</div>`+
+     `<div style="text-align:right"><div style="font-size:11px;color:var(--mut)">初月合計</div><div style="font-size:20px;font-weight:700;color:var(--berry)">${grand!=null?'¥'+grand.toLocaleString():'—'}</div>${optSum>0?`<div style="font-size:11px;color:var(--mut)">（含オプ ¥${optSum.toLocaleString()}）</div>`:''}</div>`+
+   `</div>`+
+   // 入力フィールド：2段グリッド
+   `<div style="padding:18px;display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px 16px">`+
+     fld('所属園',`<select class="inp" data-newi="${i}" data-f="park">${M.facilities.filter(f=>f.name!=='全施設').map(f=>`<option ${n.park===f.name?'selected':''}>${f.name}</option>`).join('')}</select>`)+
+     fld('園児名',`<input class="inp" data-newi="${i}" data-f="name" value="${(n.name||'').replace(/"/g,'&quot;')}" placeholder="例：山田 太郎">`)+
+     fld('フリガナ',`<input class="inp" data-newi="${i}" data-f="kana" value="${(n.kana||'').replace(/"/g,'&quot;')}" placeholder="例：ヤマダ タロウ">`)+
+     fld('生年月日',`<input class="inp" type="date" data-newi="${i}" data-f="birth" value="${n.birth||''}">`)+
+     fld('枠区分',`<select class="inp" data-newi="${i}" data-f="waku">${(facType(n.park)==='C'?['地域枠','企業提携枠','旧企業提携枠','旧地域枠','地域無償化','非課税世帯','従業員(保育士)','従業員(アドバイザー)','従業員(ハイアイランド)','従業員(Number9)','従業員(他園)']:facType(n.park)==='B'?['早割','一般','従業員(保育士)','従業員(Number9)','従業員(ハイアイランド)','従業員(アドバイザー)']:Object.keys(M.prices).concat(['非課税世帯'])).map(w=>`<option ${n.waku===w?'selected':''}>${w}</option>`).join('')}</select>`)+
+     fld('クラス（生年月日から自動）',`<select class="inp" data-newi="${i}" data-f="cls" style="${n.birth?'background:#fdf6e9':''}">${M.classes.map(cl=>`<option ${n.cls===cl?'selected':''}>${cl}</option>`).join('')}</select>`)+
+     fld('口座名義',`<input class="inp" data-newi="${i}" data-f="koza" value="${(n.koza||'').replace(/"/g,'&quot;')}" placeholder="例：山田 花子">`)+
+     fld('入園年月日',`<input class="inp" type="date" data-newi="${i}" data-f="nyuen" value="${n.nyuen||''}">`)+
+   `</div>`+
+   // 操作ボタン
+   `<div style="padding:0 18px 16px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">`+
+     `<button data-newopt="${i}" style="background:${optCount>0?'var(--berrysoft)':'var(--panel2)'};border:1px solid var(--line);border-radius:8px;color:var(--berry);cursor:pointer;font-size:13px;padding:7px 14px;font-weight:600">${isOpen?'オプションを閉じる':'オプション'+(optCount>0?'（'+optCount+'件）':'を追加')}</button>`+
+     (isConf
+       ?`<span style="font-size:12px;color:var(--mut)">園児台帳・月次計算に反映中</span>`
+       :`<button data-newconfirm="${i}" ${canConfirm?'':'disabled'} style="background:${canConfirm?'var(--leaf)':'var(--chip)'};border:none;border-radius:8px;color:${canConfirm?'#fff':'var(--mut)'};cursor:${canConfirm?'pointer':'not-allowed'};font-size:13px;padding:8px 18px;font-weight:600">確定する</button>`)+
+     `<button data-newdel="${i}" style="margin-left:auto;background:none;border:1px solid var(--line);border-radius:8px;color:var(--berry);cursor:pointer;font-size:13px;padding:7px 14px">削除</button>`+
+   `</div>`;
+  // オプション展開部
+  if(isOpen){
+   h+=`<div style="background:var(--panel2);padding:16px 18px;border-top:1px solid var(--line)">`+
+     `<div style="font-size:13px;color:var(--berry);font-weight:600;margin-bottom:10px">${n.name||'（園児名未入力）'} さんの初回オプション（制服・マット・おむつ等）</div>`+
+     `<div style="overflow-x:auto"><table style="width:100%;font-size:13px;min-width:520px"><thead><tr style="color:var(--mut);text-align:left"><th style="padding:4px 8px">項目</th><th style="padding:4px 8px">サイズ</th><th style="padding:4px 8px;text-align:right">単価</th><th style="padding:4px 8px;text-align:right">数量</th><th style="padding:4px 8px;text-align:right">小計</th><th></th></tr></thead><tbody>`;
+   (n.initOpts||[]).forEach((o,oi)=>{
+    const sub=(Number(o.price)||0)*(Number(o.qty)||0);
+    const goodsOptions=`<option value="">（選択）</option>`+goodsList.map(g=>`<option value="${g.name}" ${o.goods===g.name&&!o.custom?'selected':''}>${g.cat}：${g.name}（¥${g.price.toLocaleString()}）</option>`).join('')+`<option value="__custom" ${o.custom?'selected':''}>その他（自由入力）</option>`;
+    // 選んだ商品のサイズ配列を取得（自由入力時は空）
+    const g=o.custom?null:M.goods.find(x=>x.name===o.goods);
+    const sizes=(g&&g.sizes)?g.sizes:[];
+    // サイズセル：選択肢の数で表示を切替（追加申込みと同じロジック）
+    let sizeCell;
+    if(o.custom){sizeCell=`<input class="inp" data-iopt="${i}" data-oi="${oi}" data-of="size" value="${(o.size||'').replace(/"/g,'&quot;')}" placeholder="-" style="width:80px">`;}
+    else if(sizes.length===0){sizeCell=`<span style="color:var(--mut)">—</span>`;}
+    else if(sizes.length===1){sizeCell=`<span class="cls">${sizes[0]}</span>`;}
+    else{sizeCell=`<select class="inp" data-iopt="${i}" data-oi="${oi}" data-of="size" style="min-width:90px">${sizes.map(s=>`<option ${o.size===s?'selected':''}>${s}</option>`).join('')}</select>`;}
+    h+=`<tr>`+
+      `<td style="padding:4px 8px">`+
+        (o.custom
+          ?`<input class="inp" data-iopt="${i}" data-oi="${oi}" data-of="goods" value="${(o.goods||'').replace(/"/g,'&quot;')}" placeholder="項目名を入力" style="min-width:140px">`
+          :`<select class="inp" data-iopt="${i}" data-oi="${oi}" data-of="sel" style="min-width:200px">${goodsOptions}</select>`)+
+      `</td>`+
+      `<td style="padding:4px 8px">${sizeCell}</td>`+
+      `<td style="padding:4px 8px;text-align:right"><input class="inp num" type="number" data-iopt="${i}" data-oi="${oi}" data-of="price" value="${o.price||0}" style="width:90px;text-align:right"></td>`+
+      `<td style="padding:4px 8px;text-align:right"><input class="inp num" type="number" data-iopt="${i}" data-oi="${oi}" data-of="qty" value="${o.qty||1}" min="1" style="width:60px;text-align:right"></td>`+
+      `<td style="padding:4px 8px;text-align:right;font-weight:600">¥${sub.toLocaleString()}</td>`+
+      `<td style="padding:4px 8px"><button data-ioptdel="${i}" data-oi="${oi}" style="background:none;border:1px solid var(--line);border-radius:6px;color:var(--berry);cursor:pointer;font-size:12px;padding:3px 8px">×</button></td></tr>`;
+   });
+   if((n.initOpts||[]).length===0)h+=`<tr><td colspan="6" style="padding:10px 8px;color:var(--mut)">「＋ 項目を追加」から制服・マット・おむつ等を追加してください。</td></tr>`;
+   h+=`</tbody></table></div>`+
+     `<div style="margin-top:10px;display:flex;gap:10px;align-items:center;flex-wrap:wrap"><button data-ioptadd="${i}" style="background:var(--leaf);border:none;border-radius:8px;color:#fff;cursor:pointer;font-size:13px;padding:7px 14px;font-weight:600">＋ 項目を追加</button>`+
+     `<span style="font-size:13px;color:var(--ink)">オプション小計：<b style="color:var(--berry)">¥${optSum.toLocaleString()}</b></span></div>`+
+     `</div>`;
+  }
+  h+=`</div>`; // カード閉じ
+ });
+ h+='</div>';
+ document.getElementById('body').innerHTML=h;
+ document.querySelectorAll('[data-newi]').forEach(el=>{el.onchange=e=>{const i=+e.target.dataset.newi,f=e.target.dataset.f;roster[i][f]=e.target.value;
+   if(f==='birth'){const c=classByBirth(e.target.value,yy);if(c)roster[i].cls=c;}
+   render();};
+  el.oninput=e=>{const i=+e.target.dataset.newi,f=e.target.dataset.f;roster[i][f]=e.target.value;};});
+ // オプションパネルの開閉
+ document.querySelectorAll('[data-newopt]').forEach(el=>{el.onclick=e=>{const i=+e.currentTarget.dataset.newopt;
+   window.__newOptOpen=(window.__newOptOpen===i)?undefined:i;render();};});
+ document.querySelectorAll('[data-newoptclose]').forEach(el=>{el.onclick=e=>{window.__newOptOpen=undefined;render();};});
+ // オプション項目の追加
+ document.querySelectorAll('[data-ioptadd]').forEach(el=>{el.onclick=e=>{const i=+e.currentTarget.dataset.ioptadd;
+   if(!roster[i].initOpts)roster[i].initOpts=[];
+   roster[i].initOpts.push({goods:'',size:'',price:0,qty:1,custom:false});render();};});
+ // オプション項目の削除
+ document.querySelectorAll('[data-ioptdel]').forEach(el=>{el.onclick=e=>{const i=+e.currentTarget.dataset.ioptdel,oi=+e.currentTarget.dataset.oi;
+   roster[i].initOpts.splice(oi,1);render();};});
+ // オプション項目の編集
+ document.querySelectorAll('[data-iopt]').forEach(el=>{
+   const handler=e=>{const i=+e.target.dataset.iopt,oi=+e.target.dataset.oi,of=e.target.dataset.of;const o=roster[i].initOpts[oi];
+     if(of==='sel'){const v=e.target.value;
+       if(v==='__custom'){o.custom=true;o.goods='';o.price=0;o.size='';}
+       else if(v===''){o.goods='';o.price=0;o.size='';}
+       else{const g=M.goods.find(x=>x.name===v);o.custom=false;o.goods=v;
+         if(g){o.price=g.price;const sz=(g.sizes&&g.sizes.length>0)?g.sizes[0]:'';o.size=sz;}
+       }
+       render();
+     }else if(of==='goods'){o.goods=e.target.value;}
+     else if(of==='size'){o.size=e.target.value;}
+     else if(of==='price'){o.price=+e.target.value;render();}
+     else if(of==='qty'){o.qty=+e.target.value;render();}
+   };
+   if(el.tagName==='SELECT')el.onchange=handler; else {el.oninput=handler;el.onchange=handler;}
+ });
+ // 確定：月次計算等に反映（confirmedフラグを立てる）。リストには残る
+ document.querySelectorAll('[data-newconfirm]').forEach(el=>{el.onclick=e=>{const i=+e.currentTarget.dataset.newconfirm;
+   const n=roster[i];if(!n.name)return;
+   confirmDialog(`「${n.name}」さんを確定します。\n確定すると園児台帳・月次計算・ルクミー出力・本部集計に反映されます。\n（この一覧には記録として残ります）`,()=>{
+     roster[i].confirmed=true;render();
+   },'新規入園の確定','確定する');};});
+ document.querySelectorAll('[data-newdel]').forEach(el=>{el.onclick=e=>{const i=+e.currentTarget.dataset.newdel;
+   const nm=roster[i].name||'この入園者';
+   confirmDialog(`新規入園から「${nm}」を削除します。\nこの操作は取り消せません。本当に削除しますか？`,()=>{roster.splice(i,1);render();});};});
+ setCard('新規入園','途中入園フォーム','入力して「確定」を押すと園児台帳・月次計算・ルクミー出力・本部集計に反映されます。「オプション」ボタンから制服・マット・おむつ等の初回費用を追加でき、初月合計と初回案内PDFに明細として反映されます。確定後も記録として残ります。','add');
+}
+function renderAddon(){
+ let h='<div class="tablewrap"><table><thead><tr><th>種別</th><th>園児名</th><th>商品/項目</th><th>サイズ</th><th class="r">数量</th><th class="r">単価</th><th class="r">小計</th><th>反映年月</th><th></th></tr></thead><tbody>';
+ if(addons.length===0)h+='<tr><td colspan="9" style="text-align:center;color:var(--mut);padding:26px">「＋ 追加申込みを追加」から制服・行事費・返金などを入力してください。反映年月の月次計算に自動で上乗せ／差引されます。</td></tr>';
+ // 返金の種目候補（既存商品＋よくある項目）
+ const refundItems=['おむつ代','バス代','給食費','教材費','制服代','イベント費','その他'];
+ addons.forEach((a,i)=>{const isRefund=a.kind==='返金';
+  const qty=a.qty||1;const rawSub=(a.price||0)*qty;const sub=isRefund?-Math.abs(rawSub):rawSub;
+  const g=M.goods.find(x=>x.name===a.goods);
+  const sizes=(g&&g.sizes)?g.sizes:[];
+  let pupilOpts=allPupils();
+  if(park!=='全施設')pupilOpts=pupilOpts.filter(p=>p.park===park);
+  const pickedPupil=allPupils().find(p=>p.name===a.name);
+  const targetFac=pickedPupil?pickedPupil.park:(park!=='全施設'?park:null);
+  const goodsOpts=targetFac?M.goods.filter(gg=>!gg.facs||(gg.facs.length>0&&gg.facs.includes(targetFac))):M.goods;
+  // 商品/項目セル：申込は商品プルダウン、返金は種目プルダウン＋自由入力
+  let itemCell;
+  if(isRefund){
+   const isCustom=a.custom===true;
+   itemCell=`<select class="inp" data-add="${i}" data-f="refsel" style="width:auto"><option value="">種目を選択</option>${refundItems.map(it=>`<option ${(!isCustom&&a.goods===it)?'selected':''}>${it}</option>`).join('')}<option value="__custom" ${isCustom?'selected':''}>その他（自由入力）</option></select>`;
+   if(isCustom){
+    itemCell+=`<input class="inp" data-add="${i}" data-f="customgoods" value="${(a.goods||'').replace(/"/g,'&quot;')}" placeholder="名称を入力" style="margin-top:4px">`;
+   }
+  }else{
+   itemCell=`<select class="inp" data-add="${i}" data-f="goods"><option value="">選択</option>${goodsOpts.map(gg=>`<option ${a.goods===gg.name?'selected':''}>${gg.name}</option>`).join('')}</select>`;
+  }
+  // サイズセル
+  let sizeCell;
+  if(isRefund){sizeCell='<span style="color:var(--mut)">—</span>';}
+  else if(sizes.length===0){sizeCell=`<span style="color:var(--mut)">${a.size||'—'}</span>`;}
+  else if(sizes.length===1){sizeCell=`<span class="cls">${sizes[0]}</span>`;}
+  else{sizeCell=`<select class="inp" data-add="${i}" data-f="size">${sizes.map(s=>`<option ${a.size===s?'selected':''}>${s}</option>`).join('')}</select>`;}
+  // 単価セル：返金は手入力、申込は商品単価
+  const priceCell=isRefund
+   ?`<input class="inp num" type="number" data-add="${i}" data-f="price" value="${a.price||0}" style="text-align:right;width:90px">`
+   :`¥${(a.price||0).toLocaleString()}`;
+  // 反映年月プルダウン
+  const yrs=[yy-1,yy,yy+1];
+  const ryCell=`<select class="inp" data-add="${i}" data-f="ry" style="width:auto">${yrs.map(y=>`<option ${(+a.ry||yy)===y?'selected':''}>${y}</option>`).join('')}</select> / <select class="inp" data-add="${i}" data-f="rm" style="width:auto">${[1,2,3,4,5,6,7,8,9,10,11,12].map(mo=>`<option ${(+a.rm||mm)===mo?'selected':''}>${mo}</option>`).join('')}</select>`;
+  h+=`<tr style="${isRefund?'background:color-mix(in srgb,var(--leaf) 7%,transparent)':''}">`+
+   `<td><select class="inp" data-add="${i}" data-f="kind" style="width:auto;font-weight:600;color:${isRefund?'var(--leaf)':'var(--berry)'}"><option ${!isRefund?'selected':''}>申込</option><option ${isRefund?'selected':''}>返金</option></select></td>`+
+   `<td><select class="inp" data-add="${i}" data-f="name"><option value="">選択</option>${pupilOpts.map(p=>`<option value="${p.name}" ${a.name===p.name?'selected':''}>${(park==='全施設'?p.park+' ':'')}${p.cls}　${p.name}</option>`).join('')}</select></td>`+
+   `<td>${itemCell}</td>`+
+   `<td>${sizeCell}</td>`+
+   `<td><input class="inp" type="number" data-add="${i}" data-f="qty" value="${qty}" style="text-align:right"></td>`+
+   `<td class="num">${priceCell}</td>`+
+   `<td class="num total" style="${isRefund?'color:var(--leaf)':''}">${isRefund?'-':''}¥${Math.abs(sub).toLocaleString()}</td>`+
+   `<td>${ryCell}</td>`+
+   `<td><button data-adddel="${i}" style="background:none;border:none;color:var(--berry);cursor:pointer;font-size:16px">×</button></td></tr>`;});
+ h+='</tbody></table></div>';
+ document.getElementById('body').innerHTML=h;
+ document.querySelectorAll('[data-add]').forEach(el=>{const handler=e=>{const i=+e.target.dataset.add,f=e.target.dataset.f;
+   let v=e.target.value;if(f==='qty'||f==='price'||f==='ry'||f==='rm')v=+v;
+   if(f==='refsel'){ // 返金の種目プルダウン
+     if(v==='__custom'){addons[i].custom=true;addons[i].goods='';}
+     else{addons[i].custom=false;addons[i].goods=v;}
+   }else if(f==='customgoods'){addons[i].goods=v;}
+   else addons[i][f]=v;
+   if(f==='goods'&&addons[i].kind!=='返金'){const g=M.goods.find(x=>x.name===v);
+     addons[i].price=g?g.price:0;
+     const sizes=(g&&g.sizes)?g.sizes:[];
+     addons[i].size=sizes.length?sizes[0]:'';
+   }
+   if(f==='kind'){if(v==='返金'){addons[i].goods='';addons[i].size='';addons[i].custom=false;}}
+   render();};el.onchange=handler;
+   if(el.dataset.f==='customgoods')el.oninput=e=>{addons[+e.target.dataset.add].goods=e.target.value;};});
+ document.querySelectorAll('[data-adddel]').forEach(el=>{el.onclick=e=>{const i=+e.currentTarget.dataset.adddel;
+   const a=addons[i];const nm=(a.name?a.name+'さんの':'')+(a.goods||'この項目')+(a.kind==='返金'?'（返金）':'');
+   confirmDialog(`追加申込みから「${nm}」を削除します。\nこの操作は取り消せません。本当に削除しますか？`,()=>{addons.splice(i,1);render();});};});
+ setCard('追加申込み','制服・行事費・返金など','種別で「申込」「返金」を選べます。返金は種目を選ぶ（「その他（自由入力）」で名称を直接入力）→金額・反映月を入力すると、その月の月次計算からマイナスされます。','add');
+}
+function renderMonthly(){let rows=visible();
+ // 納入方法フィルタ
+ const allRows=rows;
+ if(monthlyPayFilter==='振込のみ')rows=rows.filter(r=>payMethod(r)==='振込');
+ else if(monthlyPayFilter==='再請求のみ')rows=rows.filter(r=>r.retry);
+ const transferCnt=allRows.filter(r=>payMethod(r)==='振込').length;
+ const retryCnt=allRows.filter(r=>r.retry).length;
+ const isY=(park==='幼稚舎'); // 幼稚舎モードかどうか
+ let h='';
+ // 絞り込みバー
+ const fbtn=(key,label,cnt)=>`<button data-payfil="${key}" style="padding:6px 14px;border:1px solid ${monthlyPayFilter===key?'var(--berry)':'var(--line)'};background:${monthlyPayFilter===key?'var(--berry)':'var(--paper)'};color:${monthlyPayFilter===key?'#fff':'var(--ink)'};border-radius:18px;font-size:12px;cursor:pointer;font-family:inherit">${label}${cnt!==undefined?` <span style="opacity:.75">${cnt}件</span>`:''}</button>`;
+ h+='<div style="padding:10px 22px 12px;border-bottom:1px solid var(--line);display:flex;gap:8px;align-items:center;flex-wrap:wrap">'+
+   '<span style="font-size:12px;color:var(--mut);margin-right:6px;min-width:60px">納入方法</span>'+
+   fbtn('すべて','すべて',allRows.length)+fbtn('振込のみ','振込のみ',transferCnt)+fbtn('再請求のみ','再請求チェック',retryCnt)+
+   '</div>';
+ h+='<div class="tablewrap"><table><thead><tr>';
+ if(isY){
+   h+='<th>施設</th><th>クラス</th><th>区分</th><th>園児名</th>'+
+      '<th class="r">授業料<br><small style="color:var(--mut);font-weight:400;font-size:10px">早割反映</small></th>'+
+      '<th class="r">付帯費</th><th class="r">レッスン</th>'+
+      '<th class="r">給食</th><th class="r">冷暖房</th><th class="r">バス</th>'+
+      '<th class="r">ｵﾌﾟｼｮﾝ/追加</th><th class="r">手数料</th>'+
+      '<th class="r">請求合計</th><th style="text-align:center">納入</th><th style="text-align:center">再請求</th><th>事由</th>';
+ }else{
+   h+='<th>施設</th><th>クラス</th><th>区分</th><th>園児名</th>'+
+      '<th class="r">基本料金</th><th class="r">付帯費</th><th class="r">調整</th>'+
+      '<th class="r">ｵﾌﾟｼｮﾝ/追加</th><th class="r">手数料</th>'+
+      '<th class="r">請求合計</th><th style="text-align:center">納入</th><th style="text-align:center">再請求</th><th>事由</th>';
+ }
+ h+='</tr></thead><tbody>';
+ rows.forEach(r=>{const c=calc(r);const chosei=(c.sib||0)+(c.half||0)+(c.early||0);const opt=(c.evSum||0)+(c.mealAmt||0);
+  const chgs=changesFor(r);const isChg=chgs.length>0;
+  const chgText=chgs.map(x=>x.label).join('、');
+  h+=`<tr class="${isChg?'changed':''}" style="${payMethod(r)==='振込'?'background:var(--berrysoft)':''}"><td><span class="ptag pt-${r.park}">${r.park}</span></td><td class="cls">${r.cls}</td><td class="waku">${r.waku}</td><td class="name">${r.name}</td>`;
+  if(isY && c.type==='B'){
+    // 幼稚舎の内訳表示：授業料は早割を反映した値で表示
+    const d=c._detail||{};
+    const jugyoNet=(d['授業料']||0)+(d['早割']||0); // 早割は授業料から差し引き
+    const isEmpRow=/^従業員\(/.test(r.waku||'');
+    const isOldPrice=(r.jugyoOverride!==undefined&&r.jugyoOverride!==null&&r.jugyoOverride!=='');
+    const labelMut=(text)=>`<small style="color:var(--mut);font-size:10px;font-weight:400">${text}</small>`;
+    const jugyoCell=`<td class="num"><div>¥${jugyoNet.toLocaleString()}</div>${d['早割']?`<small style="color:var(--berry);font-size:10px">基本¥${(d['授業料']||0).toLocaleString()} - 早割¥${Math.abs(d['早割']).toLocaleString()}</small>`:isEmpRow?labelMut('従業員価格'):isOldPrice?labelMut('旧価格'):''}</td>`;
+    h+=jugyoCell+fmt(d['付帯費']||0)+fmt(d['レッスン']||0)+fmt(d['給食']||0)+fmt(d['冷暖房']||0)+fmt(d['バス']||0)+fmt(opt)+fmt(c.fee);
+  }else if(isY){
+    // 幼稚舎モードだが園児が幼稚舎以外（全施設表示ではないので通常はないが念のため）→ 空セル
+    h+=fmt(c.getsu)+`<td class="num">—</td>`.repeat(5)+fmt(opt)+fmt(c.fee);
+  }else{
+    h+=fmt(c.getsu)+fmt(c.kyozai)+fmt(chosei)+fmt(opt)+fmt(c.fee);
+  }
+  const ri=roster.indexOf(r);
+  const payBadge=`<td style="text-align:center"><span style="display:inline-block;padding:3px 9px;border-radius:10px;font-size:11px;font-weight:700;${payMethod(r)==='振込'?'background:var(--berry);color:#fff':'background:var(--paper);color:var(--mut);border:1px solid var(--line)'}">${payMethod(r)}</span></td>`;
+  const retryCell=`<td style="text-align:center">${ri>=0?`<input type="checkbox" data-retry="${ri}" ${r.retry?'checked':''} title="引落不能→再請求の対象にする" style="width:17px;height:17px;accent-color:var(--berry);cursor:pointer">`:'—'}</td>`;
+  h+=payBadge+retryCell+`<td>${isChg?'<span class="chgmark">変動</span><span class="reason">'+chgText+'</span>':(c.flag?'<span class="reason">'+c.reason+'</span>':'')}</td></tr>`;});
+ h+='</tbody></table></div>';document.getElementById('body').innerHTML=h;
+ document.querySelectorAll('[data-payfil]').forEach(el=>{el.onclick=e=>{monthlyPayFilter=e.currentTarget.dataset.payfil;render();};});
+ document.querySelectorAll('[data-retry]').forEach(el=>{el.onchange=e=>{const i=+e.target.dataset.retry;roster[i].retry=e.target.checked;render();};});
+ // 変動件数（当月に基本情報が変更された園児）
+ const chgCount=rows.filter(r=>changesFor(r).length>0).length;
+ const note = (park==='幼稚舎')?'幼稚舎：授業料¥65,000＋付帯費¥10,000(教材費・おやつ代・設備費・保険料)＋レッスン費¥14,000(英語・音楽・体育・ダンス・ウォーキング)＋給食¥6,000＋冷暖房¥4,000＋バス¥4,300(利用者)＋振込手数料¥110。早割は授業料から差引。'
+  :(park==='資生館保育園')?'資生館：3〜5歳(LEAF/BLOSSOM/HARVEST)は無償化で副食費¥4,500のみ。0〜2歳は¥30,000(兄弟あり¥15,000)。'
+  :(park==='全施設')?'全施設横断。各施設の料金体系（保育園A/幼稚舎B/資生館C）で自動計算しています。'
+  :'保育園：枠区分の単価＋教材費＋兄弟割引(-¥8,000)＋途中入園の半額補正＋イベント費＋手数料。';
+ setCard('月次計算',`${yy}年${mm}月分 ／ 表示中：${park}${chgCount?` ／ 変動 ${chgCount}件`:''}　|　振込 ${transferCnt}件・再請求 ${retryCnt}件`,note+' 紫の行＝振込納入。再請求チェックを入れた園児は「再振替・再振込案内」タブで案内文を生成できます。','none');
+}
+function lookmeeGuard(){ // チェック済みなのに担当者未設定の園児があれば名前を返す
+ const k=ymKey();const store=lookmeeCheck[k];if(!store)return null;
+ const rows=visible().filter(r=>r.status==='在園中'||calc(r).isNew);
+ const needsInput=r=>{const c=calc(r);return changesFor(r).length>0||c.flag||c.isNew;};
+ const bad=rows.filter(needsInput).filter(r=>store[r.name]&&store[r.name].done&&!store[r.name].by).map(r=>r.name);
+ return bad.length?bad:null;
+}
+function renderLookmee(){let rows=visible().filter(r=>r.status==='在園中'||calc(r).isNew);
+ const k=ymKey();
+ if(!lookmeeCheck[k])lookmeeCheck[k]={};
+ const store=lookmeeCheck[k];
+ // 変動/フラグの判定：手入力が必要（前月から金額変動 or フラグあり）な園児
+ const needsInput=r=>{const c=calc(r);return changesFor(r).length>0||c.flag||c.isNew;};
+ const targets=rows.filter(needsInput); // 確認チェック対象
+ if(window.__lookmeeOnly===undefined)window.__lookmeeOnly=false;
+ const showRows=window.__lookmeeOnly?targets:rows;
+ const doneCnt=targets.filter(r=>store[r.name]&&store[r.name].done).length;
+ const allChecked=targets.length>0&&doneCnt===targets.length;
+ const now=()=>{const d=new Date();return `${d.getFullYear()}/${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getDate()).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;};
+ let h='';
+ // 操作バー：進捗・絞り込み・一括
+ h+=`<div style="padding:12px 22px;border-bottom:1px solid var(--line);display:flex;gap:12px;align-items:center;flex-wrap:wrap;font-size:13px">`+
+   `<span style="font-weight:700">手入力の確認：<span style="color:var(--berry)">${doneCnt}</span> / ${targets.length}名</span>`+
+   `<div style="flex:1;min-width:120px;max-width:220px;height:8px;background:var(--line);border-radius:4px;overflow:hidden"><div style="width:${targets.length?Math.round(doneCnt/targets.length*100):0}%;height:100%;background:var(--leaf2)"></div></div>`+
+   `<button id="lkAll" class="btn btn-ghost" style="padding:6px 14px;font-size:12px">全員にチェック</button>`+
+   `<button id="lkClear" class="btn btn-ghost" style="padding:6px 14px;font-size:12px">全員解除</button>`+
+   `<button id="lkOnly" style="padding:6px 14px;font-size:12px;border:1px solid ${window.__lookmeeOnly?'var(--berry)':'var(--line)'};background:${window.__lookmeeOnly?'var(--berry)':'var(--paper)'};color:${window.__lookmeeOnly?'#fff':'var(--ink)'};border-radius:8px;cursor:pointer;font-family:inherit">${window.__lookmeeOnly?'✓ 変動・フラグのみ表示中':'変動・フラグのみ表示'}</button>`+
+   `</div>`;
+ // 一括担当者設定バー（全員チェック後のみ有効）
+ h+=`<div style="padding:10px 22px;border-bottom:1px solid var(--line);display:flex;gap:10px;align-items:center;flex-wrap:wrap;font-size:13px;background:${allChecked?'var(--leafsoft)':'var(--paper)'}">`+
+   `<span style="color:var(--mut)">${allChecked?'✓ 全員チェック済み。':'まず「全員にチェック」を押してください。'} 担当者を一括設定：</span>`+
+   `<select id="lkBulkBy" class="inp" ${allChecked?'':'disabled'} style="width:auto;padding:4px 10px;${allChecked?'':'opacity:.5'}"><option value="">担当者を選択…</option>${STAFF.map(s=>`<option>${s}</option>`).join('')}</select>`+
+   `<button id="lkBulkSet" ${allChecked?'':'disabled'} style="padding:6px 16px;font-size:12px;border:none;border-radius:8px;background:${allChecked?'var(--berry)':'var(--line)'};color:#fff;cursor:${allChecked?'pointer':'default'};font-family:inherit;font-weight:700">全員に設定</button>`+
+   `<button id="lkBulkClear" ${allChecked?'':'disabled'} style="padding:6px 16px;font-size:12px;border:1px solid ${allChecked?'var(--berry)':'var(--line)'};border-radius:8px;background:#fff;color:${allChecked?'var(--berry)':'var(--mut)'};cursor:${allChecked?'pointer':'default'};font-family:inherit;font-weight:700">担当を一括解除</button>`+
+   `</div>`;
+ h+='<div class="tablewrap"><table><thead><tr><th>ルクミーID</th><th>クラス</th><th>園児名</th><th>月極保育料金名称</th><th class="r">単価</th><th>オプション</th><th class="r">請求金額</th><th>変動/フラグ</th><th style="text-align:center">手入力確認</th><th>担当</th></tr></thead><tbody>';
+ showRows.forEach(r=>{const c=calc(r);const base=c.getsu+c.kyozai+c.sib+c.half;const opt=c.evs.map(e=>e.item+'(¥'+e.amt.toLocaleString()+')').join('、');
+  const chgs=changesFor(r);const isChg=chgs.length>0;const chgText=chgs.map(x=>x.label).join('、');
+  const need=needsInput(r);
+  const ri=roster.indexOf(r);
+  const rec=store[r.name]||{};
+  // 確認チェックは「変動・フラグのある園児」だけに表示
+  const checkCell=need
+   ? `<td style="text-align:center"><input type="checkbox" data-lkchk="${encodeURIComponent(r.name)}" ${rec.done?'checked':''} title="手入力が完了したらチェック" style="width:18px;height:18px;accent-color:var(--leaf2);cursor:pointer">${rec.done&&rec.at?`<div style="font-size:9px;color:var(--mut);margin-top:2px">${rec.at}</div>`:''}</td>`
+   : `<td style="text-align:center;color:var(--line2)">—</td>`;
+  const byCell=need
+   ? `<td><select data-lkby="${encodeURIComponent(r.name)}" class="inp" ${rec.done?'':'disabled'} style="width:auto;padding:3px 6px;font-size:12px;${rec.done?(rec.by?'':'border-color:var(--berry);background:var(--berrysoft)'):'opacity:.45'}"><option value="">${rec.done?'担当者…':'（先にチェック）'}</option>${STAFF.map(s=>`<option ${rec.by===s?'selected':''}>${s}</option>`).join('')}</select></td>`
+   : `<td style="color:var(--line2)">—</td>`;
+  const rowBg=rec.done?'background:var(--leafsoft)':(isChg||c.flag?'background:#fff7d6':'');
+  h+=`<tr class="${isChg?'changed':''}" style="${rowBg}"><td class="num" style="color:var(--mut)">${r.lid||'—'}</td><td class="cls">${r.cls}</td><td class="name">${r.name}</td><td>月謝（${r.waku}）</td><td class="num">¥${base.toLocaleString()}</td><td style="font-size:12px;color:var(--mut)">${opt||'—'}</td><td class="num total">¥${c.total.toLocaleString()}</td><td>${isChg?'<span class="chgmark">変動</span><span class="reason" style="font-size:11px">'+chgText+'</span>':(c.flag?'<span class="reason" style="font-size:11px">'+c.reason+'</span>':(c.isNew?'<span class="chgmark" style="background:var(--leaf)">新規</span>':''))}</td>${checkCell}${byCell}</tr>`;});
+ h+='</tbody></table></div>';document.getElementById('body').innerHTML=h;
+ // ハンドラ
+ document.querySelectorAll('[data-lkchk]').forEach(el=>{el.onchange=e=>{const nm=decodeURIComponent(e.target.dataset.lkchk);if(!store[nm])store[nm]={};store[nm].done=e.target.checked;store[nm].at=e.target.checked?now():'';if(!e.target.checked)store[nm].by='';render();};});
+ document.querySelectorAll('[data-lkby]').forEach(el=>{el.onchange=e=>{const nm=decodeURIComponent(e.target.dataset.lkby);if(!store[nm])store[nm]={};store[nm].by=e.target.value;render();};});
+ const aAll=document.getElementById('lkAll');if(aAll)aAll.onclick=()=>{const t=now();targets.forEach(r=>{if(!store[r.name])store[r.name]={};store[r.name].done=true;if(!store[r.name].at)store[r.name].at=t;});render();};
+ const aClr=document.getElementById('lkClear');if(aClr)aClr.onclick=()=>{targets.forEach(r=>{if(store[r.name]){store[r.name].done=false;store[r.name].at='';store[r.name].by='';}});render();};
+ const aOnly=document.getElementById('lkOnly');if(aOnly)aOnly.onclick=()=>{window.__lookmeeOnly=!window.__lookmeeOnly;render();};
+ const aBulk=document.getElementById('lkBulkSet');if(aBulk)aBulk.onclick=()=>{const who=document.getElementById('lkBulkBy').value;if(!who){alert('一括設定する担当者を選んでください。');return;}targets.forEach(r=>{if(!store[r.name])store[r.name]={};store[r.name].done=true;if(!store[r.name].at)store[r.name].at=now();store[r.name].by=who;});render();};
+ const aBulkClr=document.getElementById('lkBulkClear');if(aBulkClr)aBulkClr.onclick=()=>{targets.forEach(r=>{if(store[r.name])store[r.name].by='';});render();};
+ setCard('ルクミー出力',`${park} の取込対象 ${rows.length}名 ／ 要手入力 ${targets.length}名（確認済 ${doneCnt}）`,'ルクミーは手入力です。手順：①内容を確認→②「全員にチェック」→③担当者を選んで「全員に設定」。一人で担当する場合はこれで全員に同じ担当者が入ります。担当者が未設定の確認があると他タブへ移動できません。確認はその月だけに保存されます。','none');
+}
+function renderHQ(){const allpks=['月寒園','白石園','サッポロファクトリー園','幼稚舎','資生館保育園'];
+ const pks = (park==='全施設')? allpks : allpks.filter(p=>p===park);
+ let gt=0,gc=0,guni=0,gcap=0;
+ let h='<div class="tablewrap"><table><thead><tr><th>施設</th><th class="r">在園数</th><th class="r">定員</th><th class="r">充足率</th><th class="r">請求合計</th><th class="r">うち月謝系</th><th class="r">うち制服代</th><th class="r">うち行事/その他</th></tr></thead><tbody>';
+ pks.forEach(p=>{let cnt=0,tot=0,base=0,uni=0,ev=0;
+  allPupils().filter(r=>r.park===p).forEach(r=>{const c=calc(r);if(r.status==='在園中'||c.isNew){cnt++;tot+=c.total;base+=c.getsu+c.kyozai+c.sib+c.half+(c.early||0)+c.fee;
+   c.evs.forEach(e=>{ if(isUniform(e.item)) uni+=e.amt; else ev+=e.amt; });}});
+  gt+=tot;gc+=cnt;guni+=uni;
+  const fac=M.facilities.find(f=>f.name===p);const cap=fac?fac.capacity:null;
+  if(cap)gcap+=cap;
+  const rate=cap?Math.round(cnt/cap*100):null;
+  const rateColor=rate==null?'':(rate>=90?'color:var(--berry)':rate>=70?'color:var(--leaf)':'color:var(--mut)');
+  h+=`<tr><td><span class="ptag pt-${p}">${p}</span></td><td class="num">${cnt}</td>`+
+   `<td class="num" style="color:var(--mut)">${cap||'—'}</td>`+
+   `<td class="num" style="${rateColor};font-weight:${rate?'600':'400'}">${rate!=null?rate+'%':'—'}</td>`+
+   `<td class="num total">¥${tot.toLocaleString()}</td><td class="num">¥${base.toLocaleString()}</td>${uni?`<td class="num" style="color:var(--berry)">¥${uni.toLocaleString()}</td>`:'<td class="num zero">—</td>'}${ev?`<td class="num">¥${ev.toLocaleString()}</td>`:'<td class="num zero">—</td>'}</tr>`;});
+ if(park==='全施設'){
+  const grate=gcap?Math.round(gc/gcap*100):null;
+  h+=`<tr style="border-top:2px solid var(--leaf)"><td style="font-weight:700;color:var(--leaf)">全施設合計</td><td class="num" style="font-weight:700">${gc}</td>`+
+   `<td class="num" style="font-weight:700;color:var(--mut)">${gcap||'—'}</td>`+
+   `<td class="num" style="font-weight:700">${grate!=null?grate+'%':'—'}</td>`+
+   `<td class="num total" style="font-size:16px">¥${gt.toLocaleString()}</td><td class="num zero">—</td>${guni?`<td class="num" style="font-weight:700;color:var(--berry)">¥${guni.toLocaleString()}</td>`:'<td class="num zero">—</td>'}<td class="num zero">—</td></tr>`;}
+ h+='</tbody></table></div>';document.getElementById('body').innerHTML=h;
+ const note=(park==='全施設')?'全施設を横断表示。定員・充足率と、制服代（追加申込み）は専用列に分けて表示します。':`${park} のみ表示中。`;
+ setCard('本部用集計',(park==='全施設')?'全施設の内訳＋合計':`${park} の内訳`,note,'none');
+}
+// 制服判定（販売単価マスターの制服カテゴリ）
+function isUniform(item){if(item&&item.indexOf('制服ﾚﾝﾀﾙ')===0)return true;const g=M.goods.find(x=>x.name===item);return g && g.cat==='制服';}
+function renderSched(){
+ // 年月順・同月内は入力順（元の配列順）でソート（安定ソート）
+ const idx=new Map(sched.map((s,i)=>[s,i]));
+ const sorted=sched.slice().sort((a,b)=>{
+  const ka=(+a.year||0)*100+(+a.month||0), kb=(+b.year||0)*100+(+b.month||0);
+  if(ka!==kb)return ka-kb; return idx.get(a)-idx.get(b);});
+ const clsList=['全員','幼稚舎','資生館保育園','月寒園','白石園','サッポロファクトリー園','LEAF','BLOSSOM','HARVEST','SEED-0','SEED-1','SPROUT','個別'];
+ // 並び替えボタン
+ let h='<div style="padding:12px 22px;border-bottom:1px solid var(--line);display:flex;gap:10px;align-items:center;flex-wrap:wrap">'+
+  '<button id="schSort" class="btn btn-ghost" style="padding:8px 18px;font-size:13px">↕ 年月順に並び替え</button>'+
+  '<span style="font-size:12px;color:var(--mut)">年月を変えてこのボタンを押すと、表の順序が年月順に確定します。</span></div>';
+ h+='<div class="tablewrap"><table><thead><tr><th>年月</th><th>項目</th><th>対象</th><th class="r">金額</th><th>状態</th><th>除外</th><th></th></tr></thead><tbody>';
+ sorted.forEach(s=>{const i=sched.indexOf(s);
+  const isFixed=s.state==='確定';
+  let pupilPool=allPupils();
+  if(park!=='全施設')pupilPool=pupilPool.filter(p=>p.park===park);
+  pupilPool=pupilPool.slice().sort((a,b)=>(a.park+a.cls+a.name).localeCompare(b.park+b.cls+b.name,'ja'));
+  // 除外対象になりうる園児（このスケジュールの対象に該当＋現在の施設で絞り込み）
+  const targetPupils=allPupils().filter(p=>{
+   if(park!=='全施設'&&p.park!==park)return false; // 現在の園で絞る
+   if(s.cls==='全員'||s.cls==='全園')return true;
+   if(s.cls==='個別')return false;
+   if(M.facilities.some(f=>f.name===s.cls))return s.cls===p.park;
+   return s.cls===p.cls;
+  }).sort((a,b)=>(a.cls+a.name).localeCompare(b.cls+b.name,'ja'));
+  const exCount=(s.exclude||[]).length;
+  h+=`<tr>`+
+   `<td style="white-space:nowrap"><input class="inp" type="number" data-sch="${i}" data-f="year" value="${s.year||yy}" style="width:64px;display:inline">/<input class="inp" type="number" data-sch="${i}" data-f="month" value="${s.month||1}" style="width:48px;display:inline"></td>`+
+   `<td><input class="inp" data-sch="${i}" data-f="item" value="${(s.item||'').replace(/"/g,'&quot;')}" placeholder="項目名"></td>`+
+   `<td><select class="inp" data-sch="${i}" data-f="cls" style="width:auto">${clsList.map(c=>`<option ${(s.cls===c||(c==='全員'&&s.cls==='全園'))?'selected':''}>${c}</option>`).join('')}</select>`+
+     (s.cls==='個別'?` <select class="inp" data-sch="${i}" data-f="pupil" style="width:auto"><option value="">園児を選択</option>${pupilPool.map(p=>`<option value="${p.name}" ${s.pupil===p.name?'selected':''}>${(park==='全施設'?p.park+' ':'')}${p.cls}　${p.name}</option>`).join('')}</select>`:'')+`</td>`+
+   `<td><input class="inp num" type="number" data-sch="${i}" data-f="fix" value="${s.fix||0}" style="text-align:right;width:100px"></td>`+
+   `<td><button data-toggle="${i}" class="ptag ${isFixed?'pt-月寒園':''}" style="border:none;cursor:pointer;${isFixed?'':'background:var(--chip);color:var(--mut)'}">${s.state}</button></td>`+
+   `<td>${s.cls==='個別'?'<span style="color:var(--mut);font-size:12px">—</span>':`<button data-exptoggle="${i}" style="background:none;border:1px solid var(--line);border-radius:14px;padding:4px 10px;font-size:11px;cursor:pointer;color:${exCount?'var(--berry)':'var(--mut)'}">除外${exCount?' '+exCount+'名':''}</button>`}</td>`+
+   `<td><button data-schdel="${i}" style="background:none;border:none;color:var(--berry);cursor:pointer;font-size:16px">×</button></td></tr>`;
+  // 除外パネル（展開時）
+  if(window.__expandExclude===i && s.cls!=='個別'){
+   h+=`<tr><td colspan="7" style="background:var(--chip);padding:14px 22px">`+
+     `<div style="font-size:12px;color:var(--mut);margin-bottom:8px">「${s.item}」を徴収しない園児を選択（チェックした人は除外）：</div>`+
+     `<div style="display:flex;flex-wrap:wrap;gap:6px 14px">`+
+     (targetPupils.length?targetPupils.map(p=>`<label style="display:inline-flex;align-items:center;gap:5px;font-size:12px;cursor:pointer"><input type="checkbox" data-ex="${i}" data-exname="${p.name}" ${(s.exclude||[]).includes(p.name)?'checked':''} style="width:15px;height:15px;accent-color:var(--berry)">${p.cls} ${p.name}</label>`).join(''):'<span style="color:var(--mut);font-size:12px">対象園児がいません</span>')+
+     `</div></td></tr>`;
+  }
+ });
+ if(sched.length===0)h+='<tr><td colspan="6" style="text-align:center;color:var(--mut);padding:26px">「＋ 項目を追加」から年間スケジュールを登録してください。</td></tr>';
+ h+='</tbody></table></div>';
+ // メモ欄
+ h+='<div style="padding:18px 22px 8px"><div style="font-size:13px;color:var(--berry);font-weight:600;margin-bottom:8px;display:flex;align-items:center;gap:6px">📝 メモ <span style="font-size:11px;color:var(--mut);font-weight:400">来年度の予定・金額変更の可能性など、自由に書き留められます</span></div>'+
+   `<textarea id="schedMemo" placeholder="例：2027年度から進級費を改定予定／バス遠足の金額は5月の見積り後に確定／運動会費は例年5,000円前後 など" style="width:100%;min-height:120px;padding:14px 16px;border:1px solid var(--line);border-radius:12px;font-family:inherit;font-size:13.5px;line-height:1.8;color:var(--ink);background:var(--paper);resize:vertical;box-sizing:border-box">${(schedMemo||'').replace(/</g,'&lt;')}</textarea></div>`;
+ document.getElementById('body').innerHTML=h;
+ // メモ欄の保存
+ const memoEl=document.getElementById('schedMemo');
+ if(memoEl)memoEl.oninput=e=>{schedMemo=e.target.value;};
+ // 並び替えボタン：配列自体を年月順に並び替えて確定
+ document.getElementById('schSort').onclick=()=>{const id2=new Map(sched.map((s,i)=>[s,i]));
+   sched.sort((a,b)=>{const ka=(+a.year||0)*100+(+a.month||0),kb=(+b.year||0)*100+(+b.month||0);if(ka!==kb)return ka-kb;return id2.get(a)-id2.get(b);});render();};
+ document.querySelectorAll('[data-sch]').forEach(el=>{const handler=e=>{const i=+e.target.dataset.sch,f=e.target.dataset.f;
+   let v=e.target.value;if(f==='year'||f==='month'||f==='fix')v=+v;sched[i][f]=v;
+   if(f==='cls'&&v!=='個別')sched[i].pupil='';
+   render();};el.onchange=handler;});
+ document.querySelectorAll('[data-toggle]').forEach(el=>{el.onclick=e=>{const i=+e.target.dataset.toggle;
+   sched[i].state=(sched[i].state==='確定')?'予定':'確定';
+   if(sched[i].state==='確定'&&!sched[i].fix)sched[i].fix=sched[i].plan||0;
+   render();};});
+ document.querySelectorAll('[data-schdel]').forEach(el=>{el.onclick=e=>{const i=+e.currentTarget.dataset.schdel;
+   const nm=sched[i].item||'この項目';
+   confirmDialog(`年間スケジュールから「${nm}」を削除します。\nこの操作は取り消せません。本当に削除しますか？`,()=>{sched.splice(i,1);render();});};});
+ document.querySelectorAll('[data-exptoggle]').forEach(el=>{el.onclick=e=>{const i=+e.currentTarget.dataset.exptoggle;
+   window.__expandExclude=(window.__expandExclude===i)?null:i;render();};});
+ document.querySelectorAll('[data-ex]').forEach(el=>{el.onchange=e=>{const i=+e.target.dataset.ex,name=e.target.dataset.exname;
+   if(!sched[i].exclude)sched[i].exclude=[];
+   if(e.target.checked){if(!sched[i].exclude.includes(name))sched[i].exclude.push(name);}
+   else{sched[i].exclude=sched[i].exclude.filter(n=>n!==name);}
+   render();};});
+ setCard('年間スケジュール','イレギュラー徴収項目','項目・対象・金額を編集でき、状態を「確定」にするとその月の月次計算に反映されます。個別はクラス＋名前から選べます。「年月順に並び替え」で順序を確定できます。','add');
+}
+function renderPDF(){
+ // 案内対象：新規入園（roster内のisNew）の園児。当園で絞り込み、登録順
+ const newCandAll=roster.filter(n=>n.isNew&&n.name).filter(n=>park==='全施設'||n.park===park);
+ const orderedCand=newCandAll.slice().sort((a,b)=>(a.regSeq||0)-(b.regSeq||0));
+ if(window.__pdfPick===undefined||window.__pdfPick>=orderedCand.length)window.__pdfPick=0;
+ const p=orderedCand[window.__pdfPick]||orderedCand[0];
+ const bk=Object.fromEntries(bank.map(b=>[b.label,b[park]||'']));
+ // 園名表示は再振替案内と統一（資生館→チルドレンズガーデン資生館保育園／その他→STRAWBERRY FIELD ○○）
+ const FAC_JP_NAME={'月寒園':'STRAWBERRY FIELD 月寒園','白石園':'STRAWBERRY FIELD 白石園','サッポロファクトリー園':'STRAWBERRY FIELD サッポロファクトリー園','幼稚舎':'STRAWBERRY FIELD 幼稚舎','資生館保育園':'チルドレンズガーデン資生館保育園'};
+ const footName=FAC_JP_NAME[park]||(bk['園名（正式名称）']||'');
+ if(!window.__issueDate){const d=new Date();window.__issueDate=d.toISOString().slice(0,10);}
+ const issue=window.__issueDate;
+ const due=(()=>{const d=new Date(issue);d.setDate(d.getDate()+7);return d.toISOString().slice(0,10);})();
+ const fmtJP=s=>{const d=new Date(s);return `${d.getFullYear()}年 ${d.getMonth()+1}月 ${d.getDate()}日`;};
+ const fmtJPshort=s=>{const d=new Date(s);return `${d.getFullYear()}.${String(d.getMonth()+1).padStart(2,'0')}.${String(d.getDate()).padStart(2,'0')}`;};
+ const facColor=FAC_COLORS[park]||'#a8466a';
+ let h='';
+ if(orderedCand.length===0){
+  document.getElementById('body').innerHTML='<div style="padding:48px 22px;text-align:center;color:var(--mut);font-size:14px;line-height:1.9">この園に新規入園の入力がありません。<br>「新規入園」タブで園児を入力すると、ここに案内状が表示されます。<br><span style="font-size:12px">（確定して園児台帳に登録した後は、ここには表示されません）</span></div>';
+  setCard('初回案内PDF出力','新規入園者の案内状','「新規入園」タブで入力した園児の初回振込案内を表示します。','none');
+  return;
+ }
+ h+=`<div style="padding:14px 22px;border-bottom:1px solid var(--line);font-size:13px;color:var(--mut);display:flex;gap:24px;align-items:center;flex-wrap:wrap">`+
+   `<div>案内対象（新規入園）：<select id="pdfPick" class="inp" style="width:auto;padding:4px 8px">${orderedCand.map((c,idx)=>`<option value="${idx}" ${window.__pdfPick===idx?'selected':''}>${c.cls||''} ${c.name}${c.nyuen?'（入園 '+c.nyuen+'）':''}</option>`).join('')}</select></div>`+
+   `<div>発行日：<input id="issueDate" type="date" value="${issue}" class="inp" style="width:auto;padding:4px 8px"></div>`+
+   `<div>振込期限（発行日＋7日）：<b style="color:var(--berry)">${fmtJP(due)}</b></div></div>`;
+ if(p){const c=calc(p,true);
+  h+=`<style>
+   .pdfdoc{max-width:780px;margin:32px auto;background:#fdfaf6;color:#2a2018;padding:0;font-family:'Zen Old Mincho',serif;box-shadow:0 2px 24px rgba(120,80,60,.08);border:1px solid #e8dcc8;position:relative;overflow:hidden;}
+   .pdfdoc::before{content:'';position:absolute;top:0;left:0;right:0;height:6px;background:linear-gradient(90deg,${facColor} 0%,${facColor}aa 60%,#d4a574 100%);}
+   .pdfdoc::after{content:'';position:absolute;bottom:0;left:0;right:0;height:2px;background:${facColor};opacity:.25;}
+   .pdfdoc .topbar{padding:36px 56px 22px;display:flex;justify-content:space-between;align-items:flex-start;border-bottom:1px solid #ebdfc8;}
+   .pdfdoc .brand{font-family:'Spline Sans Mono',monospace;letter-spacing:.28em;font-size:11px;color:${facColor};font-weight:600;margin-bottom:6px;text-transform:uppercase;}
+   .pdfdoc .brandJP{font-size:13.5px;color:#5a4a3a;letter-spacing:.08em;}
+   .pdfdoc .issuedate{text-align:right;font-size:11px;color:#8a7a6a;letter-spacing:.06em;}
+   .pdfdoc .issuedate .dlabel{font-family:'Spline Sans Mono',monospace;font-size:9px;letter-spacing:.2em;color:${facColor};display:block;margin-bottom:4px;}
+   .pdfdoc .issuedate .dval{font-size:14px;color:#2a2018;letter-spacing:.04em;}
+   .pdfdoc .titlewrap{text-align:center;padding:44px 56px 28px;position:relative;}
+   .pdfdoc .titleEN{font-family:'Spline Sans Mono',monospace;font-size:10px;letter-spacing:.4em;color:${facColor};margin-bottom:14px;text-transform:uppercase;}
+   .pdfdoc .titleJP{font-size:26px;letter-spacing:.6em;color:#2a2018;font-weight:500;padding-left:.6em;}
+   .pdfdoc .titleline{display:flex;align-items:center;justify-content:center;gap:14px;margin-top:18px;}
+   .pdfdoc .titleline .ld{width:60px;height:1px;background:${facColor};opacity:.5;}
+   .pdfdoc .titleline .dot{width:6px;height:6px;border-radius:50%;background:${facColor};}
+   .pdfdoc .body{padding:8px 56px 40px;}
+   .pdfdoc .addr{font-size:18px;margin:10px 0 4px;letter-spacing:.08em;}
+   .pdfdoc .addr small{font-size:13px;color:#8a7a6a;margin-left:6px;}
+   .pdfdoc .greet{font-size:13px;line-height:2;color:#3a2e22;margin:18px 0 36px;letter-spacing:.04em;}
+   .pdfdoc .sec2{display:flex;align-items:baseline;gap:10px;margin:28px 0 14px;}
+   .pdfdoc .sec2 .num{font-family:'Spline Sans Mono',monospace;font-size:11px;color:${facColor};letter-spacing:.2em;}
+   .pdfdoc .sec2 .lbl{font-size:14px;color:#2a2018;letter-spacing:.16em;font-weight:600;}
+   .pdfdoc .sec2 .line{flex:1;height:1px;background:#e8dcc8;margin-left:6px;}
+   .pdfdoc .info{display:grid;grid-template-columns:120px 1fr;gap:14px 28px;font-size:13.5px;padding:0 8px;}
+   .pdfdoc .info dt{color:#8a7a6a;letter-spacing:.1em;}
+   .pdfdoc .info dd{margin:0;color:#2a2018;letter-spacing:.04em;}
+   .pdfdoc .info dd b{font-size:17px;font-weight:600;letter-spacing:.08em;}
+   .pdfdoc .billtable{width:100%;border-collapse:collapse;margin-top:4px;}
+   .pdfdoc .billtable td{padding:13px 10px;font-size:13.5px;border-bottom:1px dotted #d8c8b0;letter-spacing:.04em;}
+   .pdfdoc .billtable td:first-child{color:#5a4a3a;}
+   .pdfdoc .billtable td:last-child{text-align:right;font-family:'Spline Sans Mono',monospace;color:#2a2018;font-weight:500;}
+   .pdfdoc .billtable .neg td:last-child{color:${facColor};}
+   .pdfdoc .billtotal{display:flex;justify-content:space-between;align-items:baseline;padding:18px 10px 6px;border-top:2px solid ${facColor};margin-top:8px;}
+   .pdfdoc .billtotal .lbl{font-size:14px;letter-spacing:.18em;color:#2a2018;font-weight:600;}
+   .pdfdoc .billtotal .amt{font-family:'Spline Sans Mono',monospace;font-size:28px;color:${facColor};font-weight:600;letter-spacing:.02em;}
+   .pdfdoc .bankcard{margin-top:14px;background:linear-gradient(135deg,#fbf5ec 0%,#f5ead8 100%);border-left:3px solid ${facColor};padding:24px 28px;display:grid;grid-template-columns:90px 1fr;gap:12px 22px;font-size:13px;}
+   .pdfdoc .bankcard dt{color:#8a7a6a;letter-spacing:.1em;}
+   .pdfdoc .bankcard dd{margin:0;color:#2a2018;letter-spacing:.04em;font-family:'Spline Sans Mono',monospace;font-size:13.5px;}
+   .pdfdoc .duebox{margin-top:18px;background:#fff;border:1.5px dashed ${facColor};padding:20px 28px;text-align:center;}
+   .pdfdoc .duebox .lbl{font-family:'Spline Sans Mono',monospace;font-size:10px;letter-spacing:.3em;color:${facColor};margin-bottom:8px;text-transform:uppercase;}
+   .pdfdoc .duebox .date{font-size:24px;color:#2a2018;letter-spacing:.12em;font-weight:500;}
+   .pdfdoc .duebox .sub{font-size:11px;color:#8a7a6a;margin-top:6px;letter-spacing:.08em;}
+   .pdfdoc .closing{font-size:13px;line-height:2;color:#3a2e22;margin:24px 0 6px;letter-spacing:.03em;}
+   .pdfdoc .keigu{text-align:right;font-size:13px;color:#3a2e22;margin-top:4px;}
+   .pdfdoc .footer{padding:24px 56px 36px;text-align:center;font-size:10px;color:#a89888;letter-spacing:.2em;border-top:1px solid #ebdfc8;}
+   .pdfdoc .footer .seal{display:inline-block;font-family:'Spline Sans Mono',monospace;font-size:9px;letter-spacing:.3em;border:1px solid ${facColor};padding:6px 14px;color:${facColor};margin-bottom:10px;}
+  </style>`+
+   `<div class="pdfdoc">`+
+    `<div class="topbar" style="display:block;text-align:center">`+
+     `<div class="brandJP" style="font-size:15px;letter-spacing:.1em;color:${facColor}">${footName}</div>`+
+     `<div class="issuedate" style="text-align:center;margin-top:8px;font-size:13px;color:#5a4a3a">${fmtJP(issue)}</div>`+
+    `</div>`+
+    `<div class="titlewrap">`+
+     `<div class="titleEN">Enrollment Payment Notice</div>`+
+     `<div class="titleJP">新規入園振込案内</div>`+
+     `<div class="titleline"><span class="ld"></span><span class="dot"></span><span class="ld"></span></div>`+
+    `</div>`+
+    `<div class="body">`+
+     `<div class="addr">${p.koza||p.name} <small>様</small></div>`+
+     `<div class="greet">拝啓　時下ますますご清栄のこととお慶び申し上げます。<br>このたびはお子様のご入園、誠におめでとうございます。<br>初月の月謝につきまして、下記のとおりご案内申し上げます。</div>`+
+
+     `<div class="sec2"><span class="num">01</span><span class="lbl">入園情報</span><span class="line"></span></div>`+
+     `<dl class="info">`+
+      `<dt>園児氏名</dt><dd><b>${p.name}</b></dd>`+
+      `<dt>クラス</dt><dd>${p.cls}</dd>`+
+      `<dt>枠区分</dt><dd>${p.waku}</dd>`+
+     `</dl>`+
+
+     `<div class="sec2"><span class="num">02</span><span class="lbl">初月月謝内訳</span><span class="line"></span></div>`+
+     `<table class="billtable">`+
+      `<tr><td>基本月謝</td><td>¥ ${c.getsu.toLocaleString()}</td></tr>`+
+      `<tr><td>教材費等</td><td>¥ ${c.kyozai.toLocaleString()}</td></tr>`+
+      (c.half?`<tr class="neg"><td>途中入園 半額補正</td><td>- ¥ ${Math.abs(c.half).toLocaleString()}</td></tr>`:'')+
+      (c.sib?`<tr class="neg"><td>兄弟割引</td><td>- ¥ ${Math.abs(c.sib).toLocaleString()}</td></tr>`:'')+
+      (c.early?`<tr class="neg"><td>早割（幼稚舎）</td><td>- ¥ ${Math.abs(c.early).toLocaleString()}</td></tr>`:'')+
+      `<tr><td>振込手数料</td><td>¥ ${c.fee}</td></tr>`+
+      ((p.initOpts||[]).filter(o=>o.goods&&(Number(o.price)||0)>0).map(o=>{const sub=(Number(o.price)||0)*(Number(o.qty)||1);return `<tr><td>${(o.goods||'').replace(/</g,'&lt;')}${o.size?'（'+o.size+'）':''}${(Number(o.qty)||1)>1?' ×'+(Number(o.qty)||1):''}</td><td>¥ ${sub.toLocaleString()}</td></tr>`;}).join(''))+
+     `</table>`+
+     `<div class="billtotal"><span class="lbl">ご請求金額合計</span><span class="amt">¥ ${(c.total+initOptsSum(p)).toLocaleString()}</span></div>`+
+
+     `<div class="sec2"><span class="num">03</span><span class="lbl">お振込先 / Payment</span><span class="line"></span></div>`+
+     `<dl class="bankcard">`+
+      `<dt>銀行名</dt><dd>${bk['振込先銀行名']||'—'}</dd>`+
+      `<dt>支店名</dt><dd>${bk['振込先支店名']||'—'}</dd>`+
+      `<dt>口座番号</dt><dd>${bk['口座種別']||''}　${bk['口座番号']||'—'}</dd>`+
+      `<dt>口座名義</dt><dd style="font-size:11.5px;letter-spacing:.02em">${bk['口座名義(カナ)']||'—'}</dd>`+
+     `</dl>`+
+
+     `<div class="duebox">`+
+      `<div class="lbl">Payment Due Date　お振込期限</div>`+
+      `<div class="date">${fmtJP(due)}</div>`+
+      `<div class="sub">発行日より 7 日以内にお振込みをお願いいたします</div>`+
+     `</div>`+
+     `<div class="closing">※ 振込手数料はお客様のご負担にてお願いいたします。<br>お子様の健やかなご成長を職員一同心よりお祈り申し上げますとともに、今後ともどうぞよろしくお願い申し上げます。</div>`+
+     `<div class="keigu">敬具</div>`+
+    `</div>`+
+   `</div>`;
+ }else h+='<div style="padding:40px;text-align:center;color:var(--mut)">この園に園児がいません。</div>';
+ document.getElementById('body').innerHTML=h;
+ const isd=document.getElementById('issueDate');if(isd)isd.onchange=e=>{window.__issueDate=e.target.value;render();};
+ const pdfPickEl=document.getElementById('pdfPick');if(pdfPickEl)pdfPickEl.onchange=e=>{window.__pdfPick=+e.target.value;render();};
+ setCard('初回案内PDF出力','選択園の口座を自動反映','発行日を変えると振込期限(発行日+7日)も自動で再計算されます。施設色がアクセントに反映されます。','none');
+}
+function renderReissue(){
+ // 対象＝再請求チェックが入った在園児（当園で絞り込み）
+ const targets=visible().filter(r=>r.retry);
+ const bk=Object.fromEntries(bank.map(b=>[b.label,b[park]||'']));
+ const facColor=FAC_COLORS[park]||'#a8466a';
+ // フッター用の園名（前置きの全園共通文言なし・各園の正式名称）
+ const FAC_JP_NAME={'月寒園':'STRAWBERRY FIELD 月寒園','白石園':'STRAWBERRY FIELD 白石園','サッポロファクトリー園':'STRAWBERRY FIELD サッポロファクトリー園','幼稚舎':'STRAWBERRY FIELD 幼稚舎','資生館保育園':'チルドレンズガーデン資生館保育園'};
+ const footName=FAC_JP_NAME[park]||(bk['園名（正式名称）']||'');
+ const fmtJP=s=>{const d=new Date(s);return `${d.getFullYear()}年 ${d.getMonth()+1}月 ${d.getDate()}日`;};
+ const fmtJPshort=s=>{const d=new Date(s);return `${d.getFullYear()}.${String(d.getMonth()+1).padStart(2,'0')}.${String(d.getDate()).padStart(2,'0')}`;};
+ if(!window.__reissueDate){const d=new Date();window.__reissueDate=d.toISOString().slice(0,10);}
+ const issue=window.__reissueDate;
+ // 振込期限と再振替日は別々に保持
+ if(!window.__reissueDueFuri){const d=new Date(issue);d.setDate(d.getDate()+7);window.__reissueDueFuri=d.toISOString().slice(0,10);}
+ if(!window.__reissueDueSai){const d=new Date(issue);d.setDate(d.getDate()+7);window.__reissueDueSai=d.toISOString().slice(0,10);}
+ // タブ＝納入方法で自動振り分け（furi＝振込の人／hiki＝引落の人）
+ if(!window.__reissueTab)window.__reissueTab='furi';
+ const isFuriMode=window.__reissueTab==='furi';
+ const due=isFuriMode?window.__reissueDueFuri:window.__reissueDueSai;
+ // 当該タブの納入方法に該当する再請求対象だけを抽出
+ const furiTargets=targets.filter(r=>payMethod(r)==='振込');
+ const hikiTargets=targets.filter(r=>payMethod(r)==='引落');
+ const tabTargets=isFuriMode?furiTargets:hikiTargets;
+ // 事務手数料：対象園児の施設別既定（資生館¥550／その他¥660）。手動編集は施設ごとに保持。
+ let _pick=window.__rePick;if(_pick===undefined||_pick>=tabTargets.length)_pick=0;
+ const feePark=(tabTargets[_pick]&&tabTargets[_pick].park)||park;
+ const reissueFee=getReissueFee(feePark);
+ let h='';
+ // 納入方法タブ（振込の人／引落の人）
+ const tabBtn=(key,label,cnt)=>`<button data-retab="${key}" style="padding:8px 18px;border:1px solid ${window.__reissueTab===key?'var(--berry)':'var(--line)'};background:${window.__reissueTab===key?'var(--berry)':'var(--paper)'};color:${window.__reissueTab===key?'#fff':'var(--ink)'};border-radius:20px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">${label} <span style="opacity:.8;font-weight:400">${cnt}名</span></button>`;
+ h+=`<div class="noprint" style="padding:12px 22px;border-bottom:1px solid var(--line);display:flex;gap:10px;align-items:center;flex-wrap:wrap">`+
+   `<span style="font-size:12px;color:var(--mut);margin-right:4px">納入方法で表示</span>`+
+   tabBtn('furi','💳 振込の人',furiTargets.length)+tabBtn('hiki','🏦 引落の人',hikiTargets.length)+
+   `</div>`;
+ // 操作バー（発行日・期限・手数料）
+ h+=`<div class="noprint" style="padding:14px 22px;border-bottom:1px solid var(--line);font-size:13px;color:var(--mut);display:flex;gap:20px;align-items:center;flex-wrap:wrap">`+
+   `<div>発行日：<input id="reIssue" type="date" value="${issue}" class="inp" style="width:auto;padding:4px 8px"></div>`+
+   `<div>${isFuriMode?'振込期限':'再振替日'}：<input id="reDue" type="date" value="${due}" data-duemode="${isFuriMode?'furi':'sai'}" class="inp" style="width:auto;padding:4px 8px"></div>`+
+   `<div>事務手数料：¥<input id="reFee" type="number" step="10" value="${reissueFee}" data-feepark="${feePark}" class="inp" style="width:90px;padding:4px 8px"></div>`+
+   `</div>`;
+ if(tabTargets.length===0){
+  const other=isFuriMode?hikiTargets.length:furiTargets.length;
+  h+=`<div style="padding:48px 22px;text-align:center;color:var(--mut);font-size:14px;line-height:1.9">${isFuriMode?'振込':'引落'}の再請求対象がいません。`+
+    (other>0?`<br>もう一方のタブ（${isFuriMode?'引落':'振込'}の人）に ${other}名 います。`:`<br>「月次計算」タブで、引落不能だった園児の <b style="color:var(--berry)">再請求チェック</b> を入れてください。納入方法（振込/引落）は園児台帳で設定できます。`)+`</div>`;
+  document.getElementById('body').innerHTML=h;
+  bindReissueBar();
+  setCard('再振替・再振込案内','引落不能者への督促状','「振込の人」「引落の人」タブで自動的に分かれます。園児台帳の納入方法で振込/引落を設定し、月次計算で再請求チェックを入れてください。','none');
+  return;
+ }
+ // 対象セレクタ（当該タブの対象者のみ）
+ if(window.__rePick===undefined||window.__rePick>=tabTargets.length)window.__rePick=0;
+ const p=tabTargets[window.__rePick];
+ h+=`<div class="noprint" style="padding:10px 22px;border-bottom:1px solid var(--line);font-size:13px;color:var(--mut);display:flex;gap:14px;align-items:center;flex-wrap:wrap">`+
+   `<div>対象者（${tabTargets.length}名）：`+
+   `<select id="rePick" class="inp" style="width:auto;padding:4px 8px">${tabTargets.map((t,idx)=>`<option value="${idx}" ${window.__rePick===idx?'selected':''}>${t.cls||''} ${t.name}</option>`).join('')}</select></div>`+
+   `<div style="flex:1"></div>`+
+   `<button id="reJpeg" class="btn btn-ghost" style="padding:7px 16px;font-size:13px">🖼 JPEG保存</button>`+
+   `<button id="rePrint" class="btn btn-primary" style="padding:7px 16px;font-size:13px">🖨 印刷</button>`+
+   `</div>`;
+ // 金額：当月請求合計＝月謝、＋事務手数料＝振込額
+ const c=calc(p);
+ const monthly=c.total;
+ const payable=monthly+(Number(reissueFee)||0);
+ const isFuri=isFuriMode;
+ h+=`<style>
+  .redoc{max-width:780px;margin:32px auto;background:#fdfaf6;color:#2a2018;font-family:'Zen Old Mincho',serif;box-shadow:0 2px 24px rgba(120,80,60,.08);border:1px solid #e8dcc8;position:relative;overflow:hidden;}
+  .redoc::before{content:'';position:absolute;top:0;left:0;right:0;height:6px;background:linear-gradient(90deg,${facColor} 0%,${facColor}aa 60%,#d4a574 100%);}
+  .redoc .topbar{padding:34px 56px 18px;display:flex;justify-content:space-between;align-items:flex-start;border-bottom:1px solid #ebdfc8;}
+  .redoc .brand{font-family:'Spline Sans Mono',monospace;letter-spacing:.26em;font-size:11px;color:${facColor};font-weight:600;text-transform:uppercase;margin-bottom:6px;}
+  .redoc .brandJP{font-size:13px;color:#5a4a3a;letter-spacing:.06em;}
+  .redoc .tel{font-size:11px;color:#8a7a6a;margin-top:4px;letter-spacing:.04em;}
+  .redoc .issuedate{text-align:right;font-size:12px;color:#2a2018;letter-spacing:.04em;}
+  .redoc .titlewrap{text-align:center;padding:38px 56px 22px;}
+  .redoc .titleEN{font-family:'Spline Sans Mono',monospace;font-size:10px;letter-spacing:.4em;color:${facColor};margin-bottom:12px;text-transform:uppercase;}
+  .redoc .titleJP{font-size:24px;letter-spacing:.5em;color:#2a2018;font-weight:500;padding-left:.5em;}
+  .redoc .body{padding:8px 56px 36px;}
+  .redoc .addr{font-size:18px;margin:6px 0 22px;letter-spacing:.08em;}
+  .redoc .addr small{font-size:13px;color:#8a7a6a;margin-left:6px;}
+  .redoc .greet{font-size:13px;line-height:2.05;color:#3a2e22;margin:14px 0 26px;letter-spacing:.03em;}
+  .redoc .greet b{color:${facColor};}
+  .redoc .amtbox{background:linear-gradient(135deg,#fbf5ec 0%,#f5ead8 100%);border-left:3px solid ${facColor};padding:20px 26px;margin:10px 0 24px;}
+  .redoc .amtrow{display:flex;justify-content:space-between;align-items:baseline;padding:6px 0;font-size:13.5px;border-bottom:1px dotted #d8c8b0;}
+  .redoc .amtrow:last-child{border-bottom:none;}
+  .redoc .amtrow .v{font-family:'Spline Sans Mono',monospace;}
+  .redoc .amttotal{display:flex;justify-content:space-between;align-items:baseline;margin-top:12px;padding-top:12px;border-top:2px solid ${facColor};}
+  .redoc .amttotal .l{font-size:14px;letter-spacing:.14em;font-weight:600;}
+  .redoc .amttotal .v{font-family:'Spline Sans Mono',monospace;font-size:26px;color:${facColor};font-weight:600;}
+  .redoc .sec2{display:flex;align-items:baseline;gap:10px;margin:24px 0 12px;}
+  .redoc .sec2 .num{font-family:'Spline Sans Mono',monospace;font-size:11px;color:${facColor};letter-spacing:.2em;}
+  .redoc .sec2 .lbl{font-size:14px;letter-spacing:.14em;font-weight:600;}
+  .redoc .sec2 .line{flex:1;height:1px;background:#e8dcc8;margin-left:6px;}
+  .redoc .bankcard{background:#fff;border:1px solid #e8dcc8;border-radius:4px;padding:20px 26px;display:grid;grid-template-columns:90px 1fr;gap:11px 22px;font-size:13px;}
+  .redoc .bankcard dt{color:#8a7a6a;letter-spacing:.1em;}
+  .redoc .bankcard dd{margin:0;color:#2a2018;letter-spacing:.03em;font-family:'Spline Sans Mono',monospace;font-size:13px;}
+  .redoc .duebox{margin-top:18px;background:#fff;border:1.5px dashed ${facColor};padding:18px 26px;text-align:center;}
+  .redoc .duebox .lbl{font-family:'Spline Sans Mono',monospace;font-size:10px;letter-spacing:.3em;color:${facColor};margin-bottom:6px;text-transform:uppercase;}
+  .redoc .duebox .date{font-size:22px;color:#2a2018;letter-spacing:.1em;}
+  .redoc .closing{font-size:13px;line-height:2;color:#3a2e22;margin:24px 0 6px;letter-spacing:.03em;}
+  .redoc .keigu{text-align:right;font-size:13px;color:#3a2e22;margin-top:4px;}
+  .redoc .contact{font-size:11.5px;color:#8a7a6a;margin-top:20px;padding-top:14px;border-top:1px solid #ebdfc8;letter-spacing:.04em;line-height:1.8;}
+  .redoc .footer{padding:22px 56px 32px;text-align:center;font-size:10px;color:#a89888;letter-spacing:.2em;border-top:1px solid #ebdfc8;}
+  .redoc .footer .seal{display:inline-block;font-family:'Spline Sans Mono',monospace;font-size:9px;letter-spacing:.3em;border:1px solid ${facColor};padding:6px 14px;color:${facColor};margin-bottom:10px;}
+ </style>`;
+ const greetFuri=`いつも当園の活動にご理解、ご協力をいただきありがとうございます。<br>さて、月謝の納入についてですが、<b>${yy}年${mm}月分 ¥${monthly.toLocaleString()}</b>（${fmtJP(issue)}自動引落）の確認がとれませんでした。お手数ですが通帳をご確認いただきますようお願い申し上げます。<br>つきましては、下記のとおりお振込みをお願いいたします。`;
+ const greetSai=`いつも当園の活動にご理解、ご協力をいただきありがとうございます。<br>さて、月謝の納入についてですが、<b>${yy}年${mm}月分 ¥${monthly.toLocaleString()}</b>（${fmtJP(issue)}自動引落）の確認がとれませんでした。お手数ですが通帳をご確認いただきますようお願い申し上げます。<br>つきましては、下記の日程で再度口座より引落しをさせていただきます。残高のご確認をお願い申し上げます。`;
+ h+=`<div class="redoc" id="reissueDoc">`+
+   `<div class="topbar" style="display:block;text-align:center">`+
+    `<div class="brandJP" style="font-size:15px;letter-spacing:.1em;color:${facColor}">${footName}</div>`+
+    `<div class="issuedate" style="text-align:center;margin-top:8px;font-size:13px;color:#5a4a3a">${fmtJP(issue)}</div>`+
+   `</div>`+
+   `<div class="titlewrap">`+
+    `<div class="titleEN">${isFuri?'Payment Reminder':'Re-debit Notice'}</div>`+
+    `<div class="titleJP">月謝納入のお願い</div>`+
+   `</div>`+
+   `<div class="body">`+
+    `<div class="addr">${p.koza||p.name} <small>様</small></div>`+
+    `<div class="greet">${isFuri?greetFuri:greetSai}</div>`+
+    `<div class="sec2"><span class="num">01</span><span class="lbl">ご請求金額</span><span class="line"></span></div>`+
+    `<div class="amtbox">`+
+     `<div class="amtrow"><span>${yy}年${mm}月分 月謝</span><span class="v">¥ ${monthly.toLocaleString()}</span></div>`+
+     `<div class="amtrow"><span>事務手数料</span><span class="v">¥ ${(Number(reissueFee)||0).toLocaleString()}</span></div>`+
+     `<div class="amttotal"><span class="l">${isFuri?'お振込金額':'再引落金額'}合計</span><span class="v">¥ ${payable.toLocaleString()}</span></div>`+
+    `</div>`;
+ if(isFuri){
+  h+=`<div class="sec2"><span class="num">02</span><span class="lbl">お振込先 / Payment</span><span class="line"></span></div>`+
+    `<dl class="bankcard">`+
+     `<dt>銀行名</dt><dd>${bk['振込先銀行名']||'—'}</dd>`+
+     `<dt>支店名</dt><dd>${bk['振込先支店名']||'—'}</dd>`+
+     `<dt>口座番号</dt><dd>${bk['口座種別']||''}　${bk['口座番号']||'—'}</dd>`+
+     `<dt>口座名義</dt><dd style="font-size:11.5px">${bk['口座名義(カナ)']||'—'}</dd>`+
+    `</dl>`+
+    `<div class="duebox"><div class="lbl">Payment Due　お振込期限</div><div class="date">${fmtJP(due)}</div></div>`+
+    `<div class="closing">※ 振込手数料はお客様のご負担にてお願いいたします。<br>お忙しいところ恐縮ですが、何卒よろしくお願い申し上げます。</div>`;
+ }else{
+  h+=`<div class="sec2"><span class="num">02</span><span class="lbl">再振替日</span><span class="line"></span></div>`+
+    `<div class="duebox"><div class="lbl">Re-debit Date　再振替日</div><div class="date">${fmtJP(due)}</div></div>`+
+    `<div class="closing">上記日程で再度引落しをさせていただきます。前日までに残高のご確認をお願い申し上げます。<br>何卒よろしくお願い申し上げます。</div>`;
+ }
+ h+=`<div class="keigu">敬具</div>`+
+   `</div>`+
+  `</div>`;
+ document.getElementById('body').innerHTML=h;
+ bindReissueBar();
+ const rp=document.getElementById('rePick');if(rp)rp.onchange=e=>{window.__rePick=+e.target.value;render();};
+ const safeName=(p.name||'案内').replace(/[\\/:*?"<>|\s]/g,'_');
+ const jb=document.getElementById('reJpeg');
+ if(jb)jb.onclick=()=>{
+   const doc=document.getElementById('reissueDoc');if(!doc)return;
+   if(typeof html2canvas==='undefined'){alert('画像変換ライブラリの読み込みに失敗しました。通信環境をご確認のうえ、ページを再読み込みしてください。');return;}
+   const old=jb.textContent;jb.textContent='変換中…';jb.disabled=true;
+   html2canvas(doc,{scale:2,backgroundColor:'#fdfaf6',useCORS:true}).then(canvas=>{
+     const a=document.createElement('a');
+     a.href=canvas.toDataURL('image/jpeg',0.95);
+     a.download=`月謝納入のお願い_${safeName}_${issue}.jpg`;
+     a.click();
+     jb.textContent=old;jb.disabled=false;
+   }).catch(err=>{alert('JPEG変換に失敗しました：'+err);jb.textContent=old;jb.disabled=false;});
+ };
+ const pb=document.getElementById('rePrint');if(pb)pb.onclick=()=>{document.body.classList.add('printing-reissue');window.print();setTimeout(()=>document.body.classList.remove('printing-reissue'),500);};
+ setCard('再振替・再振込案内',`${park} の再請求対象 ${targets.length}名`,'「🖼 JPEG保存」で案内を画像として保存し連絡帳に貼り付け。「🖨 印刷」で紙に印刷（PDF保存も可）。方式を「振込」にすると振込先口座入り、「再振替」にすると再引落日のみの案内になります。月謝＋事務手数料が請求額です。','none');
+}
+function bindReissueBar(){
+ document.querySelectorAll('[data-retab]').forEach(el=>{el.onclick=e=>{window.__reissueTab=e.currentTarget.dataset.retab;window.__rePick=0;render();};});
+ const i=document.getElementById('reIssue');if(i)i.onchange=e=>{window.__reissueDate=e.target.value;const d=new Date(e.target.value);d.setDate(d.getDate()+7);const nd=d.toISOString().slice(0,10);window.__reissueDueFuri=nd;window.__reissueDueSai=nd;render();};
+ const du=document.getElementById('reDue');if(du)du.onchange=e=>{if(e.target.dataset.duemode==='sai')window.__reissueDueSai=e.target.value;else window.__reissueDueFuri=e.target.value;render();};
+ const f=document.getElementById('reFee');if(f)f.onchange=e=>{const pk=e.target.dataset.feepark;reissueFeeByPark[pk]=Number(e.target.value)||0;render();};
+}
+function renderReadme(){
+ const t=`<b>STRAWBERRY FIELD 月謝管理アプリ（多園対応）</b>
+
+月寒園・白石園・サッポロファクトリー園を1つのアプリで管理します。データの正本はGoogleスプレッドシート。アプリで編集 → xlsx出力 → スプレッドシートに取込、という流れです。
+
+<b>■ 毎月の流れ</b>
+1. 現在の園・対象年月を選ぶ
+2. 新規入園・追加申込みがあれば入力（月次計算に自動反映）
+3. 年間スケジュールで当月イベントを確定
+4. 月次計算でフラグ（●）の園児を確認
+5. ルクミー出力を園別に確認
+6. 初回案内PDFを新規入園者へ
+7. 引落不能だった園児は月次計算タブで「再請求チェック」→「再振替・再振込案内」タブで督促状を作成
+8. 本部用集計で園別＋全園合計を確認
+9. 「スプレッドシートに出力」でxlsxを書き出し、Googleドライブへ
+
+<b>■ 振込／引落の区別</b>
+園児台帳の「納入方法」で各園児を引落（既定）か振込かに設定できます。振込の園児は月次計算で紫色の行＋「振込」バッジで一目で分かります。銀行の引落結果を見て、引落できなかった園児に月次計算タブで「再請求チェック」を入れると、「再振替・再振込案内」タブに月謝＋事務手数料を記した督促状が一人ずつ表示され、ブラウザ印刷でPDF化して連絡帳に添付できます。
+
+<b>■ 園切替</b>
+「現在の園」で全園／各園を切替。全園は本部横断、単園はその園だけを表示・集計します。
+
+<b>■ 自動計算</b>
+枠区分の単価＋教材費＋兄弟割引＋途中入園の半額補正＋当月の確定イベント費＋追加申込み＋手数料。スプレッドシートと同一ロジックです。
+
+<b>■ 兄弟割引</b>
+同園内に下子がいる園児が対象。別園に分かれる場合はフラグを立てないでください。
+
+<b>■ ライト/ダーク</b>
+右上で切替。明るい場所ではライト、夜間や暗所ではダークが見やすいです。`;
+ document.getElementById('body').innerHTML='<div class="readme">'+t+'</div>';
+ setCard('README','使い方','','none');
+}
+let mealDate=new Date().toISOString().slice(0,10); // 既定の対象日（初期＝今日）
+function renderMeals(){
+ // 幼稚舎の在園児（プルダウン候補：クラス＋名前）
+ const pupils=allPupils().filter(r=>r.park==='幼稚舎'&&(r.status==='在園中'||calc(r).isNew));
+ const today=new Date().toISOString().slice(0,10);
+ const todayCount=meals.filter(r=>r.date===today&&(r.lunch||r.bread)).length;
+ let h='';
+ // 記入漏れ警告
+ if(todayCount===0){
+  h+='<div style="margin:16px 22px;padding:12px 16px;background:var(--berrysoft);border:1px solid var(--berry);border-radius:10px;color:var(--berry);font-weight:700">⚠ 本日（'+today+'）の給食記録がまだありません。お弁当・パンを忘れた園児がいれば、その場で「＋ 給食記録を追加」から記入してください。</div>';
+ }
+ h+='<div style="padding:14px 22px;font-size:12.5px;color:var(--mut);border-bottom:1px solid var(--line)">'+
+  '昼食 ¥'+M.mealfee.lunch+' ／ パン ¥'+M.mealfee.bread+'（1回あたり）。記録は <b style="color:var(--leaf)">翌月の請求</b> に乗ります（末締め翌末払い）。'+
+  '園児はクラス＋名前のプルダウンから選べます。</div>';
+ // 記録一覧（プルダウン行）
+ h+='<div class="tablewrap"><table><thead><tr><th>日付</th><th>園児（クラス・名前）</th><th style="text-align:center">昼食 ¥500</th><th style="text-align:center">パン ¥100</th><th class="r">金額</th><th></th></tr></thead><tbody>';
+ if(meals.length===0)h+='<tr><td colspan="6" style="text-align:center;color:var(--mut);padding:26px">「＋ 給食記録を追加」から、お弁当・パンを忘れた園児を記録してください。</td></tr>';
+ meals.forEach((r,i)=>{const amt=(r.lunch?M.mealfee.lunch:0)+(r.bread?M.mealfee.bread:0);
+  const opts=pupils.map(p=>`<option value="${p.name}" ${r.name===p.name?'selected':''}>${p.cls}　${p.name}</option>`).join('');
+  h+=`<tr>`+
+   `<td><input class="inp" type="date" data-meal="${i}" data-f="date" value="${r.date||today}" style="width:auto"></td>`+
+   `<td><select class="inp" data-meal="${i}" data-f="name"><option value="">選択</option>${opts}</select></td>`+
+   `<td style="text-align:center"><input type="checkbox" data-meal="${i}" data-f="lunch" ${r.lunch?'checked':''} style="width:20px;height:20px;accent-color:var(--leaf);cursor:pointer"></td>`+
+   `<td style="text-align:center"><input type="checkbox" data-meal="${i}" data-f="bread" ${r.bread?'checked':''} style="width:20px;height:20px;accent-color:var(--berry);cursor:pointer"></td>`+
+   `<td class="num">${amt?'¥'+amt.toLocaleString():'<span class="zero">—</span>'}</td>`+
+   `<td><button data-del="${i}" style="background:none;border:none;color:var(--berry);cursor:pointer;font-size:16px">×</button></td></tr>`;});
+ h+='</tbody></table></div>';
+ // 当月集計（最も多く使われている月 or 今日の月）
+ const ym=(meals.length?meals[meals.length-1].date:today).slice(0,7);
+ const monthRecs=meals.filter(r=>r.date.startsWith(ym));
+ const agg={};let tl=0,tb=0;
+ monthRecs.forEach(r=>{if(!r.name)return;if(!agg[r.name])agg[r.name]={l:0,b:0};if(r.lunch){agg[r.name].l++;tl++;}if(r.bread){agg[r.name].b++;tb++;}});
+ h+='<div style="padding:16px 22px"><h3 style="font-family:\'Zen Old Mincho\',serif;font-size:14px;color:var(--leaf);margin-bottom:8px">'+ym.replace('-','年')+'月の集計（→ 翌月請求）</h3>';
+ if(Object.keys(agg).length===0)h+='<div style="color:var(--mut);font-size:13px">この月の記録はまだありません。</div>';
+ else{h+='<div class="tablewrap"><table><thead><tr><th>園児名</th><th class="r">昼食(回)</th><th class="r">パン(回)</th><th class="r">実費合計</th></tr></thead><tbody>';
+  Object.entries(agg).forEach(([nm,v])=>{const amt=v.l*M.mealfee.lunch+v.b*M.mealfee.bread;
+   h+=`<tr><td class="name">${nm}</td><td class="num">${v.l}</td><td class="num">${v.b}</td><td class="num total">¥${amt.toLocaleString()}</td></tr>`;});
+  h+=`<tr style="border-top:2px solid var(--leaf)"><td style="font-weight:700;color:var(--leaf)">合計</td><td class="num" style="font-weight:700">${tl}</td><td class="num" style="font-weight:700">${tb}</td><td class="num total" style="font-size:15px">¥${(tl*M.mealfee.lunch+tb*M.mealfee.bread).toLocaleString()}</td></tr>`;
+  h+='</tbody></table></div>';}
+ h+='</div>';
+ document.getElementById('body').innerHTML=h;
+ document.querySelectorAll('[data-meal]').forEach(el=>{const handler=e=>{const i=+e.target.dataset.meal,f=e.target.dataset.f;
+   if(f==='lunch'||f==='bread')meals[i][f]=e.target.checked; else meals[i][f]=e.target.value;
+   renderMeals();};el.onchange=handler;});
+ document.querySelectorAll('[data-del]').forEach(el=>{el.onclick=e=>{const i=+e.currentTarget.dataset.del;
+   const nm=(meals[i].name?meals[i].name+'さんの':'')+'給食記録';
+   confirmDialog(`「${nm}」を削除します。\nこの操作は取り消せません。本当に削除しますか？`,()=>{meals.splice(i,1);renderMeals();});};});
+ setCard('給食記録','幼稚舎・お弁当/パン忘れの実費','「＋ 給食記録を追加」で行を足し、日付と園児（クラス＋名前のプルダウン）を選んで昼食/パンにチェック。月集計は翌月の月次計算に自動反映されます。','add');
+}
+const RENDER={settings:renderSettings,roster:renderRoster,newcomer:renderNew,sched:renderSched,monthly:renderMonthly,lookmee:renderLookmee,hq:renderHQ,pdf:renderPDF,reissue:renderReissue,addon:renderAddon,meals:renderMeals,readme:renderReadme};
+function setCard(title,meta,hint,addType){
+ document.getElementById('cardTitle').textContent=title;
+ document.getElementById('cardMeta').textContent=meta;
+ document.getElementById('hint').innerHTML=hint;
+ const ab=document.getElementById('addBtn'),eb=document.getElementById('editBadge');
+ if(addType==='add'){ab.style.display='inline-flex';
+   ab.textContent = tab==='newcomer'?'＋ 新規入園を追加': tab==='addon'?'＋ 追加申込みを追加': tab==='meals'?'＋ 給食記録を追加': tab==='sched'?'＋ 項目を追加':'＋ 園児を追加';
+   eb.textContent = (tab==='roster')?'✎ 青字セルはクリックで編集できます':'';
+ }else{ab.style.display='none';eb.textContent='';}
+}
+function addAction(){if(tab==='roster')roster.push({id:roster.length+1,status:'在園中',waku:'地域枠',cls:'SEED-1',name:'新規 園児',sib:'なし',koza:'',lid:'',park:(park==='全施設'||!park)?'月寒園':park,nyuen:''});
+ else if(tab==='newcomer'){const newId=Math.max(0,...roster.map(r=>r.id||0))+1;
+   roster.push({id:newId,status:'在園中',park:(park==='全施設'||!park)?'月寒園':park,name:'',kana:'',waku:'地域枠',cls:'LEAF',koza:'',nyuen:'',sib:'なし',lid:'',birth:'',isNew:true,confirmed:false,regSeq:Date.now()});}
+ else if(tab==='addon')addons.push({kind:'申込',name:'',goods:'',size:'',qty:1,price:0,ry:yy,rm:mm});
+ else if(tab==='meals')meals.push({date:new Date().toISOString().slice(0,10),name:'',lunch:false,bread:false});
+ else if(tab==='sched')sched.push({year:yy,month:mm,item:'新規項目',cls:'全員',pupil:'',plan:0,fix:0,state:'予定'});
+ render();}
+function render(){renderStats();RENDER[tab]();if(tab==='roster')bindEdit();saveState();}
+
+// xlsx出力（全シート）
+function exportXlsx(){const wb=XLSX.utils.book_new();const add=(n,a)=>XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(a),n);
+ const ros=[['ID','ステータス','枠区分','クラス','園児名','兄弟有(下子)','口座名義','ルクミー園児ID','入園年月日','所属園','マットレス','バス','おむつサブスク','制服ﾚﾝﾀﾙ:ニット','制服ﾚﾝﾀﾙ:キャップ','制服ﾚﾝﾀﾙ:パーカー']];
+ const yn=v=>v?'あり':'';
+ allPupils().forEach((r,i)=>ros.push([i+1,r.status,r.waku,r.cls,r.name,r.sib,r.koza,r.lid,r.nyuen,r.park,yn(r.optMattress),yn(r.optBus),yn(r.optDiaper),yn(r.optKnit),yn(r.optCap),yn(r.optParka)]));add('園児台帳',ros);
+ const m=[[`月次計算 ${yy}年${mm}月分 / ${park}`],[],['所属園','クラス','枠区分','園児名','基本月謝','教材費','兄弟割引','半額補正','早割','イベント/追加','手数料','請求合計','変動','フラグ事由']];
+ visible().forEach(r=>{const c=calc(r);const chg=changesFor(r);m.push([r.park,r.cls,r.waku,r.name,c.getsu,c.kyozai,c.sib,c.half,c.early||0,c.evSum,c.fee,c.total,chg.length?'変動':'',chg.length?chg.map(x=>x.label).join('、'):(c.flag?c.reason:'')]);});add('月次計算',m);
+ const l=[['園児ID','クラス','園児名','月極保育料金名称','単価','オプション名称1','オプション小計1','請求金額','変動']];
+ visible().filter(r=>r.status==='在園中'||calc(r).isNew).forEach(r=>{const c=calc(r);const base=c.getsu+c.kyozai+c.sib+c.half+(c.early||0);const e0=c.evs[0];const chg=changesFor(r);l.push([r.lid,r.cls,r.name,'月謝（'+r.waku+'）',base,e0?e0.item:'',e0?e0.amt:'',c.total,chg.length?'変動':'']);});add('ルクミー出力',l);
+ const hq=[['施設','在園数','請求合計','うち月謝系','うち制服代','うち行事/その他']];let gt=0,gc=0;['月寒園','白石園','サッポロファクトリー園','幼稚舎','資生館保育園'].forEach(p=>{let cnt=0,tot=0,base=0,uni=0,ev=0;allPupils().filter(r=>r.park===p).forEach(r=>{const c=calc(r);if(r.status==='在園中'||c.isNew){cnt++;tot+=c.total;base+=c.getsu+c.kyozai+c.sib+c.half+(c.early||0)+c.fee;c.evs.forEach(e=>{if(isUniform(e.item))uni+=e.amt;else ev+=e.amt;});}});gt+=tot;gc+=cnt;hq.push([p,cnt,tot,base,uni,ev]);});hq.push(['全施設合計',gc,gt,'','','']);add('本部用集計',hq);
+ const nw=[['状態','所属園','園児名','フリガナ','枠区分','クラス','口座名義','入園年月日']];roster.filter(r=>r.isNew).sort((a,b)=>(a.regSeq||0)-(b.regSeq||0)).forEach(n=>nw.push([n.confirmed?'確定済':'未確定',n.park,n.name,n.kana||'',n.waku,n.cls,n.koza,n.nyuen]));add('新規入園',nw);
+ const ad=[['園児名','商品/項目','サイズ','数量','単価','小計','反映年','反映月']];addons.forEach(a=>ad.push([a.name,a.goods,a.size,a.qty,a.price,(a.price||0)*(a.qty||0),a.ry,a.rm]));add('追加申込み',ad);
+ const ml=[['日付','園児名','昼食','パン','金額']];meals.forEach(r=>ml.push([r.date,r.name,r.lunch?'○':'',r.bread?'○':'',(r.lunch?M.mealfee.lunch:0)+(r.bread?M.mealfee.bread:0)]));add('給食記録',ml);
+ const sc=[['年','月','項目','対象','個別園児','金額','状態']];sched.forEach(s=>sc.push([s.year,s.month,s.item,s.cls,s.pupil||'',s.fix||0,s.state]));add('年間スケジュール',sc);
+ const FACS=['月寒園','白石園','サッポロファクトリー園','幼稚舎','資生館保育園'];
+ const bk=[['項目',...FACS]];bank.forEach(b=>bk.push([b.label,...FACS.map(f=>b[f]||'')]));add('設定_振込先',bk);
+ XLSX.writeFile(wb,`月謝管理_${yy}-${('0'+mm).slice(-2)}_${park}.xlsx`);
+}
+
+// init
+M.facilities.forEach(f=>{const o=document.createElement('option');o.textContent=f.name;if(f.name===park)o.selected=true;document.getElementById('park').appendChild(o);});
+const mmSel=document.getElementById('mm');for(let i=1;i<=12;i++){const o=document.createElement('option');o.value=i;o.textContent=i+'月';if(i===mm)o.selected=true;mmSel.appendChild(o);}
+const TABS=[['settings','設定'],['roster','園児台帳'],['newcomer','新規入園',1],['sched','年間スケジュール'],['monthly','月次計算',1],['lookmee','ルクミー出力',1],['hq','本部用集計'],['pdf','初回案内PDF出力'],['reissue','再振替・再振込案内',1],['addon','追加申込み',1],['meals','給食記録',1],['readme','README']];
+function tabVisible(k){ if(k==='meals') return (park==='幼稚舎'||park==='全施設'); return true; }
+function syncTabs(){const el=document.getElementById('tabs');el.innerHTML='';
+ // 非表示タブを開いていたら設定に戻す
+ if(!tabVisible(tab))tab='settings';
+ TABS.filter(([k])=>tabVisible(k)).forEach(([k,label,live])=>{const t=document.createElement('div');t.className='tab'+(k===tab?' active':'');
+  t.innerHTML=label+(live?'<span class="mini">連動</span>':'');t.onclick=()=>{
+   if(tab==='lookmee'&&k!=='lookmee'){const bad=lookmeeGuard();if(bad){alert('ルクミー出力で、チェック済みなのに担当者が未設定の園児がいます：\n\n'+bad.join('、')+'\n\n担当者を設定してから移動してください。');return;}}
+   tab=k;syncTabs();render();};el.appendChild(t);});}
+const FAC_COLORS={'月寒園':'#3d7355','白石園':'#4a5a82','サッポロファクトリー園':'#a8466a','幼稚舎':'#9a6b2f','資生館保育園':'#6a548c','全施設':'var(--leaf)'};
+function applyParkColor(){const sel=document.getElementById('park');const c=FAC_COLORS[park]||'var(--leaf)';
+ sel.style.borderColor=c;sel.style.color=c;sel.style.borderLeftWidth='5px';}
+document.getElementById('park').onchange=e=>{park=e.target.value;wakuFilter='すべて';clsFilter='すべて';applyParkColor();syncTabs();render();};
+document.getElementById('yy').onchange=e=>{yy=+e.target.value;render();};
+document.getElementById('mm').onchange=e=>{mm=+e.target.value;render();};
+loadState();
+syncTabs();applyParkColor();render();
+</script></body></html>
