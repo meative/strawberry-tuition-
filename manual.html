@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="ja"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>STRAWBERRY FIELD 月謝管理アプリ ｜ 事務員向け操作説明書</title>
+<link href="https://fonts.googleapis.com/css2?family=Zen+Old+Mincho:wght@600;700;900&family=Zen+Kaku+Gothic+New:wght@400;500;700&family=Spline+Sans+Mono:wght@500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+ --bg:#f3f6f2; --panel:#ffffff; --line:#dde6df; --ink:#1c2c22; --mut:#65786c;
+ --berry:#c2185b; --berry2:#e8417a; --berrysoft:#fce4ec; --leaf:#2f6b46; --leafsoft:#e9f2eb;
+ --gold:#b8860b; --goldsoft:#fbf3dc; --cream:#fbfaf4;
+}
+*{box-sizing:border-box;}
+body{margin:0;background:var(--bg);color:var(--ink);
+ font-family:'Zen Kaku Gothic New',sans-serif;line-height:1.9;font-size:15px;}
+.wrap{max-width:860px;margin:0 auto;padding:0 20px 80px;}
+
+/* ヘッダー */
+.cover{background:linear-gradient(135deg,#fff 0%,var(--berrysoft) 100%);
+ border-bottom:4px solid var(--berry);padding:48px 40px 40px;margin-bottom:8px;}
+.cover .brand{font-family:'Spline Sans Mono',monospace;letter-spacing:.3em;
+ font-size:12px;color:var(--berry);font-weight:600;text-transform:uppercase;margin-bottom:14px;}
+.cover h1{font-family:'Zen Old Mincho',serif;font-size:30px;font-weight:700;margin:0 0 6px;letter-spacing:.04em;}
+.cover .sub{font-size:15px;color:var(--mut);letter-spacing:.06em;}
+.cover .note{margin-top:20px;font-size:13px;color:var(--mut);background:#fff;
+ border-left:3px solid var(--berry);padding:12px 18px;border-radius:0 8px 8px 0;}
+
+/* 目次 */
+.toc{background:var(--cream);border:1px solid var(--line);border-radius:12px;
+ padding:22px 28px;margin:28px 0 36px;}
+.toc h2{margin:0 0 12px;font-size:15px;color:var(--berry);letter-spacing:.1em;
+ font-family:'Zen Old Mincho',serif;}
+.toc ol{margin:0;padding-left:1.4em;}
+.toc li{margin:6px 0;font-size:14px;}
+.toc a{color:var(--ink);text-decoration:none;border-bottom:1px dotted var(--line);}
+.toc a:hover{color:var(--berry);}
+
+/* 章 */
+h2.sec{font-family:'Zen Old Mincho',serif;font-size:22px;font-weight:700;
+ margin:48px 0 4px;padding-top:14px;letter-spacing:.04em;display:flex;align-items:center;gap:12px;}
+h2.sec .n{display:inline-flex;align-items:center;justify-content:center;
+ width:38px;height:38px;border-radius:50%;background:var(--berry);color:#fff;
+ font-size:18px;font-family:'Spline Sans Mono',monospace;flex:none;}
+.sec-lead{color:var(--mut);font-size:14px;margin:4px 0 20px;padding-left:50px;}
+
+h3.sub{font-size:17px;font-weight:700;margin:30px 0 10px;color:var(--ink);
+ border-left:4px solid var(--berry2);padding-left:12px;letter-spacing:.03em;}
+
+p{margin:10px 0;}
+strong{color:var(--berry);font-weight:700;}
+
+/* カード */
+.card{background:#fff;border:1px solid var(--line);border-radius:12px;
+ padding:18px 24px;margin:16px 0;box-shadow:0 1px 6px rgba(120,80,60,.04);}
+.card .tabname{display:inline-block;background:var(--berry);color:#fff;
+ font-size:13px;font-weight:700;padding:4px 14px;border-radius:8px;margin-bottom:8px;letter-spacing:.04em;}
+.card .tabname.green{background:var(--leaf);}
+.card .tabname.gold{background:var(--gold);}
+.card p{margin:6px 0;font-size:14px;}
+.card .role{font-size:13px;color:var(--mut);}
+
+/* 連動バッジ説明 */
+.badge{display:inline-block;background:var(--berry);color:#fff;font-size:11px;
+ padding:2px 9px;border-radius:8px;font-weight:700;vertical-align:middle;}
+
+/* ステップ */
+.steps{counter-reset:step;margin:20px 0;padding:0;list-style:none;}
+.steps>li{position:relative;padding:16px 20px 16px 64px;background:#fff;
+ border:1px solid var(--line);border-radius:12px;margin:12px 0;}
+.steps>li::before{counter-increment:step;content:counter(step);
+ position:absolute;left:16px;top:16px;width:34px;height:34px;border-radius:50%;
+ background:var(--leaf);color:#fff;font-family:'Spline Sans Mono',monospace;
+ font-size:16px;font-weight:600;display:flex;align-items:center;justify-content:center;}
+.steps>li .t{font-weight:700;font-size:15px;margin-bottom:4px;}
+.steps>li .d{font-size:13.5px;color:var(--mut);line-height:1.8;}
+.steps>li .d b{color:var(--berry);}
+
+/* 矢印・反映の図 */
+.flow{background:var(--leafsoft);border:1px dashed var(--leaf);border-radius:10px;
+ padding:14px 18px;margin:10px 0;font-size:13.5px;line-height:1.9;}
+.flow .arrow{color:var(--leaf);font-weight:700;}
+
+/* ヒント */
+.tip{background:var(--goldsoft);border-left:4px solid var(--gold);
+ border-radius:0 8px 8px 0;padding:12px 18px;margin:14px 0;font-size:13.5px;}
+.tip b{color:var(--gold);}
+.warn{background:var(--berrysoft);border-left:4px solid var(--berry);
+ border-radius:0 8px 8px 0;padding:12px 18px;margin:14px 0;font-size:13.5px;}
+.warn b{color:var(--berry);}
+
+table{border-collapse:collapse;width:100%;margin:14px 0;font-size:13.5px;}
+th,td{border:1px solid var(--line);padding:8px 12px;text-align:left;vertical-align:top;}
+th{background:var(--berrysoft);color:var(--ink);font-weight:700;}
+td .pill{display:inline-block;background:var(--chip,#eef4ef);border:1px solid var(--line);
+ border-radius:6px;padding:1px 8px;font-size:12px;}
+
+.foot{text-align:center;color:var(--mut);font-size:12px;margin-top:60px;
+ padding-top:24px;border-top:1px solid var(--line);letter-spacing:.05em;}
+
+/* 模式図 */
+figure.shot{margin:18px 0 8px;border:1px solid var(--line);border-radius:12px;
+ overflow:hidden;background:#fff;box-shadow:0 1px 8px rgba(120,80,60,.06);}
+figure.shot svg{display:block;width:100%;height:auto;}
+figcaption{font-size:12.5px;color:var(--mut);margin:8px 2px 0;padding-left:4px;}
+figcaption b{color:var(--berry);}
+.callout-row{display:flex;gap:10px;flex-wrap:wrap;margin:10px 0;}
+.callout{flex:1;min-width:200px;background:var(--cream);border:1px solid var(--line);
+ border-radius:10px;padding:10px 14px;font-size:13px;}
+.callout .num{display:inline-flex;width:22px;height:22px;border-radius:50%;
+ background:var(--berry);color:#fff;font-size:12px;font-weight:700;align-items:center;
+ justify-content:center;margin-right:6px;font-family:'Spline Sans Mono',monospace;}
+
+@media print{
+ body{background:#fff;}
+ .toc{break-inside:avoid;}
+ h2.sec{break-after:avoid;}
+ .card,.steps>li{break-inside:avoid;}
+}
+</style></head>
+<body>
+
+<div class="cover">
+ <div class="brand">Strawberry Field ・ Operation Manual</div>
+ <h1>月謝管理アプリ 操作説明書</h1>
+ <div class="sub">事務員向け ／ 毎月の操作はこれだけ</div>
+ <div class="note">このアプリは、月寒園・白石園・サッポロファクトリー園・幼稚舎・資生館保育園の月謝を一括管理するためのものです。画面上部の「現在の園」を切り替えると、その園の園児・料金が表示されます。毎月の作業は、本書の「3. 使い方の順序」だけを順番に行えば完了します。</div>
+</div>
+
+<div class="wrap">
+
+<div class="toc">
+ <h2>もくじ</h2>
+ <ol>
+  <li><a href="#s1">設定 と 園児台帳 について（土台になる2つ）</a></li>
+  <li><a href="#s2">各タブの役割（カテゴリーごとの説明）</a></li>
+  <li><a href="#s3">使い方の順序（毎月の操作）</a></li>
+  <li><a href="#s4">アプリの開き方・データの注意</a></li>
+ </ol>
+</div>
+
+<figure class="shot">
+<svg viewBox="0 0 820 300" xmlns="http://www.w3.org/2000/svg" font-family="'Zen Kaku Gothic New',sans-serif">
+ <rect width="820" height="300" fill="#fbfaf4"/>
+ <!-- タイトル帯 -->
+ <text x="28" y="42" font-size="22" font-weight="700" fill="#c2185b" font-family="serif">STRAWBERRY FIELD 月謝管理</text>
+ <text x="28" y="60" font-size="9" letter-spacing="2" fill="#b08aa0">MULTI-GARDEN TUITION SYSTEM</text>
+ <!-- 上部バー：現在の園 / 年 / 月 / サマリ -->
+ <rect x="24" y="76" width="772" height="58" rx="10" fill="#fff" stroke="#dde6df"/>
+ <text x="40" y="96" font-size="10" fill="#65786c">現在の園 / GARDEN</text>
+ <rect x="40" y="102" width="150" height="24" rx="6" fill="#fff" stroke="#c2185b"/>
+ <text x="50" y="119" font-size="12" font-weight="700" fill="#1c2c22">資生館保育園 ▾</text>
+ <rect x="200" y="102" width="58" height="24" rx="6" fill="#fff" stroke="#dde6df"/>
+ <text x="212" y="119" font-size="11" fill="#1c2c22">2026 ▾</text>
+ <rect x="266" y="102" width="50" height="24" rx="6" fill="#fff" stroke="#dde6df"/>
+ <text x="277" y="119" font-size="11" fill="#1c2c22">5月 ▾</text>
+ <rect x="470" y="88" width="100" height="34" rx="8" fill="#fbf3dc"/>
+ <text x="520" y="104" font-size="13" font-weight="700" fill="#1c2c22" text-anchor="middle">28名</text>
+ <text x="520" y="117" font-size="8" fill="#8a7a5a" text-anchor="middle">在園 / 定員60</text>
+ <rect x="580" y="88" width="120" height="34" rx="8" fill="#fce4ec"/>
+ <text x="640" y="104" font-size="13" font-weight="700" fill="#c2185b" text-anchor="middle">¥313,000</text>
+ <text x="640" y="117" font-size="8" fill="#b08aa0" text-anchor="middle">合計請求額</text>
+ <!-- タブバー -->
+ <g font-size="10.5">
+  <text x="46" y="172" fill="#65786c">設定</text>
+  <text x="96" y="172" fill="#65786c">園児台帳</text>
+  <text x="170" y="172" fill="#65786c">新規入園</text>
+  <text x="246" y="172" fill="#65786c">年間スケジュール</text>
+  <text x="356" y="172" fill="#c2185b" font-weight="700">月次計算</text>
+  <text x="424" y="172" fill="#65786c">ルクミー出力</text>
+  <text x="516" y="172" fill="#65786c">本部用集計</text>
+  <text x="600" y="172" fill="#65786c">初回案内PDF</text>
+  <text x="688" y="172" fill="#65786c">再振替・再振込案内</text>
+ </g>
+ <rect x="350" y="180" width="62" height="3" fill="#c2185b"/>
+ <line x1="24" y1="184" x2="796" y2="184" stroke="#dde6df"/>
+ <!-- 本体エリア -->
+ <rect x="24" y="196" width="772" height="86" rx="10" fill="#fff" stroke="#dde6df"/>
+ <text x="40" y="220" font-size="13" font-weight="700" fill="#1c2c22">● 選んだタブの内容がここに表示されます</text>
+ <text x="40" y="244" font-size="11" fill="#65786c">（園児の一覧・請求額の表・案内状など）</text>
+ <text x="40" y="266" font-size="10" fill="#8fae9b">「現在の園」を変えると、その園の内容に切り替わります。</text>
+</svg>
+<figcaption><b>画面全体の見方</b>　上部で「園・年・月」を選び（赤枠）、中段のタブを切り替えると、下に内容が表示されます。まずここを合わせてから操作を始めます。</figcaption>
+</figure>
+
+<!-- ============ 1 ============ -->
+<h2 class="sec" id="s1"><span class="n">1</span>設定 と 園児台帳 について</h2>
+<p class="sec-lead">この2つは、アプリ全体の「土台」です。ここが正しければ、他のタブは自動で正しく計算されます。</p>
+
+<h3 class="sub">① 設定タブ ── 料金と振込先の大もと</h3>
+<div class="card">
+ <span class="tabname">設定</span>
+ <p>各園の<strong>料金体系（枠区分ごとの単価）</strong>と<strong>施設ごとの振込先口座</strong>を管理する場所です。料金は枠ごと・園ごとに編集できます。</p>
+ <p class="role">ここで金額を変えると、月次計算・ルクミー出力・本部用集計などすべてに自動で反映されます。普段は触る必要はなく、料金改定や口座変更があったときだけ確認・修正します。</p>
+</div>
+<div class="tip"><b>ポイント</b>　日々の業務では設定タブはほとんど開きません。「最初に1回ちゃんと設定しておけば、あとは自動」という土台のタブだと考えてください。</div>
+
+<h3 class="sub">② 園児台帳タブ ── 園児名簿の中心</h3>
+<div class="card">
+ <span class="tabname">園児台帳</span>
+ <p>在園している園児の名簿です。<strong>名前・所属園・クラス・枠区分・兄弟の有無・口座名義・納入方法（振込/引落）</strong>などを管理します。すべての計算は、この台帳の内容をもとに行われます。</p>
+ <p class="role">クラスは生年月日から自動で決まります。「納入方法」欄では、その園児が <span class="pill">引落</span>（既定）か <span class="pill">振込</span> かを選べます。振込の園児は色付きで一目で分かります。</p>
+</div>
+<figure class="shot">
+<svg viewBox="0 0 820 230" xmlns="http://www.w3.org/2000/svg" font-family="'Zen Kaku Gothic New',sans-serif">
+ <rect width="820" height="230" fill="#fff"/>
+ <rect x="0" y="0" width="820" height="32" fill="#14281c"/>
+ <g font-size="10" fill="#f4f1e8" font-weight="700">
+  <text x="20" y="21">所属園</text><text x="100" y="21">クラス</text><text x="170" y="21">枠区分</text>
+  <text x="270" y="21">園児名</text><text x="380" y="21">口座名義</text><text x="490" y="21">兄弟</text>
+  <text x="560" y="21">納入方法</text><text x="700" y="21">ルクミーID</text>
+ </g>
+ <rect x="0" y="32" width="820" height="44" fill="#fff"/>
+ <rect x="16" y="44" width="64" height="20" rx="6" fill="#e9eef3"/><text x="48" y="58" font-size="9" fill="#4a5a82" text-anchor="middle">資生館</text>
+ <text x="100" y="59" font-size="11" fill="#a8466a" font-weight="700">SEED-0</text>
+ <text x="170" y="59" font-size="11" fill="#1c2c22">地域枠</text>
+ <text x="270" y="59" font-size="12" fill="#1c2c22" font-weight="700">浦田 珠翠</text>
+ <text x="380" y="59" font-size="11" fill="#65786c">浦田 淳貴</text>
+ <text x="490" y="59" font-size="11" fill="#65786c">なし</text>
+ <rect x="558" y="46" width="48" height="22" rx="10" fill="#c2185b"/><text x="582" y="61" font-size="10" fill="#fff" font-weight="700" text-anchor="middle">振込</text>
+ <line x1="0" y1="76" x2="820" y2="76" stroke="#eee"/>
+ <rect x="0" y="76" width="820" height="44" fill="#f5f9f5"/>
+ <rect x="16" y="88" width="64" height="20" rx="6" fill="#e9eef3"/><text x="48" y="102" font-size="9" fill="#4a5a82" text-anchor="middle">資生館</text>
+ <text x="100" y="103" font-size="11" fill="#a8466a" font-weight="700">LEAF</text>
+ <text x="170" y="103" font-size="11" fill="#1c2c22">地域無償化</text>
+ <text x="270" y="103" font-size="12" fill="#1c2c22" font-weight="700">青木 優志郎</text>
+ <text x="380" y="103" font-size="11" fill="#65786c">青木 仁美</text>
+ <text x="490" y="103" font-size="11" fill="#65786c">なし</text>
+ <rect x="558" y="90" width="48" height="22" rx="10" fill="#fff" stroke="#dde6df"/><text x="582" y="105" font-size="10" fill="#65786c" font-weight="700" text-anchor="middle">引落</text>
+ <line x1="0" y1="120" x2="820" y2="120" stroke="#eee"/>
+ <rect x="0" y="120" width="820" height="44" fill="#fff"/>
+ <rect x="16" y="132" width="64" height="20" rx="6" fill="#e9eef3"/><text x="48" y="146" font-size="9" fill="#4a5a82" text-anchor="middle">資生館</text>
+ <text x="100" y="147" font-size="11" fill="#a8466a" font-weight="700">HARVEST</text>
+ <text x="170" y="147" font-size="11" fill="#1c2c22">地域無償化</text>
+ <text x="270" y="147" font-size="12" fill="#1c2c22" font-weight="700">田代 柚乃</text>
+ <text x="380" y="147" font-size="11" fill="#65786c">田代 徹志</text>
+ <text x="490" y="147" font-size="11" fill="#65786c">なし</text>
+ <rect x="558" y="134" width="48" height="22" rx="10" fill="#fff" stroke="#dde6df"/><text x="582" y="149" font-size="10" fill="#65786c" font-weight="700" text-anchor="middle">引落</text>
+ <line x1="0" y1="164" x2="820" y2="164" stroke="#eee"/>
+ <rect x="540" y="176" width="262" height="42" rx="8" fill="#fce4ec" stroke="#c2185b" stroke-dasharray="4 3"/>
+ <text x="671" y="193" font-size="10" fill="#c2185b" font-weight="700" text-anchor="middle">ここで「振込／引落」を選びます</text>
+ <text x="671" y="209" font-size="9" fill="#a8466a" text-anchor="middle">振込の人はピンクのバッジで目立ちます</text>
+ <path d="M598 166 L612 176" stroke="#c2185b" stroke-width="1.5" fill="none" marker-end="url(#arR)"/>
+ <defs><marker id="arR" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#c2185b"/></marker></defs>
+</svg>
+<figcaption><b>園児台帳</b>　園児ごとに所属園・クラス・枠区分・口座名義・兄弟・<b>納入方法</b>が並びます。クラスは生年月日から自動。納入方法欄で「振込／引落」を選ぶと、督促状のタブ分けに反映されます。</figcaption>
+</figure>
+
+<div class="flow">
+ 園児台帳が<span class="arrow">すべての中心</span>です。<br>
+ 園児台帳 <span class="arrow">→</span> 月次計算（請求額の計算）<span class="arrow">→</span> ルクミー出力 <span class="arrow">→</span> 本部用集計 <span class="arrow">→</span> 再振替・再振込案内
+</div>
+<div class="warn"><b>注意</b>　兄弟割引・納入方法・退園などの変更は、原則この園児台帳で行います。新しく入る園児だけは「新規入園」タブから入れます（次章で説明）。</div>
+
+<!-- ============ 2 ============ -->
+<h2 class="sec" id="s2"><span class="n">2</span>各タブの役割</h2>
+<p class="sec-lead">上部に並ぶタブの意味です。<span class="badge">連動</span> が付いたタブは、園児台帳などと自動で連動して数字が変わります。よく使うものから順に説明します。</p>
+
+<h3 class="sub">入力するタブ（情報を足す）</h3>
+
+<div class="card">
+ <span class="tabname">新規入園 <span class="badge">連動</span></span>
+ <p>途中入園を含め、<strong>新しく入る園児を登録</strong>するフォームです。入力して「確定」を押すと、<strong>園児台帳に自動で追加</strong>され、月次計算・ルクミー出力・本部集計にも反映されます。</p>
+ <p class="role">「オプション」ボタンから制服・マットレス・おむつなどの初回費用も追加でき、初月合計と初回案内PDFに明細として載ります。</p>
+</div>
+
+<div class="card">
+ <span class="tabname gold">追加申込み <span class="badge">連動</span></span>
+ <p>制服の追加購入・行事費・<strong>返金</strong>など、月謝以外の臨時の増減を入力します。種別で「申込」「返金」を選び、金額と反映する月を入れると、その月の月次計算に反映されます（返金はマイナス）。</p>
+</div>
+
+<div class="card">
+ <span class="tabname gold">年間スケジュール</span>
+ <p>遠足・お泊まり会・運動会など、<strong>イレギュラーに徴収する項目</strong>を年間で登録します。状態を「確定」にすると、その月の月次計算に自動で加算されます。クラス単位・個人単位の指定もできます。</p>
+</div>
+
+<div class="card">
+ <span class="tabname green">給食記録 <span class="badge">連動</span></span>
+ <p>幼稚舎で、お弁当やパンを忘れた日の実費を記録します。日付と園児を選んでチェックすると、月集計が<strong>翌月の月次計算に自動反映</strong>されます。（幼稚舎・全施設表示のときだけ出るタブです）</p>
+</div>
+
+<h3 class="sub">確認・計算するタブ</h3>
+
+<div class="card">
+ <span class="tabname">月次計算 <span class="badge">連動</span></span>
+ <p><strong>その月の請求額が一覧で自動計算</strong>される、毎月の中心画面です。対象年・対象月を選ぶと、台帳・新規入園・追加申込み・年間スケジュール・給食記録の内容がすべて合算されて表示されます。</p>
+ <p class="role">振込の園児は紫色の行で表示されます。各行の「再請求」チェックは、引落できなかった園児に印を付けるための欄です（後述の案内タブと連動）。</p>
+</div>
+
+<figure class="shot">
+<svg viewBox="0 0 820 200" xmlns="http://www.w3.org/2000/svg" font-family="'Zen Kaku Gothic New',sans-serif">
+ <rect width="820" height="200" fill="#fff"/>
+ <rect x="0" y="0" width="820" height="30" fill="#14281c"/>
+ <g font-size="9.5" fill="#f4f1e8" font-weight="700">
+  <text x="18" y="20">施設</text><text x="92" y="20">クラス</text><text x="170" y="20">園児名</text>
+  <text x="300" y="20">基本料金</text><text x="400" y="20">付帯費</text><text x="500" y="20">手数料</text>
+  <text x="585" y="20">請求合計</text><text x="690" y="20">納入</text><text x="745" y="20">再請求</text>
+ </g>
+ <!-- 行1 引落 -->
+ <rect x="0" y="30" width="820" height="40" fill="#fff"/>
+ <rect x="14" y="40" width="60" height="20" rx="6" fill="#f3e0e8"/><text x="44" y="54" font-size="9" fill="#a8466a" text-anchor="middle">資生館</text>
+ <text x="92" y="55" font-size="10" fill="#a8466a">HARVEST</text>
+ <text x="170" y="55" font-size="11" fill="#1c2c22" font-weight="700">田代 柚乃</text>
+ <text x="330" y="55" font-size="10" fill="#1c2c22" text-anchor="end">¥0</text>
+ <text x="430" y="55" font-size="10" fill="#1c2c22" text-anchor="end">¥4,500</text>
+ <text x="525" y="55" font-size="10" fill="#1c2c22" text-anchor="end">¥110</text>
+ <text x="630" y="55" font-size="11" fill="#c2185b" font-weight="700" text-anchor="end">¥4,610</text>
+ <rect x="676" y="42" width="38" height="18" rx="9" fill="#fff" stroke="#dde6df"/><text x="695" y="55" font-size="8.5" fill="#65786c" text-anchor="middle">引落</text>
+ <rect x="757" y="42" width="16" height="16" rx="3" fill="#fff" stroke="#c2185b"/><path d="M760 50 l3 3 l6 -7" stroke="#c2185b" stroke-width="2" fill="none"/>
+ <line x1="0" y1="70" x2="820" y2="70" stroke="#eee"/>
+ <!-- 行2 振込（紫の行） -->
+ <rect x="0" y="70" width="820" height="40" fill="#fce4ec"/>
+ <rect x="14" y="80" width="60" height="20" rx="6" fill="#f3e0e8"/><text x="44" y="94" font-size="9" fill="#a8466a" text-anchor="middle">資生館</text>
+ <text x="92" y="95" font-size="10" fill="#a8466a">SEED-0</text>
+ <text x="170" y="95" font-size="11" fill="#1c2c22" font-weight="700">浦田 珠翠</text>
+ <text x="330" y="95" font-size="10" fill="#1c2c22" text-anchor="end">¥30,000</text>
+ <text x="430" y="95" font-size="10" fill="#1c2c22" text-anchor="end">¥0</text>
+ <text x="525" y="95" font-size="10" fill="#1c2c22" text-anchor="end">¥110</text>
+ <text x="630" y="95" font-size="11" fill="#c2185b" font-weight="700" text-anchor="end">¥30,110</text>
+ <rect x="676" y="82" width="38" height="18" rx="9" fill="#c2185b"/><text x="695" y="95" font-size="8.5" fill="#fff" text-anchor="middle">振込</text>
+ <rect x="757" y="82" width="16" height="16" rx="3" fill="#fff" stroke="#dde6df"/>
+ <line x1="0" y1="110" x2="820" y2="110" stroke="#eee"/>
+ <!-- 注記 -->
+ <rect x="520" y="124" width="288" height="58" rx="8" fill="#fbf3dc" stroke="#b8860b" stroke-dasharray="4 3"/>
+ <text x="664" y="142" font-size="10" fill="#9a6b2f" font-weight="700" text-anchor="middle">引落できなかった人にチェック ✔</text>
+ <text x="664" y="158" font-size="9" fill="#9a6b2f" text-anchor="middle">→「再振替・再振込案内」タブに自動で出ます</text>
+ <text x="664" y="173" font-size="9" fill="#9a6b2f" text-anchor="middle">紫の行＝振込の園児</text>
+ <path d="M765 118 L740 124" stroke="#b8860b" stroke-width="1.5" fill="none" marker-end="url(#arM)"/>
+ <defs><marker id="arM" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#b8860b"/></marker></defs>
+</svg>
+<figcaption><b>月次計算</b>　その月の請求額が自動表示されます。<b>紫の行＝振込</b>の園児。右端の<b>「再請求」チェック</b>に、引落できなかった園児の印を付けると、督促状のタブへ連動します。</figcaption>
+</figure>
+
+<div class="card">
+ <span class="tabname">本部用集計</span>
+ <p>園別の内訳と全園合計を確認できる、<strong>本部報告用</strong>の集計画面です。「全施設」を選ぶと全園まとめて見られます。</p>
+</div>
+
+<h3 class="sub">出力するタブ（書類を作る）</h3>
+
+<div class="card">
+ <span class="tabname green">ルクミー出力 <span class="badge">連動</span></span>
+ <p>その月の請求対象を一覧表示します。<strong>ルクミーへは手入力</strong>のため、前月から金額が変わった園児・フラグのある園児（黄色の行）に <strong>「手入力確認」チェックと担当者名</strong>を記録でき、転記ミスを防ぎます。</p>
+ <p class="role">使う順番は「①内容を確認 → ②『全員にチェック』 → ③担当者を選んで『全員に設定』」。一人で担当する場合はこれで全員に同じ担当者が入ります。担当者は<strong>チェックした後でないと選べません</strong>。設定済みを外したいときは「担当を一括解除」または各行で個別に変更します。「変動・フラグのみ表示」の絞り込みと、確認済み件数の進捗バーも付いています。</p>
+ <p class="role"><strong>チェック済みなのに担当者が未設定だと、他のタブへ移動できません</strong>（誰が未設定かエラーで表示）。チェックは月ごとに保存されます。</p>
+</div>
+
+<figure class="shot">
+<svg viewBox="0 0 820 150" xmlns="http://www.w3.org/2000/svg" font-family="'Zen Kaku Gothic New',sans-serif">
+ <rect width="820" height="150" fill="#fff"/>
+ <text x="24" y="34" font-size="12" font-weight="700" fill="#1c2c22">手入力の確認：<tspan fill="#c2185b">21</tspan> / 21名</text>
+ <rect x="220" y="22" width="180" height="10" rx="5" fill="#e9f2eb"/><rect x="220" y="22" width="180" height="10" rx="5" fill="#3fa86a"/>
+ <rect x="430" y="18" width="120" height="26" rx="8" fill="#fff" stroke="#dde6df"/><text x="490" y="35" font-size="11" fill="#1c2c22" text-anchor="middle">全員にチェック</text>
+ <rect x="560" y="18" width="100" height="26" rx="8" fill="#fff" stroke="#dde6df"/><text x="610" y="35" font-size="11" fill="#1c2c22" text-anchor="middle">全員解除</text>
+ <rect x="670" y="18" width="130" height="26" rx="8" fill="#c2185b"/><text x="735" y="35" font-size="11" fill="#fff" text-anchor="middle">変動・フラグのみ</text>
+ <line x1="0" y1="58" x2="820" y2="58" stroke="#eee"/>
+ <rect x="0" y="58" width="820" height="44" fill="#e9f2eb"/>
+ <text x="24" y="86" font-size="12" fill="#1c2c22">✓ 全員チェック済み。担当者を一括設定：</text>
+ <rect x="360" y="70" width="150" height="24" rx="6" fill="#fff" stroke="#dde6df"/><text x="372" y="86" font-size="11" fill="#1c2c22">佐藤 ▾</text>
+ <rect x="520" y="70" width="100" height="24" rx="6" fill="#c2185b"/><text x="570" y="86" font-size="11" fill="#fff" text-anchor="middle">全員に設定</text>
+ <rect x="630" y="70" width="120" height="24" rx="6" fill="#fff" stroke="#c2185b"/><text x="690" y="86" font-size="11" fill="#c2185b" text-anchor="middle">担当を一括解除</text>
+ <text x="24" y="128" font-size="11" fill="#65786c">＊担当者はチェック後に選べます。未設定のまま他タブへ移動するとエラーになります。</text>
+</svg>
+<figcaption><b>ルクミー出力（手入力確認）</b>　全員にチェック → 担当者を選んで「全員に設定」が基本の流れ。「担当を一括解除」で外せます。チェック済みで担当者が空のままだと他タブへ移れません。</figcaption>
+</figure>
+
+<div class="card">
+ <span class="tabname">初回案内PDF出力</span>
+ <p>「新規入園」で登録した園児へ渡す、<strong>初回の振込案内状</strong>を表示します。発行日を変えると振込期限も自動で再計算されます。</p>
+</div>
+
+<div class="card">
+ <span class="tabname">再振替・再振込案内 <span class="badge">連動</span></span>
+ <p>引落できなかった園児への<strong>督促状（月謝納入のお願い）</strong>を作るタブです。上部の「<strong>💳 振込の人</strong>」「<strong>🏦 引落の人</strong>」タブで、園児台帳の納入方法に応じて自動的に分かれて表示されます。</p>
+ <p class="role">振込の人には振込先口座入りの案内、引落の人には再振替日の案内が出ます。「JPEG保存」で画像にして連絡帳に貼り付け、「印刷」で紙やPDFにできます。月謝＋事務手数料が請求額です（資生館は手数料550円、その他660円）。</p>
+</div>
+
+<figure class="shot">
+<svg viewBox="0 0 820 250" xmlns="http://www.w3.org/2000/svg" font-family="'Zen Kaku Gothic New',sans-serif">
+ <rect width="820" height="250" fill="#fff"/>
+ <!-- 納入方法タブ -->
+ <text x="24" y="34" font-size="10" fill="#65786c">納入方法で表示</text>
+ <rect x="120" y="18" width="130" height="30" rx="15" fill="#c2185b"/><text x="185" y="38" font-size="12" fill="#fff" font-weight="700" text-anchor="middle">💳 振込の人 1名</text>
+ <rect x="262" y="18" width="130" height="30" rx="15" fill="#fff" stroke="#dde6df"/><text x="327" y="38" font-size="12" fill="#1c2c22" font-weight="700" text-anchor="middle">🏦 引落の人 2名</text>
+ <line x1="0" y1="60" x2="820" y2="60" stroke="#dde6df"/>
+ <!-- 操作バー -->
+ <text x="24" y="86" font-size="11" fill="#65786c">発行日：</text>
+ <rect x="78" y="72" width="110" height="22" rx="5" fill="#fff" stroke="#dde6df"/><text x="88" y="87" font-size="10" fill="#1c2c22">2026/05/28</text>
+ <text x="206" y="86" font-size="11" fill="#65786c">振込期限：</text>
+ <rect x="276" y="72" width="110" height="22" rx="5" fill="#fff" stroke="#dde6df"/><text x="286" y="87" font-size="10" fill="#1c2c22">2026/06/01</text>
+ <text x="406" y="86" font-size="11" fill="#65786c">事務手数料：¥</text>
+ <rect x="494" y="72" width="60" height="22" rx="5" fill="#fff" stroke="#dde6df"/><text x="504" y="87" font-size="10" fill="#1c2c22">550</text>
+ <line x1="0" y1="106" x2="820" y2="106" stroke="#dde6df"/>
+ <!-- 対象者選択 -->
+ <text x="24" y="130" font-size="11" fill="#65786c">対象者（1名）：</text>
+ <rect x="118" y="116" width="170" height="24" rx="6" fill="#fff" stroke="#dde6df"/><text x="130" y="132" font-size="11" fill="#1c2c22">SEED-0 浦田 珠翠 ▾</text>
+ <rect x="600" y="114" width="90" height="28" rx="8" fill="#fff" stroke="#dde6df"/><text x="645" y="132" font-size="11" fill="#1c2c22" text-anchor="middle">🖼 JPEG保存</text>
+ <rect x="700" y="114" width="70" height="28" rx="8" fill="#c2185b"/><text x="735" y="132" font-size="11" fill="#fff" text-anchor="middle">🖨 印刷</text>
+ <!-- 案内状プレビュー -->
+ <rect x="180" y="158" width="460" height="80" rx="6" fill="#fdfaf6" stroke="#e8dcc8"/>
+ <rect x="180" y="158" width="460" height="4" fill="#6a548c"/>
+ <text x="410" y="182" font-size="11" fill="#6a548c" font-weight="700" text-anchor="middle" font-family="serif">チルドレンズガーデン資生館保育園</text>
+ <text x="410" y="200" font-size="9" letter-spacing="2" fill="#6a548c" text-anchor="middle">PAYMENT REMINDER</text>
+ <text x="410" y="220" font-size="15" fill="#2a2018" font-weight="700" text-anchor="middle" font-family="serif" letter-spacing="3">月 謝 納 入 の お 願 い</text>
+ <text x="660" y="200" font-size="9" fill="#8fae9b">案内状が</text>
+ <text x="660" y="214" font-size="9" fill="#8fae9b">ここに出ます</text>
+</svg>
+<figcaption><b>再振替・再振込案内</b>　上の<b>「振込の人」「引落の人」</b>タブで、台帳の納入方法どおりに自動で分かれます。対象者を選び、JPEG保存または印刷で配布。振込期限と再振替日は別々に設定できます。</figcaption>
+</figure>
+
+<div class="card">
+ <span class="tabname green">スプレッドシート(xlsx)に出力</span>
+ <p>画面下のボタンから、全データをExcel形式で書き出せます。バックアップやGoogleドライブ保存に使います。</p>
+</div>
+
+<div class="card">
+ <span class="tabname gold">README</span>
+ <p>アプリ内に組み込まれた簡易説明です。困ったときの早見表として使えます。</p>
+</div>
+
+<!-- ============ 3 ============ -->
+<h2 class="sec" id="s3"><span class="n">3</span>使い方の順序（毎月の操作）</h2>
+<p class="sec-lead">毎月の作業はこの順番だけで完了します。最初に画面上部で<strong>「現在の園」「対象年」「対象月」</strong>を合わせてから始めてください。</p>
+
+<ol class="steps">
+ <li>
+  <div class="t">入退園・変更を反映する</div>
+  <div class="d">新しく入る園児は <b>「新規入園」</b> から入力して「確定」。これで<b>園児台帳に自動で追加</b>されます。<br>退園・兄弟割引・納入方法（振込/引落）の変更などは <b>「園児台帳」</b> で直接直します。</div>
+ </li>
+ <li>
+  <div class="t">臨時の費用・記録を入れる</div>
+  <div class="d">行事費や制服の追加・返金は <b>「追加申込み」</b>、遠足などの一斉徴収は <b>「年間スケジュール」</b>（状態を「確定」に）、幼稚舎のお弁当忘れなどは <b>「給食記録」</b> に入力します。その月に必要な分だけでOKです。</div>
+ </li>
+ <li>
+  <div class="t">月次計算で請求額を確認する</div>
+  <div class="d"><b>「月次計算」</b> を開くと、ここまでの入力がすべて合算されて<b>請求額が自動表示</b>されます。金額に間違いがないか目で確認します。（ここで数字を直接打つ必要はありません。直したいときは元のタブを直します）</div>
+ </li>
+ <li>
+  <div class="t">ルクミーへ手入力し、確認チェックを付ける</div>
+  <div class="d"><b>「ルクミー出力」</b> で当月の対象を確認します。ルクミーへは<b>手入力</b>なので、変わった園児（黄色）をルクミー側に入力したら、ここで <b>「全員にチェック」→ 担当者を選んで「全員に設定」</b>。これが毎月27日の引落のもとになります。担当者が未設定だと他タブへ移れません。</div>
+ </li>
+ <li>
+  <div class="t">引落結果を確認し、できなかった人に印を付ける</div>
+  <div class="d">銀行から届く「振込済み／資金不足」などの表を見て、引落できなかった園児を <b>「月次計算」</b> の <b>「再請求」チェック</b> に入れます。</div>
+ </li>
+ <li>
+  <div class="t">督促状を作って配る</div>
+  <div class="d"><b>「再振替・再振込案内」</b> を開くと、チェックした園児が <b>「振込の人」「引落の人」</b> に自動で振り分けられて出ます。対象者を選び、<b>「JPEG保存」で画像にして連絡帳に貼り付け</b>、または「印刷」で配布します。</div>
+ </li>
+</ol>
+
+<!-- ============ 4 ============ -->
+<h2 class="sec" id="s4"><span class="n">4</span>アプリの開き方・データの注意</h2>
+<p class="sec-lead">このアプリはインターネット上に公開されています。各園のiPadやパソコンのブラウザで、下のURLを開けば使えます。</p>
+
+<div class="card">
+ <span class="tabname">アクセスURL</span>
+ <p style="font-family:'Spline Sans Mono',monospace;font-size:14px;word-break:break-all;color:var(--ink)">https://meative.github.io/strawberry-tuition-/</p>
+ <p class="role">ブックマーク（お気に入り）に登録しておくと毎回入力せずに開けます。iPadなら「ホーム画面に追加」しておくとアプリのように使えます。</p>
+</div>
+
+<div class="warn"><b>大切な注意：データの保存について</b><br>
+入力した内容（園児の追加・チェック・担当者など）は、その<b>iPad／パソコンのブラウザの中だけ</b>に保存されます。別の端末では共有されず、また同じ端末でも<b>ブラウザの履歴やデータを消すと失われます</b>。大事な記録は、定期的に「スプレッドシート(xlsx)に出力」でバックアップを取ってください。複数人・複数端末で同じデータを共有したい場合は、別途その仕組みが必要になります（必要なら相談してください）。</div>
+
+<div class="tip"><b>覚えておくとラクなこと</b><br>
+・どのタブで入力しても、最後は必ず「月次計算」に集まります。だから<b>金額の最終確認は月次計算を見ればOK</b>。<br>
+・金額が違うと思ったら、月次計算で直すのではなく、<b>もとのタブ（園児台帳・追加申込みなど）を直す</b>と、全部が自動で直ります。<br>
+・園児が「振込」か「引落」かは <b>園児台帳の「納入方法」</b> で決まります。督促状のタブ分けもこれに従います。<br>
+・ルクミーは手入力。<b>変わった人をルクミーに入力したら、必ず確認チェックと担当者を付ける</b>と転記漏れを防げます。</div>
+
+<div class="flow" style="margin-top:24px">
+ <b style="color:var(--leaf)">毎月の流れ（ひと目で）</b><br>
+ 新規入園・台帳更新 <span class="arrow">→</span> 追加申込み・年間スケジュール・給食記録 <span class="arrow">→</span> 月次計算で確認 <span class="arrow">→</span> ルクミーへ手入力＋確認チェック <span class="arrow">→</span> 引落結果を見て再請求チェック <span class="arrow">→</span> 再振替・再振込案内を作って配布
+</div>
+
+<div class="foot">
+ STRAWBERRY FIELD Children's Garden ／ ハイアイランド株式会社<br>
+ 月謝管理アプリ 事務員向け操作説明書
+</div>
+
+</div>
+</body></html>
