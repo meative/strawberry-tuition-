@@ -277,7 +277,19 @@ function selectDialog(msg,options,onOK,title,okLabel){
  cnBtn.onclick=close;
  ov.onclick=e=>{if(e.target===ov)close();};
 }
-// 基本情報の変更ログ：園児名→{ 'YYYY-M': [{field,label,from,to}] }。台帳を変えた対象月にだけ記録
+// 中央のお知らせダイアログ（OKのみ）。alert()の代わり
+function infoDialog(msg,title){
+ const ov=document.getElementById('confirmOverlay');
+ document.getElementById('confirmTitle').textContent=title||'お知らせ';
+ document.getElementById('confirmMsg').textContent=msg;
+ document.getElementById('confirmExtra').innerHTML='';
+ const okBtn=document.getElementById('confirmOK'),cnBtn=document.getElementById('confirmCancel');
+ okBtn.textContent='OK';cnBtn.style.display='none';
+ ov.style.display='flex';
+ const close=()=>{ov.style.display='none';okBtn.onclick=null;ov.onclick=null;cnBtn.style.display='';};
+ okBtn.onclick=close;
+ ov.onclick=e=>{if(e.target===ov)close();};
+}
 let changeLog={};
 // ルクミー手入力の確認チェック：'YYYY-M' → { 園児名: {done:true, by:'氏名', at:'日時'} }
 let lookmeeCheck={};
@@ -1807,6 +1819,7 @@ function renderCashbook(){
  const totalOut=calcRows.reduce((s,r)=>s+r.out,0);
  const endBal=bal;
  const openSet=!!cb.openingBy; // 本部振替の担当が選ばれているか（未選択なら明細入力をロック）
+ const locked=cb.rows.some(r=>r.isClose); // 締め（預金振替）済みなら編集ロック
  let h='';
  // ヘッダ：事業者・部門・繰越/本部振替
  h+=`<div style="padding:10px 22px;border-bottom:1px solid var(--line);display:flex;gap:24px;align-items:center;flex-wrap:wrap;font-size:13px">`+
@@ -1814,70 +1827,128 @@ function renderCashbook(){
    `<span>部門：<b style="color:var(--leaf)">${bumon}</b></span>`+
    `<span>${yy}年 ${mm}月</span>`+
    `<div style="flex:1"></div>`+
-   `<label style="display:flex;align-items:center;gap:6px">本部から振替（入金）：¥<input type="number" id="cbOpening" value="${cb.opening||0}" class="inp" style="width:110px;padding:4px 8px;text-align:right"></label>`+
+   `<label style="display:flex;align-items:center;gap:6px">本部から振替（入金）：¥<input type="number" id="cbOpening" value="${cb.opening||0}" ${locked?'disabled':''} class="inp" style="width:110px;padding:4px 8px;text-align:right"></label>`+
    `</div>`;
+ // イベント費の集計と絞り込み状態
+ if(window.__cbEventOnly===undefined)window.__cbEventOnly=false;
+ const eventOnly=window.__cbEventOnly;
+ const eventOut=calcRows.filter(r=>r.event).reduce((s,r)=>s+r.out,0);
  // 集計バー
  h+=`<div class="noprint" style="padding:10px 22px;border-bottom:1px solid var(--line);display:flex;gap:18px;align-items:center;flex-wrap:wrap;font-size:13px">`+
    `<span>入金計：<b style="color:var(--leaf)">¥${totalIn.toLocaleString()}</b></span>`+
    `<span>出金計：<b style="color:var(--berry)">¥${totalOut.toLocaleString()}</b></span>`+
+   `<span>うちイベント費：<b style="color:#9a6b2f">¥${eventOut.toLocaleString()}</b></span>`+
    `<span>残高：<b>¥${endBal.toLocaleString()}</b></span>`+
    `<div style="flex:1"></div>`+
-   `<button id="cbAdd" class="btn btn-ghost" style="padding:7px 14px;font-size:13px${openSet?'':';opacity:.4;cursor:not-allowed'}" ${openSet?'':'disabled'}>＋ 行を追加</button>`+
-   `<button id="cbClose" class="btn btn-ghost" style="padding:7px 14px;font-size:13px">🔒 預金振替で締める</button>`+
-   `<button id="cbCsv" class="btn btn-ghost" style="padding:7px 14px;font-size:13px">📄 CSV出力（税理士提出用）</button>`+
+   `<button id="cbEventOnly" style="padding:6px 14px;font-size:12px;border:1px solid ${eventOnly?'#9a6b2f':'var(--line)'};background:${eventOnly?'#9a6b2f':'var(--paper)'};color:${eventOnly?'#fff':'var(--ink)'};border-radius:8px;cursor:pointer;font-family:inherit">${eventOnly?'✓ イベント費のみ表示中':'🎪 イベント費のみ表示'}</button>`+
+   (locked
+     ? `<button id="cbUnlock" class="btn btn-ghost" style="padding:7px 14px;font-size:13px;border-color:#9a6b2f;color:#9a6b2f">🔓 締めを解除</button>`
+     : `<button id="cbAddCash" class="btn btn-ghost" style="padding:7px 14px;font-size:13px${openSet?'':';opacity:.4;cursor:not-allowed'}" ${openSet?'':'disabled'}>＋ 現金入金</button>`+
+       `<button id="cbAdd" class="btn btn-ghost" style="padding:7px 14px;font-size:13px${openSet?'':';opacity:.4;cursor:not-allowed'}" ${openSet?'':'disabled'}>＋ 行を追加</button>`+
+       `<button id="cbClose" class="btn btn-ghost" style="padding:7px 14px;font-size:13px">🔒 預金振替で締める</button>`)+
+   (locked?'':`<button id="cbTimely" class="btn btn-ghost" style="padding:7px 14px;font-size:13px${openSet?'':';opacity:.4;cursor:not-allowed'}" ${openSet?'':'disabled'}>📥 タイムリースクールCSV取込</button>`)+
+   `<button id="cbCsv" class="btn btn-ghost" style="padding:7px 14px;font-size:13px">📄 CSV（全体）</button>`+
+   `<button id="cbCsvEvent" class="btn btn-ghost" style="padding:7px 14px;font-size:13px">🎪 CSV（イベント費のみ）</button>`+
    `</div>`;
+ if(locked){
+  h+=`<div class="noprint" style="padding:10px 22px;background:var(--leafsoft);color:var(--leaf);font-size:12.5px;border-bottom:1px solid var(--line)">🔒 この月は預金振替で締め済みです。編集・削除はできません。やり直す場合は「締めを解除」を押してください。</div>`;
+ }
  // 入力テーブル
  h+='<div class="tablewrap"><table style="font-size:13px"><thead><tr>'+
    '<th style="width:42px">No.</th><th style="width:100px">日付</th><th style="width:140px">勘定科目</th><th style="width:130px">税区分</th><th style="width:160px">店舗名</th><th>商品名</th>'+
-   '<th class="r" style="width:82px">入金</th><th class="r" style="width:82px">出金</th><th class="r" style="width:90px">残高</th><th style="width:90px">担当</th><th style="width:34px"></th>'+
+   '<th class="r" style="width:82px">入金</th><th class="r" style="width:82px">出金</th><th class="r" style="width:90px">残高</th><th style="width:90px">担当</th><th style="width:52px">イベント</th><th style="width:34px"></th>'+
    '</tr></thead><tbody>';
  // 繰越・本部振替の固定行
- h+=`<tr style="background:var(--berrysoft)"><td></td><td colspan="3" style="color:var(--mut)">繰越金</td><td colspan="2">—</td><td class="num"></td><td class="num"></td><td class="num">¥0</td><td></td><td></td></tr>`;
+ h+=`<tr style="background:var(--berrysoft)"><td></td><td colspan="3" style="color:var(--mut)">繰越金</td><td colspan="2">—</td><td class="num"></td><td class="num"></td><td class="num">¥0</td><td></td><td></td><td></td></tr>`;
  const openByOpts=`<option value="">担当を選択…</option>`+STAFF.map(s=>`<option ${cb.openingBy===s?'selected':''}>${s}</option>`).join('');
- h+=`<tr style="background:var(--berrysoft)"><td></td><td>${yy}/${mm}/1</td><td colspan="2">1 現金</td><td colspan="2">本部から振替</td><td class="num total" style="color:var(--leaf)">¥${(Number(cb.opening)||0).toLocaleString()}</td><td class="num"></td><td class="num">¥${(Number(cb.opening)||0).toLocaleString()}</td><td><select id="cbOpeningBy" class="inp" style="width:100%;padding:3px 4px;font-size:11px;${cb.openingBy?'':'border-color:var(--berry);background:#fff'}">${openByOpts}</select></td><td></td></tr>`;
+ h+=`<tr style="background:var(--berrysoft)"><td></td><td>${yy}/${mm}/1</td><td colspan="2">1 現金</td><td colspan="2">本部から振替</td><td class="num total" style="color:var(--leaf)">¥${(Number(cb.opening)||0).toLocaleString()}</td><td class="num"></td><td class="num">¥${(Number(cb.opening)||0).toLocaleString()}</td><td><select id="cbOpeningBy" ${locked?'disabled':''} class="inp" style="width:100%;padding:3px 4px;font-size:11px;${cb.openingBy?'':'border-color:var(--berry);background:#fff'}">${openByOpts}</select></td><td></td><td></td></tr>`;
  // 明細行（No.は領収書番号と照合できるよう連番）。本部振替の担当が未選択のうちは入力ロック
  if(!openSet){
-  h+=`<tr><td colspan="11" style="padding:20px 16px;text-align:center;color:var(--berry);font-size:13px;background:#fff7fa">まず「本部から振替」の担当（右端のプルダウン）を選んでください。<br>担当を選ぶと、明細の入力ができるようになります。</td></tr>`;
+  h+=`<tr><td colspan="12" style="padding:20px 16px;text-align:center;color:var(--berry);font-size:13px;background:#fff7fa">まず「本部から振替」の担当（右端のプルダウン）を選んでください。<br>担当を選ぶと、明細の入力ができるようになります。</td></tr>`;
  }
- if(openSet)calcRows.forEach((r,i)=>{
+ if(openSet){
+  const visRows=calcRows.map((r,i)=>({r,i})).filter(x=>!eventOnly||x.r.event);
+  if(eventOnly&&visRows.length===0){
+   h+=`<tr><td colspan="12" style="padding:20px 16px;text-align:center;color:var(--mut);font-size:13px">イベント費のチェックが付いた行がありません。</td></tr>`;
+  }
+  visRows.forEach(({r,i})=>{
   const acctOpts=`<option value="">選択…</option>`+CB_USED.map(a=>`<option value="${a.code}" ${String(r.acct)===String(a.code)?'selected':''}>${a.code} ${a.name}</option>`).join('');
   const taxOpts=CB_TAXES.map(tx=>`<option ${r.tax===tx?'selected':''}>${tx}</option>`).join('');
   const byOpts=`<option value="">担当…</option>`+STAFF.map(s=>`<option ${r.by===s?'selected':''}>${s}</option>`).join('');
-  h+=`<tr>`+
+  const dis=locked?'disabled':''; // 締め済みは全項目を編集不可
+  const fixed=r.isClose||r.isCash; // 現金固定行（締め・現金入金）は勘定科目固定・税区分/店舗名なし
+  const timely=r.src==='timely'; // タイムリースクール収入：勘定科目128固定・税区分固定・店舗名なし・摘要のみ編集可
+  h+=`<tr${locked?' style="opacity:.85"':''}${timely?' style="background:var(--leafsoft)"':''}>`+
     `<td style="text-align:center;font-weight:700;color:var(--berry)">${i+1}</td>`+
-    `<td><div style="display:flex;align-items:center;gap:1px"><input type="number" min="1" max="12" data-cb="${i}" data-f="mon" value="${r.mon!=null&&r.mon!==''?r.mon:mm}" class="inp" style="width:34px;padding:3px 3px" title="月"><span style="font-size:10px;color:var(--mut)">月</span><input type="number" min="1" max="31" data-cb="${i}" data-f="day" value="${r.day||''}" class="inp" style="width:34px;padding:3px 3px" placeholder="日" title="日"><span style="font-size:10px;color:var(--mut)">日</span></div></td>`+
-    (r.isClose
+    `<td><div style="display:flex;align-items:center;gap:1px"><input type="number" min="1" max="12" data-cb="${i}" data-f="mon" value="${r.mon!=null&&r.mon!==''?r.mon:mm}" ${dis} class="inp" style="width:34px;padding:3px 3px" title="月"><span style="font-size:10px;color:var(--mut)">月</span><input type="number" min="1" max="31" data-cb="${i}" data-f="day" value="${r.day||''}" ${dis} class="inp" style="width:34px;padding:3px 3px" placeholder="日" title="日"><span style="font-size:10px;color:var(--mut)">日</span></div></td>`+
+    (fixed
       ? `<td style="color:var(--mut)">1 現金</td>`
-      : `<td><select data-cb="${i}" data-f="acct" class="inp" style="width:100%;padding:3px 5px;font-size:12px">${acctOpts}</select></td>`)+
-    (r.isClose
+      : timely
+      ? `<td style="color:var(--leaf);font-size:12px">128 保育園収入高</td>`
+      : `<td><select data-cb="${i}" data-f="acct" ${dis} class="inp" style="width:100%;padding:3px 5px;font-size:12px">${acctOpts}</select></td>`)+
+    (fixed
       ? `<td></td>`
-      : `<td><select data-cb="${i}" data-f="tax" class="inp" style="width:100%;padding:3px 5px;font-size:11px">${taxOpts}</select></td>`)+
-    (r.isClose
+      : timely
+      ? `<td style="color:var(--mut);font-size:11px">${r.tax||'非課税売上'}</td>`
+      : `<td><select data-cb="${i}" data-f="tax" ${dis} class="inp" style="width:100%;padding:3px 5px;font-size:11px">${taxOpts}</select></td>`)+
+    (fixed||timely
       ? `<td></td>`
-      : `<td><select data-cb="${i}" data-f="shop" class="inp" style="width:100%;padding:3px 5px;font-size:12px"><option value="">店舗名…</option>${CB_SHOPS.map(s=>`<option value="${s}" ${r.shop===s?'selected':''}>${s}</option>`).join('')}${(r.shop&&!CB_SHOPS.includes(r.shop))?`<option value="${r.shop.replace(/"/g,'&quot;')}" selected>${r.shop}</option>`:''}<option value="__other__">✏️ その他（手入力）</option></select></td>`)+
-    `<td><input type="text" data-cb="${i}" data-f="item" value="${(r.item||'').replace(/"/g,'&quot;')}" class="inp" style="width:100%;padding:3px 6px" placeholder="商品名・費目"></td>`+
-    `<td>${r.kind==='in'?`<input type="number" data-cb="${i}" data-f="amt" value="${r.amt||''}" class="inp" style="width:74px;padding:3px 5px;text-align:right">`:`<span style="color:var(--mut);font-size:11px;cursor:pointer" data-cbkind="${i}" data-k="in">入金に</span>`}</td>`+
-    `<td>${r.kind==='out'?`<input type="number" data-cb="${i}" data-f="amt" value="${r.amt||''}" class="inp" style="width:74px;padding:3px 5px;text-align:right">`:`<span style="color:var(--mut);font-size:11px;cursor:pointer" data-cbkind="${i}" data-k="out">出金に</span>`}</td>`+
+      : `<td><select data-cb="${i}" data-f="shop" ${dis} class="inp" style="width:100%;padding:3px 5px;font-size:12px"><option value="">店舗名…</option>${CB_SHOPS.map(s=>`<option value="${s}" ${r.shop===s?'selected':''}>${s}</option>`).join('')}${(r.shop&&!CB_SHOPS.includes(r.shop))?`<option value="${r.shop.replace(/"/g,'&quot;')}" selected>${r.shop}</option>`:''}<option value="__other__">✏️ その他（手入力）</option></select></td>`)+
+    `<td><input type="text" data-cb="${i}" data-f="item" value="${(r.item||'').replace(/"/g,'&quot;')}" ${dis} class="inp" style="width:100%;padding:3px 6px" placeholder="${r.isCash?'現金入金':timely?'タイムリースクール':'商品名・費目'}"></td>`+
+    `<td>${r.kind==='in'?`<input type="number" data-cb="${i}" data-f="amt" value="${r.amt||''}" ${dis} class="inp" style="width:74px;padding:3px 5px;text-align:right">`:(locked?'':`<span style="color:var(--mut);font-size:11px;cursor:pointer" data-cbkind="${i}" data-k="in">入金に</span>`)}</td>`+
+    `<td>${r.kind==='out'?`<input type="number" data-cb="${i}" data-f="amt" value="${r.amt||''}" ${dis} class="inp" style="width:74px;padding:3px 5px;text-align:right">`:(locked||timely?'':`<span style="color:var(--mut);font-size:11px;cursor:pointer" data-cbkind="${i}" data-k="out">出金に</span>`)}</td>`+
     `<td class="num">¥${r.bal.toLocaleString()}</td>`+
-    `<td><select data-cb="${i}" data-f="by" class="inp" style="width:100%;padding:3px 4px;font-size:11px">${byOpts}</select></td>`+
-    `<td><span style="color:var(--berry);cursor:pointer;font-weight:700" data-cbdel="${i}" title="削除">✕</span></td>`+
+    `<td><select data-cb="${i}" data-f="by" ${dis} class="inp" style="width:100%;padding:3px 4px;font-size:11px">${byOpts}</select></td>`+
+    `<td style="text-align:center">${fixed||timely?'':`<input type="checkbox" data-cbev="${i}" ${r.event?'checked':''} ${dis} style="width:17px;height:17px;accent-color:#9a6b2f;cursor:pointer" title="行事イベントの按分費用">`}</td>`+
+    `<td>${locked?'':`<span style="color:var(--berry);cursor:pointer;font-weight:700" data-cbdel="${i}" title="削除">✕</span>`}</td>`+
     `</tr>`;
- });
+  });
+ }
  h+='</tbody></table></div>';
  // 未使用科目（ロック表示）
  h+=`<div class="noprint" style="padding:14px 22px;border-top:1px solid var(--line)"><div style="font-size:12px;color:var(--mut);margin-bottom:6px">使っていない勘定科目（選択不可・ロック）</div>`+
    `<div style="display:flex;flex-wrap:wrap;gap:6px">`+CB_ACCTS.filter(a=>!a.used).map(a=>`<span style="font-size:11px;color:#aaa;background:#f0f0f0;border:1px solid #e3e3e3;border-radius:4px;padding:2px 8px">🔒 ${a.code} ${a.name}</span>`).join('')+`</div></div>`;
  document.getElementById('body').innerHTML=h;
  // ハンドラ
- const op=document.getElementById('cbOpening');if(op)op.onchange=e=>{cbGet().opening=Number(e.target.value)||0;render();};
+ document.getElementById('cbOpening')&&(document.getElementById('cbOpening').onchange=e=>{cbGet().opening=Number(e.target.value)||0;render();});
  const opBy=document.getElementById('cbOpeningBy');if(opBy)opBy.onchange=e=>{cbGet().openingBy=e.target.value;render();};
- document.getElementById('cbAdd').onclick=()=>{cbGet().rows.push({mon:mm,day:'',acct:'',tax:'非課税対応仕入 10%',shop:'',item:'',kind:'out',amt:'',by:''});render();};
- document.getElementById('cbCsv').onclick=()=>cbExportCsv();
- document.getElementById('cbClose').onclick=()=>{
+ const addBtn=document.getElementById('cbAdd');if(addBtn)addBtn.onclick=()=>{cbGet().rows.push({mon:mm,day:'',acct:'',tax:'非課税対応仕入 10%',shop:'',item:'',kind:'out',amt:'',by:''});render();};
+ const addCashBtn=document.getElementById('cbAddCash');if(addCashBtn)addCashBtn.onclick=()=>{cbGet().rows.push({mon:mm,day:'',acct:1,tax:'',shop:'',item:'現金入金',kind:'in',amt:'',by:'',isCash:true});render();};
+ const unlockBtn=document.getElementById('cbUnlock');if(unlockBtn)unlockBtn.onclick=()=>{
+   confirmDialog('預金振替（締め）を解除して、編集できる状態に戻します。\n締めの行（預金振替）は削除されます。よろしいですか？',()=>{
+     const cur=cbGet();cur.rows=cur.rows.filter(r=>!r.isClose);render();
+   },'締めの解除','解除する');
+ };
+ document.getElementById('cbCsv').onclick=()=>cbExportCsv(false);
+ const tlBtn=document.getElementById('cbTimely');if(tlBtn)tlBtn.onclick=()=>{
+   const inp=document.createElement('input');inp.type='file';inp.accept='.csv,text/csv';
+   inp.onchange=e=>{const f=e.target.files[0];if(!f)return;
+     const fr=new FileReader();
+     fr.onload=ev=>{try{importTimelyCsv(String(ev.target.result||''));}catch(err){infoDialog('CSVの読み込み中にエラーが発生しました。\n'+err.message,'取込できません');}};
+     fr.readAsText(f);};
+   inp.click();
+ };
+ const evBtn=document.getElementById('cbCsvEvent');if(evBtn)evBtn.onclick=()=>cbExportCsv(true);
+ const evOnly=document.getElementById('cbEventOnly');if(evOnly)evOnly.onclick=()=>{window.__cbEventOnly=!window.__cbEventOnly;render();};
+ document.querySelectorAll('[data-cbev]').forEach(el=>{el.onchange=e=>{
+   const i=+e.target.dataset.cbev,cur=cbGet();cur.rows[i].event=e.target.checked;render();
+ };});
+ const closeBtn=document.getElementById('cbClose');if(closeBtn)closeBtn.onclick=()=>{
    const cur=cbGet();
-   if(endBal<=0){alert('残高が0以下です。締める必要はありません。');return;}
+   // 締め前チェック：未入力（日付・勘定科目・金額・担当）の行があれば止める
+   const bad=[];
+   cur.rows.forEach((r,i)=>{
+     const miss=[];
+     if(!r.day)miss.push('日付');
+     if(!r.isCash&&!r.acct)miss.push('勘定科目');
+     if(!(Number(r.amt)>0))miss.push('金額');
+     if(!r.by)miss.push('担当');
+     if(miss.length)bad.push(`No.${i+1}：${miss.join('・')}`);
+   });
+   if(bad.length){infoDialog('未入力の項目があるため締められません：\n\n'+bad.join('\n')+'\n\nすべて入力してから締めてください。','締められません');return;}
+   if(endBal<=0){infoDialog('残高が0以下です。締める必要はありません。','お知らせ');return;}
    selectDialog(
-     `月末の預金振替で残高 ¥${endBal.toLocaleString()} を出金し、残高を0にします。\n締めた担当者を選んでください。`,
+     `月末の預金振替で残高 ¥${endBal.toLocaleString()} を出金し、残高を0にします。\n締めた担当者を選んでください。\n\n※ 締めると、この月は編集・削除ができなくなります。`,
      STAFF,
      (who)=>{
        const t=new Date();
@@ -1911,22 +1982,106 @@ function renderCashbook(){
    const i=+e.target.dataset.cbdel,cur=cbGet();
    confirmDialog('この行を削除します。よろしいですか？',()=>{cur.rows.splice(i,1);render();});
  };});
- setCard('現金出納帳',`${park}（${bumon}）の現金管理`,'まず「本部から振替」の金額と担当（確認した人）を入れます。担当を選ぶまで明細は入力できません。日付は月・日に分けて入力（月は対象月が初期値。前後・月またぎは手で変更可）。No.は領収書番号と照合できる連番です。勘定科目を選ぶと税区分（食品は軽減8%・他は10%）と費目が自動で入ります。入力した行は担当を選ばないと他タブへ移動できません。月末は「預金振替で締める」で担当者を選んで残高を0にします。CSVは税理士提出用の列構成で出力します。','none');
+ setCard('現金出納帳',`${park}（${bumon}）の現金管理`,'まず「本部から振替」の金額と担当を入れます。担当を選ぶまで明細は入力できません。行事イベント（運動会・ファッションショー等）の按分費用は、その行の「イベント」にチェックを付けると、「🎪イベント費のみ表示」で抽出でき、CSVも全体版（区分列つき）とイベント費だけの版を別々に出せます。日付は月・日に分けて入力。No.は領収書番号と照合できる連番です。勘定科目を選ぶと税区分と費目が自動。入力した行は担当を選ばないと他タブへ移動できません。月末は「預金振替で締める」で残高を0にします。「📥 タイムリースクールCSV取込」で受付アプリのCSV（日別サマリー／明細どちらも可）を、対象月ぶんだけ「入金（保育園収入高）」として一括取込できます。','none');
 }
-function cbExportCsv(){
+function cbExportCsv(eventOnly){
  const cb=cbGet();const bumon=CB_BUMON[park]||park;
  let bal=Number(cb.opening)||0;
- const rows=[['No.','日付','相手勘定科目コード','相手勘定科目','相手部門','相手税区分','摘要','入金','出金','残高','担当']];
- rows.push(['','','','','','','繰越金','','',0,'']);
- rows.push(['',`${yy}/${mm}/1`,1,'現金',bumon,'','本部から振替',cb.opening||0,'',cb.opening||0,cb.openingBy||'']);
+ const rows=[['No.','日付','区分','相手勘定科目コード','相手勘定科目','相手部門','相手税区分','摘要','入金','出金','残高','担当']];
+ if(!eventOnly){
+   rows.push(['','','','','','','','繰越金','','',0,'']);
+   rows.push(['',`${yy}/${mm}/1`,'通常',1,'現金',bumon,'','本部から振替',cb.opening||0,'',cb.opening||0,cb.openingBy||'']);
+ }
  cb.rows.forEach((r,i)=>{const inn=r.kind==='in'?(Number(r.amt)||0):0,out=r.kind==='out'?(Number(r.amt)||0):0;bal=bal+inn-out;
+   if(eventOnly&&!r.event)return; // イベント費のみ出力
    const a=CB_ACCT_BY[+r.acct];
-   // 摘要＝「No+店舗名　商品名」（実物と同じ1列形式）。番号は領収書照合用に先頭へ
    const tekiyo=`${i+1}${r.shop||''}${r.shop&&r.item?'　':''}${r.item||''}`;
    const mo=(r.mon!=null&&r.mon!=='')?r.mon:mm;
-   rows.push([i+1, r.day?`${yy}/${mo}/${r.day}`:'', r.acct||'', a?a.name:'', bumon, r.tax||'', tekiyo, inn||'', out||'', bal, r.by||'']);
+   const kubun=r.src==='timely'?'タイムリースクール':(r.event?'イベント費':'通常');
+   rows.push([i+1, r.day?`${yy}/${mo}/${r.day}`:'', kubun, r.acct||'', a?a.name:'', bumon, r.tax||'', tekiyo, inn||'', out||'', (eventOnly?'':bal), r.by||'']);
  });
- downloadCsv(`現金出納帳_${yy}年${mm}月_${park}.csv`, rows);
+ if(eventOnly){
+   const evSum=cb.rows.filter(r=>r.event).reduce((s,r)=>s+(r.kind==='out'?(Number(r.amt)||0):0),0);
+   rows.push(['','','イベント費合計','','','','','','',evSum,'','']);
+ }
+ const fn=eventOnly?`現金出納帳_イベント費_${yy}年${mm}月_${park}.csv`:`現金出納帳_${yy}年${mm}月_${park}.csv`;
+ downloadCsv(fn, rows);
+}
+// CSVテキストを行配列にパース（ダブルクオート対応・BOM除去）
+function parseCsv(text){
+ text=text.replace(/^\ufeff/,'');
+ const rows=[];let row=[],cur='',q=false;
+ for(let i=0;i<text.length;i++){const c=text[i];
+   if(q){ if(c==='"'){ if(text[i+1]==='"'){cur+='"';i++;} else q=false; } else cur+=c; }
+   else{ if(c==='"')q=true;
+     else if(c===','){row.push(cur);cur='';}
+     else if(c==='\n'){row.push(cur);rows.push(row);row=[];cur='';}
+     else if(c==='\r'){}
+     else cur+=c; }
+ }
+ if(cur!==''||row.length){row.push(cur);rows.push(row);}
+ return rows.filter(r=>r.some(c=>String(c).trim()!==''));
+}
+// タイムリースクールCSVを現金出納帳の入金行として取り込む
+function importTimelyCsv(text){
+ const cb=cbGet();
+ const rows=parseCsv(text);
+ if(rows.length<2){infoDialog('CSVにデータが見つかりませんでした。','取込できません');return;}
+ const head=rows[0].map(h=>String(h).trim());
+ const idx=name=>head.findIndex(h=>h===name);
+ // 中身でサマリー／明細を自動判別
+ const isSummary=idx('利用者数')>=0;
+ const isDetail=idx('氏名')>=0||idx('領収書番号')>=0;
+ if(!isSummary&&!isDetail){
+   infoDialog('タイムリースクールのCSV形式を判別できませんでした。\n\n日別サマリー（利用者数の列がある）か、明細（氏名・領収書番号の列がある）のCSVを選んでください。','取込できません');return;
+ }
+ // 日付文字列から「月」「日」を取り出す（"2026/6/3"・"6/3"・"6月3日"等に対応）
+ const parseDate=s=>{
+   s=String(s||'').trim();
+   const m=s.match(/(?:(\d{4})[\/\-年])?(\d{1,2})[\/\-月](\d{1,2})/);
+   if(m)return{mon:+m[2],day:+m[3]};
+   return null;
+ };
+ const added=[];const skipped=[];
+ if(isSummary){
+   const di=idx('日付'),ai=idx('合計'),ni=idx('利用者数');
+   rows.slice(1).forEach(r=>{
+     const d=parseDate(r[di]);const amt=Number(String(r[ai]||'').replace(/[^\d.-]/g,''))||0;
+     if(!d)return;
+     if(d.mon!==mm){skipped.push(`${d.mon}/${d.day}`);return;} // 対象月以外は取り込まない
+     if(amt<=0)return;
+     const cnt=ni>=0?(Number(String(r[ni]||'').replace(/[^\d.-]/g,''))||0):0;
+     added.push({mon:d.mon,day:d.day,acct:128,tax:'非課税売上',shop:'',
+       item:`タイムリースクール ${d.mon}/${d.day}分${cnt?`（利用${cnt}名）`:''}`,
+       kind:'in',amt:amt,by:cb.openingBy||'',src:'timely'});
+   });
+ }else{
+   const di=idx('利用日'),ni=idx('氏名'),ki=idx('区分'),ai=idx('合計'),ri=idx('受領者'),bi=idx('領収書番号');
+   rows.slice(1).forEach(r=>{
+     const d=parseDate(r[di]);const amt=Number(String(r[ai]||'').replace(/[^\d.-]/g,''))||0;
+     if(!d)return;
+     if(d.mon!==mm){skipped.push(`${d.mon}/${d.day}`);return;}
+     if(amt<=0)return;
+     const nm=ni>=0?String(r[ni]||'').trim():'';
+     const kb=ki>=0?String(r[ki]||'').trim():'';
+     const rno=bi>=0?String(r[bi]||'').trim():'';
+     const rcv=ri>=0?String(r[ri]||'').trim():'';
+     added.push({mon:d.mon,day:d.day,acct:128,tax:'非課税売上',shop:'',
+       item:`タイムリースクール ${nm}${kb?`（${kb}）`:''}${rno?` 領収No.${rno}`:''}`,
+       kind:'in',amt:amt,by:STAFF.includes(rcv)?rcv:(cb.openingBy||''),src:'timely'});
+   });
+ }
+ if(added.length===0){
+   const sk=skipped.length?`\n\n対象月（${mm}月）以外の日付 ${[...new Set(skipped)].length} 件は取り込みませんでした。`:'';
+   infoDialog(`取り込める入金データがありませんでした。${sk}\n\n上部の対象年月が正しいか確認してください。`,'取込できません');return;
+ }
+ const skMsg=skipped.length?`\n（対象月以外の ${[...new Set(skipped)].length} 件は除外）`:'';
+ const total=added.reduce((s,r)=>s+r.amt,0);
+ confirmDialog(
+   `タイムリースクールの収入 ${added.length} 件・合計 ¥${total.toLocaleString()} を\n${yy}年${mm}月の現金出納帳に「入金」として追加します。${skMsg}\n\nよろしいですか？`,
+   ()=>{ cb.rows.push(...added); render(); infoDialog(`${added.length} 件を取り込みました。`,'取込完了'); },
+   'タイムリースクールCSVの取込','取り込む'
+ );
 }
 function downloadCsv(filename, rows){
  const esc=v=>{const s=String(v==null?'':v);return /[",\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s;};
@@ -1983,9 +2138,9 @@ function syncTabs(){const el=document.getElementById('tabs');el.innerHTML='';
  if(!tabVisible(tab))tab='settings';
  TABS.filter(([k])=>tabVisible(k)).forEach(([k,label,live])=>{const t=document.createElement('div');t.className='tab'+(k===tab?' active':'');
   t.innerHTML=label+(live?'<span class="mini">連動</span>':'');t.onclick=()=>{
-   if(tab==='lookmee'&&k!=='lookmee'){const bad=lookmeeGuard();if(bad){alert('ルクミー出力で、チェック済みなのに担当者が未設定の園児がいます：\n\n'+bad.join('、')+'\n\n担当者を設定してから移動してください。');return;}}
-   if(tab==='initsale'&&k!=='initsale'){const bad=initSaleGuard();if(bad){alert('初回売上管理で、入金確認済みなのに担当事務が未設定の園児がいます：\n\n'+bad.join('、')+'\n\n担当事務を選んでから移動してください。');return;}}
-   if(tab==='cashbook'&&k!=='cashbook'){const bad=cashbookGuard();if(bad){alert('現金出納帳で、入力済みなのに担当が未設定の行があります：\n\n'+bad.join('\n')+'\n\n担当を選んでから移動してください。');return;}}
+   if(tab==='lookmee'&&k!=='lookmee'){const bad=lookmeeGuard();if(bad){infoDialog('ルクミー出力で、チェック済みなのに担当者が未設定の園児がいます：\n\n'+bad.join('、')+'\n\n担当者を設定してから移動してください。','移動できません');return;}}
+   if(tab==='initsale'&&k!=='initsale'){const bad=initSaleGuard();if(bad){infoDialog('初回売上管理で、入金確認済みなのに担当事務が未設定の園児がいます：\n\n'+bad.join('、')+'\n\n担当事務を選んでから移動してください。','移動できません');return;}}
+   if(tab==='cashbook'&&k!=='cashbook'){const bad=cashbookGuard();if(bad){infoDialog('現金出納帳で、入力済みなのに担当が未設定の行があります：\n\n'+bad.join('\n')+'\n\n担当を選んでから移動してください。','移動できません');return;}}
    tab=k;syncTabs();render();};el.appendChild(t);});}
 const FAC_COLORS={'月寒園':'#3d7355','白石園':'#4a5a82','サッポロファクトリー園':'#a8466a','幼稚舎':'#9a6b2f','資生館保育園':'#6a548c','全施設':'var(--leaf)'};
 function applyParkColor(){const sel=document.getElementById('park');const c=FAC_COLORS[park]||'var(--leaf)';
