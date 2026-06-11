@@ -219,7 +219,7 @@ tr.changed:hover td{background:color-mix(in srgb,var(--gold) 22%,transparent)!im
 <div class="card">
  <div class="card-head"><h2><span class="dot"></span><span id="cardTitle"></span></h2><span class="meta" id="cardMeta"></span></div>
  <div id="body"></div>
- <div id="confirmOverlay" style="display:none;position:fixed;inset:0;background:rgba(20,12,16,.45);z-index:9999;align-items:center;justify-content:center;backdrop-filter:blur(2px)">
+ <div id="confirmOverlay" style="display:none;position:fixed;inset:0;background:rgba(20,12,16,.45);z-index:10010;align-items:center;justify-content:center;backdrop-filter:blur(2px)">
   <div style="background:var(--panel);border:1px solid var(--line);border-radius:18px;max-width:380px;width:90%;padding:28px 26px 22px;box-shadow:0 12px 48px rgba(0,0,0,.25);text-align:center">
    <div id="confirmTitle" style="font-size:16px;font-weight:700;color:var(--ink);margin-bottom:12px">確認</div>
    <div id="confirmMsg" style="font-size:13.5px;color:var(--mut);line-height:1.8;margin-bottom:22px;white-space:pre-line"></div>
@@ -298,6 +298,18 @@ const STAFF=['細野','佐藤','伊藤','小野','水野','小林'];
 // 台帳変更を記録（現在の対象年月の変更として）。元の値に戻したらその月のログを消す
 let rosterBase=JSON.parse(JSON.stringify(M.roster)); // 直近で「確定」された基準状態（前月扱い）
 function ymKey(){return yy+'-'+mm;}
+// 前月の年月キー（1月の前は前年12月）
+function prevYmKey(){let py=yy,pm=mm-1;if(pm<1){pm=12;py=yy-1;}return py+'-'+pm;}
+// イベント出納帳：前月から繰り越されたイベント予算の残金（当園）。なければ0。
+// 前月のイベント出納帳が「翌月へ繰り越す」で締められていれば、その eventCarry を当月の開始繰越金とする。
+function cbEventCarryIn(){
+ const pk=park;const pkey=prevYmKey();
+ const prev=cashbookEvent[pk]&&cashbookEvent[pk][pkey];
+ if(!prev)return 0;
+ // 前月が締め済み（繰越行 or 締め行あり）で eventCarry>0 のときのみ繰り越す
+ const closed=(prev.rows||[]).some(r=>r.isClose);
+ return closed?(Number(prev.eventCarry)||0):0;
+}
 function logChange(name,field,label,fromVal,toVal){
  const k=ymKey();
  if(!changeLog[k])changeLog[k]={};
@@ -324,6 +336,12 @@ let initSaleLog={};
 // 現金出納帳：cashbook[施設][yy-mm] = {opening:本部振替額, rows:[{day, acct, tax, desc, kind, amt, by}]}
 // acct=勘定科目コード, tax=税区分, kind='in'|'out'。残高は表示時に計算。税理士提出CSVの元データ。
 let cashbook={};
+// イベント出納帳：cashbookEvent[施設][yy-mm] = {opening:イベント予算, rows:[...]}（通常出納帳と同じ構造・別保存）
+let cashbookEvent={};
+// 出納帳のモード：'normal'＝通常の現金出納帳／'event'＝イベント出納帳
+let cbMode='normal';
+// タイムリー売上（プレビュー内で読み込む）：timelyData[施設][yy-mm] = [{mon,day,item,amt,by}]
+let timelyData={};
 // ===== 端末内保存（localStorage）：閉じても残る。Firebase移行時もこのデータ構造を流用 =====
 const STORE_KEY='sf_tuition_v1';
 let __saveTimer=null;
@@ -332,7 +350,8 @@ function saveState(){ // 入力データをまとめて端末に保存（連打�
  __saveTimer=setTimeout(()=>{
   try{
    const data={v:1, savedAt:new Date().toISOString(),
-    roster, changeLog, lookmeeCheck, rosterBase, bank, reissueFeeByPark, initSaleLog, cashbook};
+    roster, changeLog, lookmeeCheck, rosterBase, bank, reissueFeeByPark, initSaleLog, cashbook, cashbookEvent, timelyData,
+    addons, sched, schedMemo, meals};
    localStorage.setItem(STORE_KEY, JSON.stringify(data));
   }catch(e){console.warn('保存に失敗:',e);}
  },300);
@@ -348,13 +367,18 @@ function loadState(){ // 起動時に端末から復元
   if(d.bank)bank=d.bank;
   if(d.reissueFeeByPark)reissueFeeByPark=d.reissueFeeByPark;
   if(d.initSaleLog)initSaleLog=d.initSaleLog;
-  if(d.cashbook)cashbook=d.cashbook;
+  if(d.cashbook)cashbook=d.cashbook;if(d.cashbookEvent)cashbookEvent=d.cashbookEvent;if(d.timelyData)timelyData=d.timelyData;
+  if(d.addons)addons=d.addons;
+  if(d.sched)sched=d.sched;
+  if(typeof d.schedMemo==='string')schedMemo=d.schedMemo;
+  if(d.meals)meals=d.meals;
   return true;
  }catch(e){console.warn('復元に失敗:',e);return false;}
 }
 function exportBackup(){ // データをファイルに書き出し（バックアップ・受け渡し用）
  const data={v:1, savedAt:new Date().toISOString(), app:'STRAWBERRY_FIELD月謝管理',
-  roster, changeLog, lookmeeCheck, rosterBase, bank, reissueFeeByPark, initSaleLog, cashbook};
+  roster, changeLog, lookmeeCheck, rosterBase, bank, reissueFeeByPark, initSaleLog, cashbook, cashbookEvent, timelyData,
+  addons, sched, schedMemo, meals};
  const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
  const url=URL.createObjectURL(blob);const a=document.createElement('a');
  const d=new Date();const stamp=`${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}_${String(d.getHours()).padStart(2,'0')}${String(d.getMinutes()).padStart(2,'0')}`;
@@ -363,10 +387,11 @@ function exportBackup(){ // データをファイルに書き出し（バック�
 function importBackup(file){ // 書き出したファイルを読み込み（受け渡し・復元用）
  const r=new FileReader();
  r.onload=()=>{
-  try{
-   const d=JSON.parse(r.result);
-   if(!d||!d.roster){alert('このファイルは月謝データではないようです。');return;}
-   if(!confirm('読み込むと、今この端末にあるデータは上書きされます。よろしいですか？\n（不安な場合は先に「データ書き出し」でバックアップを取ってください）'))return;
+  let d;
+  try{ d=JSON.parse(r.result); }
+  catch(e){ infoDialog('読み込みに失敗しました。ファイルが壊れている可能性があります。','読み込みエラー'); return; }
+  if(!d||!d.roster){ infoDialog('このファイルは月謝データではないようです。','読み込みエラー'); return; }
+  const applyImport=()=>{
    if(d.roster)roster=d.roster;
    if(d.changeLog)changeLog=d.changeLog;
    if(d.lookmeeCheck)lookmeeCheck=d.lookmeeCheck;
@@ -374,10 +399,15 @@ function importBackup(file){ // 書き出したファイルを読み込み（受
    if(d.bank)bank=d.bank;
    if(d.reissueFeeByPark)reissueFeeByPark=d.reissueFeeByPark;
    if(d.initSaleLog)initSaleLog=d.initSaleLog;
-   if(d.cashbook)cashbook=d.cashbook;
+   if(d.cashbook)cashbook=d.cashbook;if(d.cashbookEvent)cashbookEvent=d.cashbookEvent;if(d.timelyData)timelyData=d.timelyData;
+   if(d.addons)addons=d.addons;
+   if(d.sched)sched=d.sched;
+   if(typeof d.schedMemo==='string')schedMemo=d.schedMemo;
+   if(d.meals)meals=d.meals;
    saveState();render();
-   alert('読み込みました。'+(d.savedAt?'\n（書き出し日時：'+new Date(d.savedAt).toLocaleString()+'）':''));
-  }catch(e){alert('読み込みに失敗しました。ファイルが壊れている可能性があります。');}
+   infoDialog('読み込みました。'+(d.savedAt?'\n（書き出し日時：'+new Date(d.savedAt).toLocaleString()+'）':''),'復元完了');
+  };
+  confirmDialog('読み込むと、今この端末にあるデータは上書きされます。よろしいですか？\n（不安な場合は先に「データ書き出し」でバックアップを取ってください）',applyImport,'データ読み込みの確認','読み込む');
  };
  r.readAsText(file);
 }
@@ -408,10 +438,16 @@ function eventsFor(p){let out=[];sched.forEach(s=>{
  else if(M.facilities.some(f=>f.name===s.cls)){if(s.cls===p.park)hit=true;} // 施設対象（幼稚舎など）
  else if(s.cls===p.cls)hit=true;
  if(hit)out.push({item:s.item,amt});});return out;}
+// 追加申込み行が課税（単体購入の制服）かどうか。制服商品かつ taxMode==='single' のときのみ課税。
+function addonIsTaxable(a){
+ const g=M.goods.find(x=>x.name===a.goods);
+ const isUni=g && g.cat==='制服';
+ return !!(isUni && a.taxMode==='single');
+}
 function addonsFor(p){return addons.filter(a=>a.name===p.name&&+a.ry===yy&&+a.rm===mm).map(a=>{
  const raw=(a.price||0)*(a.qty||1);
  const isRefund=a.kind==='返金';
- return {item:(isRefund?'返金:':'')+(a.goods||'項目'),amt:isRefund?-Math.abs(raw):raw};});}
+ return {item:(isRefund?'返金:':'')+(a.goods||'項目'),amt:isRefund?-Math.abs(raw):raw,addonTaxable:addonIsTaxable(a)};});}
 // 給食実費（幼稚舎・末締め翌末払い）：対象年月の請求には「前月」の利用を集計して乗せる
 function prevMonth(y,m){return m===1?{y:y-1,m:12}:{y:y,m:m-1};}
 function mealsFor(p){
@@ -984,6 +1020,18 @@ function renderAddon(){
    }
   }else{
    itemCell=`<select class="inp" data-add="${i}" data-f="goods"><option value="">選択</option>${goodsOpts.map(gg=>`<option ${a.goods===gg.name?'selected':''}>${gg.name}</option>`).join('')}</select>`;
+   // 制服商品のときのみ「徴収区分（課税判定）」を表示
+   const gSel=M.goods.find(x=>x.name===a.goods);
+   if(gSel&&gSel.cat==='制服'){
+    const tm=a.taxMode==='single'?'single':'bundle';
+    const tagColor=tm==='single'?'var(--berry)':'var(--mut)';
+    itemCell+=`<div style="margin-top:6px;display:flex;align-items:center;gap:6px">`+
+      `<span style="font-size:10px;color:${tagColor};white-space:nowrap">税区分</span>`+
+      `<select class="inp" data-add="${i}" data-f="taxMode" style="font-size:12px;width:100%;max-width:170px;color:${tagColor};padding:3px 6px">`+
+      `<option value="bundle" ${tm==='bundle'?'selected':''}>月謝と一括（非課税）</option>`+
+      `<option value="single" ${tm==='single'?'selected':''}>単体購入（課税）</option>`+
+      `</select></div>`;
+   }
   }
   // サイズセル
   let sizeCell;
@@ -1001,7 +1049,7 @@ function renderAddon(){
   h+=`<tr style="${isRefund?'background:color-mix(in srgb,var(--leaf) 7%,transparent)':''}">`+
    `<td><select class="inp" data-add="${i}" data-f="kind" style="width:auto;font-weight:600;color:${isRefund?'var(--leaf)':'var(--berry)'}"><option ${!isRefund?'selected':''}>申込</option><option ${isRefund?'selected':''}>返金</option></select></td>`+
    `<td><select class="inp" data-add="${i}" data-f="name"><option value="">選択</option>${pupilOpts.map(p=>`<option value="${p.name}" ${a.name===p.name?'selected':''}>${(park==='全施設'?p.park+' ':'')}${p.cls}　${p.name}</option>`).join('')}</select></td>`+
-   `<td>${itemCell}</td>`+
+   `<td style="min-width:200px;max-width:240px">${itemCell}</td>`+
    `<td>${sizeCell}</td>`+
    `<td><input class="inp" type="number" data-add="${i}" data-f="qty" value="${qty}" style="text-align:right"></td>`+
    `<td class="num">${priceCell}</td>`+
@@ -1021,6 +1069,9 @@ function renderAddon(){
      addons[i].price=g?g.price:0;
      const sizes=(g&&g.sizes)?g.sizes:[];
      addons[i].size=sizes.length?sizes[0]:'';
+     // 制服商品なら徴収区分の既定を「月謝と一括（非課税）」に。制服以外は区分を消す。
+     if(g&&g.cat==='制服'){ if(!addons[i].taxMode)addons[i].taxMode='bundle'; }
+     else { delete addons[i].taxMode; }
    }
    if(f==='kind'){if(v==='返金'){addons[i].goods='';addons[i].size='';addons[i].custom=false;}}
    render();};el.onchange=handler;
@@ -1028,7 +1079,7 @@ function renderAddon(){
  document.querySelectorAll('[data-adddel]').forEach(el=>{el.onclick=e=>{const i=+e.currentTarget.dataset.adddel;
    const a=addons[i];const nm=(a.name?a.name+'さんの':'')+(a.goods||'この項目')+(a.kind==='返金'?'（返金）':'');
    confirmDialog(`追加申込みから「${nm}」を削除します。\nこの操作は取り消せません。本当に削除しますか？`,()=>{addons.splice(i,1);render();});};});
- setCard('追加申込み','制服・行事費・返金など','種別で「申込」「返金」を選べます。返金は種目を選ぶ（「その他（自由入力）」で名称を直接入力）→金額・反映月を入力すると、その月の月次計算からマイナスされます。','add');
+ setCard('追加申込み','制服・行事費・返金など','種別で「申込」「返金」を選べます。制服は「月謝と一括（非課税）／単体購入（課税）」を選べ、本部集計の消費税区分に反映されます。返金は種目を選ぶ（「その他（自由入力）」で名称を直接入力）→金額・反映月を入力すると、その月の月次計算からマイナスされます。','add');
 }
 function renderMonthly(){let rows=visible();
  // 納入方法フィルタ
@@ -1107,14 +1158,13 @@ function initSaleGuard(){ // 入金確認済みなのに担当事務が未設定
    .map(r=>r.name);
  return bad.length?bad:null;
 }
-function cashbookGuard(){ // 入力済み（金額あり）なのに担当が未設定の出納帳行があれば、その施設・No.を返す（全施設横断）
+function cashbookGuardOn(store){ // 指定の出納帳ストアで、入力済みなのに担当未設定の行を返す
  const bad=[];
- Object.keys(cashbook).forEach(pk=>{
-   const months=cashbook[pk]||{};
+ Object.keys(store).forEach(pk=>{
+   const months=store[pk]||{};
    Object.keys(months).forEach(k=>{
      const m=months[k]||{};
      const rows=m.rows||[];
-     // 本部振替に金額があるのに担当未設定
      if((Number(m.opening)||0)>0&&!m.openingBy)bad.push(`${pk} ${k} 本部から振替`);
      rows.forEach((r,i)=>{
        const hasContent=(Number(r.amt)||0)>0||r.acct||r.item;
@@ -1124,6 +1174,8 @@ function cashbookGuard(){ // 入力済み（金額あり）なのに担当が未
  });
  return bad.length?bad:null;
 }
+function cashbookGuard(){ return cashbookGuardOn(cashbook); }
+function cashbookEventGuard(){ return cashbookGuardOn(cashbookEvent); }
 function renderLookmee(){let rows=visible().filter(r=>r.status==='在園中'||calc(r).isNew);
  const k=ymKey();
  if(!lookmeeCheck[k])lookmeeCheck[k]={};
@@ -1178,6 +1230,98 @@ function renderLookmee(){let rows=visible().filter(r=>r.status==='在園中'||ca
  const aBulkClr=document.getElementById('lkBulkClear');if(aBulkClr)aBulkClr.onclick=()=>{targets.forEach(r=>{if(store[r.name])store[r.name].by='';});render();};
  setCard('ルクミー出力',`${park} の取込対象 ${rows.length}名 ／ 要手入力 ${targets.length}名（確認済 ${doneCnt}）`,'ルクミーは手入力です。手順：①内容を確認→②「全員にチェック」→③担当者を選んで「全員に設定」。一人で担当する場合はこれで全員に同じ担当者が入ります。担当者が未設定の確認があると他タブへ移動できません。確認はその月だけに保存されます。','none');
 }
+// ===== 年度収支まとめ（本部集計）=====
+// 会計年度：4月〜翌3月。yy/mm から対象年度を算出（1〜3月は前年が年度）
+function hqFiscalYearOf(y,m){ return (m>=4)?y:(y-1); }
+function hqCurFY(){ return hqFiscalYearOf(yy,mm); }
+// 年度の月順（4,5,…,12,1,2,3）と、その月が属する暦年を返す
+function hqFyMonths(fy){
+ const arr=[];
+ for(let m=4;m<=12;m++)arr.push({m,cy:fy});
+ for(let m=1;m<=3;m++)arr.push({m,cy:fy+1});
+ return arr;
+}
+// 年度収支データ：施設×月の {income, expense}（収入＝新規入園振込＋タイムリー現金、支出＝通常経費＋イベント費）
+function hqFiscalData(fy){
+ const allpks=['月寒園','白石園','サッポロファクトリー園','幼稚舎','資生館保育園'];
+ const months=hqFyMonths(fy);
+ // 施設別・月別の器を用意：cell[park][monthIndex] = {shokai,timely,exp,evexp}
+ const data={};
+ allpks.forEach(p=>{data[p]=months.map(()=>({shokai:0,timely:0,exp:0,evexp:0}));});
+ // 月インデックスの逆引き：'cy-m' → index
+ const idxOf={};
+ months.forEach((mo,i)=>{idxOf[mo.cy+'-'+mo.m]=i;});
+ // ① 新規入園（振込）：initSaleLog の paidDate（入金日）の年月で配賦
+ roster.filter(r=>r.isNew&&r.name).forEach(p=>{
+  const log=initSaleLog[p.name];
+  if(!log||!log.paid||!log.paidDate)return;
+  const m=String(log.paidDate).match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if(!m)return;
+  const cy=+m[1],cm=+m[2];
+  const idx=idxOf[cy+'-'+cm];if(idx==null)return;
+  if(!data[p.park])return;
+  const amt=initSaleAmount(p);if(!(amt>0))return;
+  data[p.park][idx].shokai+=amt;
+ });
+ // ② タイムリー（現金）／③ 通常経費／④ イベント費：[施設][cy-cm] キーで拾う
+ allpks.forEach(p=>{
+  months.forEach((mo,i)=>{
+   const key=mo.cy+'-'+mo.m;
+   // タイムリー現金売上
+   const tl=(timelyData[p]&&timelyData[p][key])||[];
+   tl.forEach(r=>{data[p][i].timely+=Number(r.amt)||0;});
+   // 通常経費（出金）：本部振替・現金補充・締めの預金振替は除外
+   const cb=(cashbook[p]&&cashbook[p][key]);
+   if(cb&&Array.isArray(cb.rows)){
+    cb.rows.forEach(r=>{if(r.kind==='out'&&!r.isClose)data[p][i].exp+=Number(r.amt)||0;});
+   }
+   // イベント費（出金）：締め行・繰越行は除外
+   const ev=(cashbookEvent[p]&&cashbookEvent[p][key]);
+   if(ev&&Array.isArray(ev.rows)){
+    ev.rows.forEach(r=>{if(r.kind==='out'&&!r.isClose)data[p][i].evexp+=Number(r.amt)||0;});
+   }
+  });
+ });
+ return {fy,months,data,parks:allpks};
+}
+// ===== 消費税区分の集計（会計士確認用）=====
+// 当月（yy/mm）の請求を施設別に課税（制服代）／非課税（月謝・保育料等）／行事その他に分ける
+function hqTaxBreakdown(y,m){
+ const allpks=['月寒園','白石園','サッポロファクトリー園','幼稚舎','資生館保育園'];
+ const savedY=yy,savedM=mm;yy=y;mm=m; // calc/addonsFor が参照するグローバルを一時切替
+ const res={};
+ allpks.forEach(p=>{res[p]={taxable:0,nontaxUni:0,nontax:0,other:0,total:0};});
+ allPupils().forEach(r=>{
+  if(!res[r.park])return;
+  const c=calc(r);
+  if(!(r.status==='在園中'||c.isNew))return;
+  // 非課税：月謝・保育料・付帯費・割引・日割り・手数料・早期割引
+  const nontax=c.getsu+c.kyozai+c.sib+c.half+(c.early||0)+c.fee;
+  res[r.park].nontax+=nontax;
+  res[r.park].total+=c.total;
+  // 課税＝単体購入の制服（addonTaxable）のみ。月謝と一括の制服・レンタル・初回オプションは非課税（制服）。
+  // それ以外（行事費・用品等）は「行事/その他」。
+  c.evs.forEach(e=>{
+   if(e.addonTaxable){ res[r.park].taxable+=e.amt; }          // 単体購入の制服＝課税
+   else if(isUniform(e.item)){ res[r.park].nontaxUni+=e.amt; } // 月謝一括・レンタル等の制服＝非課税（制服）
+   else { res[r.park].other+=e.amt; }                          // 行事費・その他用品
+  });
+ });
+ yy=savedY;mm=savedM; // 復元
+ return res;
+}
+// 年度（4月〜翌3月）の月別 課税売上（制服代）と非課税売上を施設別に集計
+function hqTaxByMonth(fy){
+ const allpks=['月寒園','白石園','サッポロファクトリー園','幼稚舎','資生館保育園'];
+ const months=hqFyMonths(fy);
+ const data={};
+ allpks.forEach(p=>{data[p]=months.map(()=>({taxable:0,nontaxUni:0,nontax:0,other:0}));});
+ months.forEach((mo,i)=>{
+  const bd=hqTaxBreakdown(mo.cy,mo.m);
+  allpks.forEach(p=>{data[p][i]={taxable:bd[p].taxable,nontaxUni:bd[p].nontaxUni,nontax:bd[p].nontax,other:bd[p].other};});
+ });
+ return {fy,months,data,parks:allpks};
+}
 function renderHQ(){const allpks=['月寒園','白石園','サッポロファクトリー園','幼稚舎','資生館保育園'];
  const pks = (park==='全施設')? allpks : allpks.filter(p=>p===park);
  let gt=0,gc=0,guni=0,gcap=0;
@@ -1200,9 +1344,186 @@ function renderHQ(){const allpks=['月寒園','白石園','サッポロファク
    `<td class="num" style="font-weight:700;color:var(--mut)">${gcap||'—'}</td>`+
    `<td class="num" style="font-weight:700">${grate!=null?grate+'%':'—'}</td>`+
    `<td class="num total" style="font-size:16px">¥${gt.toLocaleString()}</td><td class="num zero">—</td>${guni?`<td class="num" style="font-weight:700;color:var(--berry)">¥${guni.toLocaleString()}</td>`:'<td class="num zero">—</td>'}<td class="num zero">—</td></tr>`;}
- h+='</tbody></table></div>';document.getElementById('body').innerHTML=h;
- const note=(park==='全施設')?'全施設を横断表示。定員・充足率と、制服代（追加申込み）は専用列に分けて表示します。':`${park} のみ表示中。`;
+ h+='</tbody></table></div>';
+ // ===== 年度収支まとめ =====
+ h+=hqFiscalSectionHtml();
+ document.getElementById('body').innerHTML=h;
+ hqWireFiscal();
+ const note=(park==='全施設')?'上段は当月の在園・請求サマリー、下段は会計年度（4月〜翌3月）の収支まとめ（現金の動き）です。':`${park} のみ表示中。`;
  setCard('本部用集計',(park==='全施設')?'全施設の内訳＋合計':`${park} の内訳`,note,'none');
+}
+// 年度収支まとめのHTML（施設別×月別マトリクス＋全施設合計＋月別推移）
+function hqFiscalSectionHtml(){
+ const fy=(window.__hqFY!=null)?window.__hqFY:hqCurFY();
+ window.__hqFY=fy;
+ const allpks=['月寒園','白石園','サッポロファクトリー園','幼稚舎','資生館保育園'];
+ const pks=(park==='全施設')?allpks:allpks.filter(p=>p===park);
+ const {months,data}=hqFiscalData(fy);
+ // 年度セレクタ候補（前後2年）
+ const yrs=[];for(let y=fy-2;y<=fy+1;y++)yrs.push(y);
+ let s=`<div style="margin-top:30px;border-top:2px solid var(--leaf)"></div>`;
+ s+=`<div class="noprint" style="padding:18px 22px 6px;display:flex;gap:14px;align-items:center;flex-wrap:wrap">`+
+   `<span style="font-size:15px;font-weight:700;color:var(--leaf)">💰 年度収支まとめ</span>`+
+   `<label style="font-size:13px;color:var(--mut)">年度：<select id="hqFYsel" class="inp" style="width:auto;padding:5px 10px">`+
+     yrs.map(y=>`<option value="${y}" ${y===fy?'selected':''}>${y}年度（${y}年4月〜${y+1}年3月）</option>`).join('')+
+   `</select></label>`+
+   `<span style="font-size:12px;color:var(--mut)">収入＝新規入園（振込）＋タイムリー（現金）。月謝は別管理のため含みません。支出＝現金出納帳＋イベント出納帳の出金。</span>`+
+   `<div style="flex:1"></div>`+
+   `<button id="hqFyCsv" class="btn btn-ghost" style="padding:7px 16px;font-size:13px;border-color:var(--leaf);color:var(--leaf)">📄 年度収支をCSV出力</button>`+
+   `</div>`;
+ // 施設別サマリー（年度合計：収入／支出／収支）
+ s+=`<div class="tablewrap"><table><thead><tr><th>施設</th><th class="r">収入合計</th><th class="r">うち新規入園</th><th class="r">うちタイムリー</th><th class="r">支出合計</th><th class="r">うち経費</th><th class="r">うちイベント費</th><th class="r">年度収支</th></tr></thead><tbody>`;
+ let G={shokai:0,timely:0,exp:0,evexp:0};
+ pks.forEach(p=>{
+  const t=data[p].reduce((a,c)=>({shokai:a.shokai+c.shokai,timely:a.timely+c.timely,exp:a.exp+c.exp,evexp:a.evexp+c.evexp}),{shokai:0,timely:0,exp:0,evexp:0});
+  G.shokai+=t.shokai;G.timely+=t.timely;G.exp+=t.exp;G.evexp+=t.evexp;
+  const inc=t.shokai+t.timely, out=t.exp+t.evexp, net=inc-out;
+  s+=`<tr><td><span class="ptag pt-${p}">${p}</span></td>`+
+    `<td class="num total">¥${inc.toLocaleString()}</td>`+
+    `<td class="num">${t.shokai?'¥'+t.shokai.toLocaleString():'<span class="zero">—</span>'}</td>`+
+    `<td class="num">${t.timely?'¥'+t.timely.toLocaleString():'<span class="zero">—</span>'}</td>`+
+    `<td class="num">¥${out.toLocaleString()}</td>`+
+    `<td class="num">${t.exp?'¥'+t.exp.toLocaleString():'<span class="zero">—</span>'}</td>`+
+    `<td class="num">${t.evexp?'¥'+t.evexp.toLocaleString():'<span class="zero">—</span>'}</td>`+
+    `<td class="num" style="font-weight:700;color:${net>=0?'var(--leaf)':'var(--berry)'}">¥${net.toLocaleString()}</td></tr>`;
+ });
+ if(park==='全施設'){
+  const inc=G.shokai+G.timely,out=G.exp+G.evexp,net=inc-out;
+  s+=`<tr style="border-top:2px solid var(--leaf)"><td style="font-weight:700;color:var(--leaf)">全施設合計</td>`+
+    `<td class="num total" style="font-size:15px">¥${inc.toLocaleString()}</td>`+
+    `<td class="num" style="font-weight:600">${G.shokai?'¥'+G.shokai.toLocaleString():'—'}</td>`+
+    `<td class="num" style="font-weight:600">${G.timely?'¥'+G.timely.toLocaleString():'—'}</td>`+
+    `<td class="num" style="font-weight:600">¥${out.toLocaleString()}</td>`+
+    `<td class="num">${G.exp?'¥'+G.exp.toLocaleString():'—'}</td>`+
+    `<td class="num">${G.evexp?'¥'+G.evexp.toLocaleString():'—'}</td>`+
+    `<td class="num" style="font-weight:700;font-size:15px;color:${net>=0?'var(--leaf)':'var(--berry)'}">¥${net.toLocaleString()}</td></tr>`;
+ }
+ s+=`</tbody></table></div>`;
+ // 月別推移（全施設合算 or 単一施設）：収入／支出／収支
+ s+=`<div style="padding:18px 22px 4px;font-size:13.5px;font-weight:700;color:var(--leaf)">月別推移（${park==='全施設'?'全施設合算':park}）</div>`;
+ s+=`<div class="tablewrap"><table><thead><tr><th>区分</th>`+
+   months.map(mo=>`<th class="r">${mo.m}月</th>`).join('')+`<th class="r">年度計</th></tr></thead><tbody>`;
+ const mInc=months.map((_,i)=>pks.reduce((a,p)=>a+data[p][i].shokai+data[p][i].timely,0));
+ const mOut=months.map((_,i)=>pks.reduce((a,p)=>a+data[p][i].exp+data[p][i].evexp,0));
+ const fmtCell=v=>v?'¥'+v.toLocaleString():'<span class="zero">—</span>';
+ s+=`<tr><td style="font-weight:600">収入</td>`+mInc.map(v=>`<td class="num">${fmtCell(v)}</td>`).join('')+`<td class="num total">¥${mInc.reduce((a,b)=>a+b,0).toLocaleString()}</td></tr>`;
+ s+=`<tr><td style="font-weight:600">支出</td>`+mOut.map(v=>`<td class="num">${fmtCell(v)}</td>`).join('')+`<td class="num">¥${mOut.reduce((a,b)=>a+b,0).toLocaleString()}</td></tr>`;
+ s+=`<tr style="border-top:1px solid var(--line)"><td style="font-weight:700">収支</td>`+months.map((_,i)=>{const n=mInc[i]-mOut[i];return `<td class="num" style="font-weight:600;color:${n>=0?'var(--leaf)':'var(--berry)'}">${n?'¥'+n.toLocaleString():'<span class="zero">—</span>'}</td>`;}).join('')+
+   (()=>{const tn=mInc.reduce((a,b)=>a+b,0)-mOut.reduce((a,b)=>a+b,0);return `<td class="num" style="font-weight:700;color:${tn>=0?'var(--leaf)':'var(--berry)'}">¥${tn.toLocaleString()}</td>`;})()+`</tr>`;
+ s+=`</tbody></table></div>`;
+ // ===== 消費税区分（会計士確認用：制服代＝課税の配当）=====
+ s+=hqTaxSectionHtml(fy);
+ return s;
+}
+// 消費税区分セクション：当月の課税/非課税内訳＋年度の月別 課税売上推移
+function hqTaxSectionHtml(fy){
+ const allpks=['月寒園','白石園','サッポロファクトリー園','幼稚舎','資生館保育園'];
+ const pks=(park==='全施設')?allpks:allpks.filter(p=>p===park);
+ let s=`<div style="margin-top:30px;border-top:2px solid var(--berry)"></div>`;
+ s+=`<div style="padding:18px 22px 6px;display:flex;gap:12px;align-items:center;flex-wrap:wrap">`+
+   `<span style="font-size:15px;font-weight:700;color:var(--berry)">🧾 消費税区分（${yy}年${mm}月の請求ベース）</span>`+
+   `<span style="font-size:12px;color:var(--mut)">単体購入の制服＝課税売上、月謝と一括徴収の制服・月謝・保育料・付帯費等＝非課税売上。会計士確認用に当月の請求を区分表示します。</span>`+
+   `<div style="flex:1"></div>`+
+   `<button id="hqTaxCsv" class="btn btn-ghost" style="padding:7px 16px;font-size:13px;border-color:var(--berry);color:var(--berry)">📄 当月の消費税区分をCSV出力</button>`+
+   `</div>`;
+ // 当月の課税/非課税内訳（施設別）
+ const bd=hqTaxBreakdown(yy,mm);
+ s+=`<div class="tablewrap"><table><thead><tr><th>施設</th><th class="r">課税売上（単体購入の制服）</th><th class="r">非課税：制服（月謝一括）</th><th class="r">非課税：月謝・保育料等</th><th class="r">行事/その他</th><th class="r">請求合計</th></tr></thead><tbody>`;
+ let GT={taxable:0,nontaxUni:0,nontax:0,other:0,total:0};
+ pks.forEach(p=>{const t=bd[p];GT.taxable+=t.taxable;GT.nontaxUni+=t.nontaxUni;GT.nontax+=t.nontax;GT.other+=t.other;GT.total+=t.total;
+  s+=`<tr><td><span class="ptag pt-${p}">${p}</span></td>`+
+    `<td class="num" style="font-weight:700;color:${t.taxable?'var(--berry)':'var(--mut)'}">${t.taxable?'¥'+t.taxable.toLocaleString():'<span class="zero">—</span>'}</td>`+
+    `<td class="num" style="color:${t.nontaxUni?'var(--leaf)':'var(--mut)'}">${t.nontaxUni?'¥'+t.nontaxUni.toLocaleString():'<span class="zero">—</span>'}</td>`+
+    `<td class="num">${t.nontax?'¥'+t.nontax.toLocaleString():'<span class="zero">—</span>'}</td>`+
+    `<td class="num">${t.other?'¥'+t.other.toLocaleString():'<span class="zero">—</span>'}</td>`+
+    `<td class="num total">¥${t.total.toLocaleString()}</td></tr>`;});
+ if(park==='全施設'){
+  s+=`<tr style="border-top:2px solid var(--berry)"><td style="font-weight:700;color:var(--berry)">全施設合計</td>`+
+    `<td class="num" style="font-weight:700;font-size:15px;color:var(--berry)">${GT.taxable?'¥'+GT.taxable.toLocaleString():'—'}</td>`+
+    `<td class="num" style="font-weight:700;color:var(--leaf)">${GT.nontaxUni?'¥'+GT.nontaxUni.toLocaleString():'—'}</td>`+
+    `<td class="num" style="font-weight:700">¥${GT.nontax.toLocaleString()}</td>`+
+    `<td class="num" style="font-weight:600">${GT.other?'¥'+GT.other.toLocaleString():'—'}</td>`+
+    `<td class="num total" style="font-size:15px">¥${GT.total.toLocaleString()}</td></tr>`;
+ }
+ s+=`</tbody></table></div>`;
+ // 年度の月別 課税売上（制服代）推移：会計士が毎月チェックする核心
+ const tm=hqTaxByMonth(fy);
+ s+=`<div style="padding:18px 22px 4px;font-size:13.5px;font-weight:700;color:var(--berry)">${fy}年度 月別 課税売上（単体購入の制服）推移（${park==='全施設'?'全施設合算':park}）</div>`;
+ s+=`<div class="tablewrap"><table><thead><tr><th>区分</th>`+tm.months.map(mo=>`<th class="r">${mo.m}月</th>`).join('')+`<th class="r">年度計</th></tr></thead><tbody>`;
+ const mTax=tm.months.map((_,i)=>pks.reduce((a,p)=>a+tm.data[p][i].taxable,0));
+ const mNonU=tm.months.map((_,i)=>pks.reduce((a,p)=>a+tm.data[p][i].nontaxUni,0));
+ const mNon=tm.months.map((_,i)=>pks.reduce((a,p)=>a+tm.data[p][i].nontax,0));
+ const fc=v=>v?'¥'+v.toLocaleString():'<span class="zero">—</span>';
+ s+=`<tr><td style="font-weight:700;color:var(--berry)">課税（単体購入の制服）</td>`+mTax.map(v=>`<td class="num" style="color:${v?'var(--berry)':'var(--mut)'};font-weight:${v?'600':'400'}">${fc(v)}</td>`).join('')+`<td class="num total" style="color:var(--berry)">¥${mTax.reduce((a,b)=>a+b,0).toLocaleString()}</td></tr>`;
+ s+=`<tr><td style="font-weight:600;color:var(--leaf)">非課税：制服（月謝一括）</td>`+mNonU.map(v=>`<td class="num" style="color:${v?'var(--leaf)':'var(--mut)'}">${fc(v)}</td>`).join('')+`<td class="num total" style="color:var(--leaf)">¥${mNonU.reduce((a,b)=>a+b,0).toLocaleString()}</td></tr>`;
+ s+=`<tr><td style="font-weight:600">非課税：月謝等</td>`+mNon.map(v=>`<td class="num">${fc(v)}</td>`).join('')+`<td class="num total">¥${mNon.reduce((a,b)=>a+b,0).toLocaleString()}</td></tr>`;
+ s+=`</tbody></table></div>`;
+ s+=`<div style="padding:8px 22px 0;font-size:11.5px;color:var(--mut)">※ 課税売上は「追加申込み」で<b>単体購入（課税）</b>を選んだ制服のみ。月謝と一括引落しの制服は非課税です。月をまたぐ申込みは反映年月に従って各月へ配当されます。</div>`;
+ return s;
+}
+function hqWireFiscal(){
+ const sel=document.getElementById('hqFYsel');
+ if(sel)sel.onchange=e=>{window.__hqFY=+e.target.value;render();};
+ const csv=document.getElementById('hqFyCsv');
+ if(csv)csv.onclick=hqFyExportCsv;
+ const tcsv=document.getElementById('hqTaxCsv');
+ if(tcsv)tcsv.onclick=hqTaxExportCsv;
+}
+// 当月の消費税区分＋年度の月別課税売上をCSV出力（会計士提出用）
+function hqTaxExportCsv(){
+ const fy=(window.__hqFY!=null)?window.__hqFY:hqCurFY();
+ const allpks=['月寒園','白石園','サッポロファクトリー園','幼稚舎','資生館保育園'];
+ const pks=(park==='全施設')?allpks:allpks.filter(p=>p===park);
+ const rows=[];
+ rows.push([`消費税区分（${yy}年${mm}月の請求ベース）`]);
+ rows.push(['※単体購入の制服＝課税売上／月謝と一括の制服・月謝・保育料・付帯費等＝非課税売上']);
+ rows.push([]);
+ rows.push(['施設','課税売上（単体購入の制服）','非課税：制服（月謝一括）','非課税：月謝・保育料等','行事/その他','請求合計']);
+ const bd=hqTaxBreakdown(yy,mm);
+ let GT={taxable:0,nontaxUni:0,nontax:0,other:0,total:0};
+ pks.forEach(p=>{const t=bd[p];GT.taxable+=t.taxable;GT.nontaxUni+=t.nontaxUni;GT.nontax+=t.nontax;GT.other+=t.other;GT.total+=t.total;
+  rows.push([p,t.taxable,t.nontaxUni,t.nontax,t.other,t.total]);});
+ if(park==='全施設')rows.push(['全施設合計',GT.taxable,GT.nontaxUni,GT.nontax,GT.other,GT.total]);
+ rows.push([]);
+ rows.push([`${fy}年度 月別 課税売上（単体購入の制服）推移（${park==='全施設'?'全施設合算':park}）`]);
+ const tm=hqTaxByMonth(fy);
+ rows.push(['区分',...tm.months.map(mo=>mo.m+'月'),'年度計']);
+ const mTax=tm.months.map((_,i)=>pks.reduce((a,p)=>a+tm.data[p][i].taxable,0));
+ const mNonU=tm.months.map((_,i)=>pks.reduce((a,p)=>a+tm.data[p][i].nontaxUni,0));
+ const mNon=tm.months.map((_,i)=>pks.reduce((a,p)=>a+tm.data[p][i].nontax,0));
+ rows.push(['課税（単体購入の制服）',...mTax,mTax.reduce((a,b)=>a+b,0)]);
+ rows.push(['非課税：制服（月謝一括）',...mNonU,mNonU.reduce((a,b)=>a+b,0)]);
+ rows.push(['非課税：月謝等',...mNon,mNon.reduce((a,b)=>a+b,0)]);
+ downloadCsv(`本部消費税区分_${yy}年${mm}月_${fy}年度_${park}.csv`,rows);
+}
+function hqFyExportCsv(){
+ const fy=(window.__hqFY!=null)?window.__hqFY:hqCurFY();
+ const allpks=['月寒園','白石園','サッポロファクトリー園','幼稚舎','資生館保育園'];
+ const pks=(park==='全施設')?allpks:allpks.filter(p=>p===park);
+ const {months,data}=hqFiscalData(fy);
+ const rows=[];
+ rows.push([`${fy}年度 収支まとめ（${fy}年4月〜${fy+1}年3月）`]);
+ rows.push(['※収入＝新規入園（振込）＋タイムリー（現金）。月謝は別管理のため含まず。支出＝現金出納帳＋イベント出納帳の出金。']);
+ rows.push([]);
+ // 施設別年度合計
+ rows.push(['施設','収入合計','うち新規入園','うちタイムリー','支出合計','うち経費','うちイベント費','年度収支']);
+ let G={shokai:0,timely:0,exp:0,evexp:0};
+ pks.forEach(p=>{
+  const t=data[p].reduce((a,c)=>({shokai:a.shokai+c.shokai,timely:a.timely+c.timely,exp:a.exp+c.exp,evexp:a.evexp+c.evexp}),{shokai:0,timely:0,exp:0,evexp:0});
+  G.shokai+=t.shokai;G.timely+=t.timely;G.exp+=t.exp;G.evexp+=t.evexp;
+  rows.push([p,t.shokai+t.timely,t.shokai,t.timely,t.exp+t.evexp,t.exp,t.evexp,(t.shokai+t.timely)-(t.exp+t.evexp)]);
+ });
+ if(park==='全施設')rows.push(['全施設合計',G.shokai+G.timely,G.shokai,G.timely,G.exp+G.evexp,G.exp,G.evexp,(G.shokai+G.timely)-(G.exp+G.evexp)]);
+ rows.push([]);
+ // 月別推移
+ rows.push([`月別推移（${park==='全施設'?'全施設合算':park}）`]);
+ rows.push(['区分',...months.map(mo=>mo.m+'月'),'年度計']);
+ const mInc=months.map((_,i)=>pks.reduce((a,p)=>a+data[p][i].shokai+data[p][i].timely,0));
+ const mOut=months.map((_,i)=>pks.reduce((a,p)=>a+data[p][i].exp+data[p][i].evexp,0));
+ rows.push(['収入',...mInc,mInc.reduce((a,b)=>a+b,0)]);
+ rows.push(['支出',...mOut,mOut.reduce((a,b)=>a+b,0)]);
+ rows.push(['収支',...months.map((_,i)=>mInc[i]-mOut[i]),mInc.reduce((a,b)=>a+b,0)-mOut.reduce((a,b)=>a+b,0)]);
+ downloadCsv(`本部収支まとめ_${fy}年度_${park}.csv`,rows);
 }
 // 制服判定（販売単価マスターの制服カテゴリ）
 function isUniform(item){if(item&&item.indexOf('制服ﾚﾝﾀﾙ')===0)return true;const g=M.goods.find(x=>x.name===item);return g && g.cat==='制服';}
@@ -1656,13 +1977,13 @@ function renderMeals(){
  document.getElementById('body').innerHTML=h;
  document.querySelectorAll('[data-meal]').forEach(el=>{const handler=e=>{const i=+e.target.dataset.meal,f=e.target.dataset.f;
    if(f==='lunch'||f==='bread')meals[i][f]=e.target.checked; else meals[i][f]=e.target.value;
-   renderMeals();};el.onchange=handler;});
+   saveState();renderMeals();};el.onchange=handler;});
  document.querySelectorAll('[data-del]').forEach(el=>{el.onclick=e=>{const i=+e.currentTarget.dataset.del;
    const nm=(meals[i].name?meals[i].name+'さんの':'')+'給食記録';
-   confirmDialog(`「${nm}」を削除します。\nこの操作は取り消せません。本当に削除しますか？`,()=>{meals.splice(i,1);renderMeals();});};});
+   confirmDialog(`「${nm}」を削除します。\nこの操作は取り消せません。本当に削除しますか？`,()=>{meals.splice(i,1);saveState();renderMeals();});};});
  setCard('給食記録','幼稚舎・お弁当/パン忘れの実費','「＋ 給食記録を追加」で行を足し、日付と園児（クラス＋名前のプルダウン）を選んで昼食/パンにチェック。月集計は翌月の月次計算に自動反映されます。','add');
 }
-const RENDER={settings:renderSettings,roster:renderRoster,newcomer:renderNew,sched:renderSched,monthly:renderMonthly,lookmee:renderLookmee,hq:renderHQ,pdf:renderPDF,reissue:renderReissue,addon:renderAddon,meals:renderMeals,initsale:renderInitSale,cashbook:renderCashbook,readme:renderReadme};
+const RENDER={settings:renderSettings,roster:renderRoster,newcomer:renderNew,sched:renderSched,monthly:renderMonthly,lookmee:renderLookmee,hq:renderHQ,pdf:renderPDF,reissue:renderReissue,addon:renderAddon,meals:renderMeals,initsale:renderInitSale,cashbook:renderCashbookNormal,cashbookEvent:renderCashbookEvent,salesreport:renderSalesReport,readme:renderReadme};
 function initSaleAmount(p){ // 初回売上＝初回案内PDFのご請求金額合計（総額）
  const c=calc(p,true);return c.total+initOptsSum(p);
 }
@@ -1798,24 +2119,63 @@ function cbSortShops(list){
 }
 const CB_SHOPS=cbSortShops(CB_SHOPS_RAW);
 const CB_BUMON={'月寒園':'月寒保育園','白石園':'白石保育園','サッポロファクトリー園':'ファクトリー保育園','幼稚舎':'幼稚園','資生館保育園':'資生館保育園'};
-function cbGet(){ // 現在の園・対象月の出納帳データ（なければ作る）
+function cbGet(){ // 現在の園・対象月の出納帳データ（モードに応じて通常／イベント）
  const k=ymKey();
- if(!cashbook[park])cashbook[park]={};
- if(!cashbook[park][k])cashbook[park][k]={opening:0, rows:[]};
- return cashbook[park][k];
+ const store=cbMode==='event'?cashbookEvent:cashbook;
+ if(!store[park])store[park]={};
+ if(!store[park][k])store[park][k]={opening:0, rows:[]};
+ return store[park][k];
 }
+// 新規入園の売上を自動生成：初回売上管理で「入金済み」かつ入金日が対象年月・当園の園児
+// （現金出納帳に実体保存せず、表示・出力時に動的合成。月謝管理＝園児台帳の新規園児と常に同期）
+function shokaiAutoRows(){
+ if(cbMode==='event')return []; // イベント出納帳には売上の自動反映なし
+ const cand=roster.filter(r=>r.isNew&&r.name).filter(r=>park==='全施設'||r.park===park);
+ const out=[];
+ cand.forEach(p=>{
+   const log=initSaleLog[p.name];
+   if(!log||!log.paid)return; // 入金済みのみ
+   const pd=String(log.paidDate||'');
+   const m=pd.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+   if(!m)return;
+   const py=+m[1],pm=+m[2],pdd=+m[3];
+   if(py!==yy||pm!==mm)return; // 対象年月の入金のみ
+   const amt=initSaleAmount(p);
+   if(amt<=0)return;
+   out.push({mon:pm,day:pdd,acct:128,tax:'非課税売上',shop:'',
+     item:`新規入園 ${p.name} 初回月謝`,kind:'in',amt:amt,
+     by:(STAFF.includes(log.by)?log.by:''),src:'shokai',auto:true});
+ });
+ return out;
+}
+// 出納帳の手動入力行のみ（締め前の本体表示・小口計算用）。
+// 新規入園（振込）の自動行は本体には出さず、締め時の確定とプレビュー／MF出力でのみ合算する。
+function cbAllRows(cb){
+ return cb.rows.slice();
+}
+// 新規入園（振込）の売上行（売上プレビュー・MF用）。本体には保存せず、常に動的に算出する。
+function cbShokaiRows(cb){
+ return shokaiAutoRows();
+}
+function renderCashbookNormal(){ cbMode='normal'; renderCashbook(); }
+function renderCashbookEvent(){ cbMode='event'; renderCashbook(); }
 function renderCashbook(){
+ const isEv=cbMode==='event';
+ const ttl=isEv?'イベント出納帳':'現金出納帳';
  if(park==='全施設'){
-  document.getElementById('body').innerHTML='<div style="padding:48px 22px;text-align:center;color:var(--mut);font-size:14px;line-height:1.9">現金出納帳は施設ごとに記帳します。<br>上部の「現在の園」で施設を選んでください。</div>';
-  setCard('現金出納帳','施設ごとの現金管理','上部の「現在の園」で施設を選ぶと、その施設の現金出納帳が表示されます。','none');
+  document.getElementById('body').innerHTML=`<div style="padding:48px 22px;text-align:center;color:var(--mut);font-size:14px;line-height:1.9">${ttl}は施設ごとに記帳します。<br>上部の「現在の園」で施設を選んでください。</div>`;
+  setCard(ttl,'施設ごとの現金管理',`上部の「現在の園」で施設を選ぶと、その施設の${ttl}が表示されます。`,'none');
   return;
  }
  const cb=cbGet();
  const bumon=CB_BUMON[park]||park;
- // 残高の積み上げ計算
- let bal=Number(cb.opening)||0;
- const calcRows=cb.rows.map(r=>{const inn=r.kind==='in'?(Number(r.amt)||0):0;const out=r.kind==='out'?(Number(r.amt)||0):0;bal=bal+inn-out;return{...r,inn,out,bal};});
- const totalIn=(Number(cb.opening)||0)+calcRows.reduce((s,r)=>s+r.inn,0);
+ // イベント出納帳：前月から繰り越されたイベント予算残金（当月の開始繰越金）
+ const carryIn=isEv?cbEventCarryIn():0;
+ // 残高の積み上げ計算（繰越金＋当月のイベント予算／本部振替から開始）
+ let bal=carryIn+(Number(cb.opening)||0);
+ const allRows=cbAllRows(cb); // 手動入力 ＋ 自動合成（入金済み新規入園）
+ const calcRows=allRows.map(r=>{const inn=r.kind==='in'?(Number(r.amt)||0):0;const out=r.kind==='out'?(Number(r.amt)||0):0;bal=bal+inn-out;return{...r,inn,out,bal};});
+ const totalIn=carryIn+(Number(cb.opening)||0)+calcRows.reduce((s,r)=>s+r.inn,0);
  const totalOut=calcRows.reduce((s,r)=>s+r.out,0);
  // 収入の内訳（区分ごと）：月謝／新規入園／タイムリースクール／その他現金入金
  const inBy={getsugaku:0,shokai:0,timely:0,other:0};
@@ -1824,6 +2184,8 @@ function renderCashbook(){
    else if(r.src==='shokai')inBy.shokai+=a;
    else if(r.src==='timely')inBy.timely+=a;
    else inBy.other+=a;});
+ // タイムリー売上はプレビュー内で読み込むため timelyData から集計
+ (cbTimelyGet()||[]).forEach(r=>{inBy.timely+=Number(r.amt)||0;});
  const endBal=bal;
  const openSet=!!cb.openingBy; // 本部振替の担当が選ばれているか（未選択なら明細入力をロック）
  const locked=cb.rows.some(r=>r.isClose); // 締め（預金振替）済みなら編集ロック
@@ -1834,36 +2196,26 @@ function renderCashbook(){
    `<span>部門：<b style="color:var(--leaf)">${bumon}</b></span>`+
    `<span>${yy}年 ${mm}月</span>`+
    `<div style="flex:1"></div>`+
-   `<label style="display:flex;align-items:center;gap:6px">本部から振替（入金）：¥<input type="number" id="cbOpening" value="${cb.opening||0}" ${locked?'disabled':''} class="inp" style="width:110px;padding:4px 8px;text-align:right"></label>`+
+   `<label style="display:flex;align-items:center;gap:6px">${isEv?'イベント予算（入金）':'本部から振替（入金）'}：¥<input type="number" id="cbOpening" value="${cb.opening||0}" ${locked?'disabled':''} class="inp" style="width:110px;padding:4px 8px;text-align:right"></label>`+
    `</div>`;
- // イベント費の集計と絞り込み状態
- if(window.__cbEventOnly===undefined)window.__cbEventOnly=false;
- const eventOnly=window.__cbEventOnly;
- const eventOut=calcRows.filter(r=>r.event).reduce((s,r)=>s+r.out,0);
  // 集計バー
  h+=`<div class="noprint" style="padding:10px 22px;border-bottom:1px solid var(--line);display:flex;gap:18px;align-items:center;flex-wrap:wrap;font-size:13px">`+
    `<span>入金計：<b style="color:var(--leaf)">¥${totalIn.toLocaleString()}</b></span>`+
    `<span>出金計：<b style="color:var(--berry)">¥${totalOut.toLocaleString()}</b></span>`+
-   `<span>うちイベント費：<b style="color:#9a6b2f">¥${eventOut.toLocaleString()}</b></span>`+
    `<span>残高：<b>¥${endBal.toLocaleString()}</b></span>`+
    `<div style="flex:1"></div>`+
-   `<button id="cbEventOnly" style="padding:6px 14px;font-size:12px;border:1px solid ${eventOnly?'#9a6b2f':'var(--line)'};background:${eventOnly?'#9a6b2f':'var(--paper)'};color:${eventOnly?'#fff':'var(--ink)'};border-radius:8px;cursor:pointer;font-family:inherit">${eventOnly?'✓ イベント費のみ表示中':'🎪 イベント費のみ表示'}</button>`+
    (locked
      ? `<button id="cbUnlock" class="btn btn-ghost" style="padding:7px 14px;font-size:13px;border-color:#9a6b2f;color:#9a6b2f">🔓 締めを解除</button>`
      : `<button id="cbAddCash" class="btn btn-ghost" style="padding:7px 14px;font-size:13px${openSet?'':';opacity:.4;cursor:not-allowed'}" ${openSet?'':'disabled'}>＋ 現金入金</button>`+
        `<button id="cbAdd" class="btn btn-ghost" style="padding:7px 14px;font-size:13px${openSet?'':';opacity:.4;cursor:not-allowed'}" ${openSet?'':'disabled'}>＋ 行を追加</button>`+
        `<button id="cbClose" class="btn btn-ghost" style="padding:7px 14px;font-size:13px">🔒 預金振替で締める</button>`)+
-   (locked?'':`<span style="font-size:11px;color:var(--mut);margin-left:4px">収入取込▶</span>`+
-     `<button id="cbImpGetsu" class="btn btn-ghost" style="padding:7px 12px;font-size:12px${openSet?'':';opacity:.4;cursor:not-allowed'}" ${openSet?'':'disabled'}>💰 月謝</button>`+
-     `<button id="cbImpShokai" class="btn btn-ghost" style="padding:7px 12px;font-size:12px${openSet?'':';opacity:.4;cursor:not-allowed'}" ${openSet?'':'disabled'}>🌱 新規入園CSV</button>`+
-     `<button id="cbTimely" class="btn btn-ghost" style="padding:7px 12px;font-size:12px${openSet?'':';opacity:.4;cursor:not-allowed'}" ${openSet?'':'disabled'}>🏫 タイムリーCSV</button>`)+
-   `<button id="cbCsv" class="btn btn-ghost" style="padding:7px 14px;font-size:13px">📄 CSV（全体）</button>`+
-   `<button id="cbCsvEvent" class="btn btn-ghost" style="padding:7px 14px;font-size:13px">🎪 CSV（イベント費のみ）</button>`+
+   (locked
+     ? `<button id="cbPreview" class="btn btn-ghost" style="padding:7px 16px;font-size:13px;border-color:var(--berry);color:var(--berry)">👁 出力プレビュー</button>`
+     : '')+
    `</div>`;
  // 収入の内訳（ガッチャンコ表示）：区分ごとの合算
  h+=`<div class="noprint" style="padding:9px 22px;border-bottom:1px solid var(--line);display:flex;gap:16px;align-items:center;flex-wrap:wrap;font-size:12.5px;background:var(--leafsoft)">`+
    `<span style="color:var(--leaf);font-weight:700">収入の内訳</span>`+
-   `<span>💰 月謝：<b>¥${inBy.getsugaku.toLocaleString()}</b></span>`+
    `<span>🌱 新規入園：<b>¥${inBy.shokai.toLocaleString()}</b></span>`+
    `<span>🏫 タイムリースクール：<b>¥${inBy.timely.toLocaleString()}</b></span>`+
    `<span>本部振替・その他現金：<b>¥${((Number(cb.opening)||0)+inBy.other).toLocaleString()}</b></span>`+
@@ -1877,30 +2229,45 @@ function renderCashbook(){
  // 入力テーブル
  h+='<div class="tablewrap"><table style="font-size:13px"><thead><tr>'+
    '<th style="width:42px">No.</th><th style="width:100px">日付</th><th style="width:140px">勘定科目</th><th style="width:130px">税区分</th><th style="width:160px">店舗名</th><th>商品名</th>'+
-   '<th class="r" style="width:82px">入金</th><th class="r" style="width:82px">出金</th><th class="r" style="width:90px">残高</th><th style="width:90px">担当</th><th style="width:52px">イベント</th><th style="width:34px"></th>'+
+   '<th class="r" style="width:82px">入金</th><th class="r" style="width:82px">出金</th><th class="r" style="width:90px">残高</th><th style="width:90px">担当</th><th style="width:34px"></th>'+
    '</tr></thead><tbody>';
- // 繰越・本部振替の固定行
- h+=`<tr style="background:var(--berrysoft)"><td></td><td colspan="3" style="color:var(--mut)">繰越金</td><td colspan="2">—</td><td class="num"></td><td class="num"></td><td class="num">¥0</td><td></td><td></td><td></td></tr>`;
+ // 繰越金行：イベント出納帳で前月から繰り越しがあれば、その額を開始残高として表示
+ h+=`<tr style="background:var(--berrysoft)"><td></td><td colspan="3" style="color:var(--mut)">繰越金${carryIn>0?'（前月のイベント残金）':''}</td><td colspan="2">${carryIn>0?'<span style="color:#9a6b2f;font-size:11px">前月繰越</span>':'—'}</td><td class="num">${carryIn>0?'¥'+carryIn.toLocaleString():''}</td><td class="num"></td><td class="num">¥${carryIn.toLocaleString()}</td><td></td><td></td></tr>`;
  const openByOpts=`<option value="">担当を選択…</option>`+STAFF.map(s=>`<option ${cb.openingBy===s?'selected':''}>${s}</option>`).join('');
- h+=`<tr style="background:var(--berrysoft)"><td></td><td>${yy}/${mm}/1</td><td colspan="2">1 現金</td><td colspan="2">本部から振替</td><td class="num total" style="color:var(--leaf)">¥${(Number(cb.opening)||0).toLocaleString()}</td><td class="num"></td><td class="num">¥${(Number(cb.opening)||0).toLocaleString()}</td><td><select id="cbOpeningBy" ${locked?'disabled':''} class="inp" style="width:100%;padding:3px 4px;font-size:11px;${cb.openingBy?'':'border-color:var(--berry);background:#fff'}">${openByOpts}</select></td><td></td><td></td></tr>`;
+ h+=`<tr style="background:var(--berrysoft)"><td></td><td>${yy}/${mm}/1</td><td colspan="2">1 現金</td><td colspan="2">${isEv?'イベント予算 振替':'本部から振替'}</td><td class="num total" style="color:var(--leaf)">¥${(Number(cb.opening)||0).toLocaleString()}</td><td class="num"></td><td class="num">¥${(carryIn+(Number(cb.opening)||0)).toLocaleString()}</td><td><select id="cbOpeningBy" ${locked?'disabled':''} class="inp" style="width:100%;padding:3px 4px;font-size:11px;${cb.openingBy?'':'border-color:var(--berry);background:#fff'}">${openByOpts}</select></td><td></td></tr>`;
  // 明細行（No.は領収書番号と照合できるよう連番）。本部振替の担当が未選択のうちは入力ロック
  if(!openSet){
-  h+=`<tr><td colspan="12" style="padding:20px 16px;text-align:center;color:var(--berry);font-size:13px;background:#fff7fa">まず「本部から振替」の担当（右端のプルダウン）を選んでください。<br>担当を選ぶと、明細の入力ができるようになります。</td></tr>`;
+  h+=`<tr><td colspan="11" style="padding:20px 16px;text-align:center;color:var(--berry);font-size:13px;background:#fff7fa">まず「本部から振替」の担当（右端のプルダウン）を選んでください。<br>担当を選ぶと、明細の入力ができるようになります。</td></tr>`;
  }
  if(openSet){
-  const visRows=calcRows.map((r,i)=>({r,i})).filter(x=>!eventOnly||x.r.event);
-  if(eventOnly&&visRows.length===0){
-   h+=`<tr><td colspan="12" style="padding:20px 16px;text-align:center;color:var(--mut);font-size:13px">イベント費のチェックが付いた行がありません。</td></tr>`;
-  }
+  const visRows=calcRows.map((r,i)=>({r,i}));
   visRows.forEach(({r,i})=>{
+  // 自動合成行（入金済み新規入園）は読み取り専用で表示（編集・削除不可）
+  if(r.auto){
+   h+=`<tr style="background:var(--leafsoft)">`+
+     `<td style="text-align:center;font-weight:700;color:var(--leaf);font-size:11px">振込</td>`+
+     `<td style="font-size:12px">${yy}/${(r.mon!=null?r.mon:mm)}/${r.day||''}</td>`+
+     `<td style="color:var(--leaf);font-size:12px">128 保育園収入高</td>`+
+     `<td style="color:var(--mut);font-size:11px">${r.tax||'非課税売上'}</td>`+
+     `<td></td>`+
+     `<td style="font-size:12px">${(r.item||'')} <span style="font-size:10px;color:#fff;background:var(--leaf);padding:1px 6px;border-radius:8px;margin-left:4px">自動</span></td>`+
+     `<td class="num" style="color:var(--leaf)">¥${(Number(r.amt)||0).toLocaleString()}</td>`+
+     `<td></td>`+
+     `<td class="num">¥${r.bal.toLocaleString()}</td>`+
+     `<td style="font-size:11px;color:var(--mut)">${r.by||'—'}</td>`+
+     `<td style="text-align:center;color:var(--mut)" title="初回売上管理で入金済みにした新規入園です。ここでは編集できません">🔒</td>`+
+     `</tr>`;
+   return;
+  }
   const acctOpts=`<option value="">選択…</option>`+CB_USED.map(a=>`<option value="${a.code}" ${String(r.acct)===String(a.code)?'selected':''}>${a.code} ${a.name}</option>`).join('');
   const taxOpts=CB_TAXES.map(tx=>`<option ${r.tax===tx?'selected':''}>${tx}</option>`).join('');
   const byOpts=`<option value="">担当…</option>`+STAFF.map(s=>`<option ${r.by===s?'selected':''}>${s}</option>`).join('');
   const dis=locked?'disabled':''; // 締め済みは全項目を編集不可
   const fixed=r.isClose||r.isCash; // 現金固定行（締め・現金入金）は勘定科目固定・税区分/店舗名なし
   const timely=!!r.src; // 収入取込行（タイムリー／新規入園／月謝）：勘定科目128固定・税区分固定・店舗名なし・摘要のみ編集可
+  const noLabel=r.src==='timely'?'現金':(r.src==='shokai'?'振込':(i+1)); // タイムリー現金売上=現金／新規入園=振込／出金=連番
   h+=`<tr${locked?' style="opacity:.85"':''}${timely?' style="background:var(--leafsoft)"':''}>`+
-    `<td style="text-align:center;font-weight:700;color:var(--berry)">${i+1}</td>`+
+    `<td style="text-align:center;font-weight:700;color:${r.src?'var(--leaf)':'var(--berry)'};font-size:${r.src?'11px':'inherit'}">${noLabel}</td>`+
     `<td><div style="display:flex;align-items:center;gap:1px"><input type="number" min="1" max="12" data-cb="${i}" data-f="mon" value="${r.mon!=null&&r.mon!==''?r.mon:mm}" ${dis} class="inp" style="width:34px;padding:3px 3px" title="月"><span style="font-size:10px;color:var(--mut)">月</span><input type="number" min="1" max="31" data-cb="${i}" data-f="day" value="${r.day||''}" ${dis} class="inp" style="width:34px;padding:3px 3px" placeholder="日" title="日"><span style="font-size:10px;color:var(--mut)">日</span></div></td>`+
     (fixed
       ? `<td style="color:var(--mut)">1 現金</td>`
@@ -1920,7 +2287,6 @@ function renderCashbook(){
     `<td>${r.kind==='out'?`<input type="number" data-cb="${i}" data-f="amt" value="${r.amt||''}" ${dis} class="inp" style="width:74px;padding:3px 5px;text-align:right">`:(locked||timely?'':`<span style="color:var(--mut);font-size:11px;cursor:pointer" data-cbkind="${i}" data-k="out">出金に</span>`)}</td>`+
     `<td class="num">¥${r.bal.toLocaleString()}</td>`+
     `<td><select data-cb="${i}" data-f="by" ${dis} class="inp" style="width:100%;padding:3px 4px;font-size:11px">${byOpts}</select></td>`+
-    `<td style="text-align:center">${fixed||timely?'':`<input type="checkbox" data-cbev="${i}" ${r.event?'checked':''} ${dis} style="width:17px;height:17px;accent-color:#9a6b2f;cursor:pointer" title="行事イベントの按分費用">`}</td>`+
     `<td>${locked?'':`<span style="color:var(--berry);cursor:pointer;font-weight:700" data-cbdel="${i}" title="削除">✕</span>`}</td>`+
     `</tr>`;
   });
@@ -1934,13 +2300,14 @@ function renderCashbook(){
  document.getElementById('cbOpening')&&(document.getElementById('cbOpening').onchange=e=>{cbGet().opening=Number(e.target.value)||0;render();});
  const opBy=document.getElementById('cbOpeningBy');if(opBy)opBy.onchange=e=>{cbGet().openingBy=e.target.value;render();};
  const addBtn=document.getElementById('cbAdd');if(addBtn)addBtn.onclick=()=>{cbGet().rows.push({mon:mm,day:'',acct:'',tax:'非課税対応仕入 10%',shop:'',item:'',kind:'out',amt:'',by:''});render();};
- const addCashBtn=document.getElementById('cbAddCash');if(addCashBtn)addCashBtn.onclick=()=>{cbGet().rows.push({mon:mm,day:'',acct:1,tax:'',shop:'',item:'現金入金',kind:'in',amt:'',by:'',isCash:true});render();};
+ const addCashBtn=document.getElementById('cbAddCash');if(addCashBtn)addCashBtn.onclick=()=>{
+   cbGet().rows.push({mon:mm,day:'',acct:1,tax:'',shop:'',item:'現金入金',kind:'in',amt:'',by:'',isCash:true});render();
+ };
  const unlockBtn=document.getElementById('cbUnlock');if(unlockBtn)unlockBtn.onclick=()=>{
    confirmDialog('預金振替（締め）を解除して、編集できる状態に戻します。\n締めの行（預金振替）は削除されます。よろしいですか？',()=>{
-     const cur=cbGet();cur.rows=cur.rows.filter(r=>!r.isClose);render();
+     const cur=cbGet();cur.rows=cur.rows.filter(r=>!r.isClose&&r.src!=='shokai');cur.eventCarry=0;render();
    },'締めの解除','解除する');
  };
- document.getElementById('cbCsv').onclick=()=>cbExportCsv(false);
  const pickCsv=(handler)=>{
    const inp=document.createElement('input');inp.type='file';inp.accept='.csv,text/csv';
    inp.onchange=e=>{const f=e.target.files[0];if(!f)return;
@@ -1950,13 +2317,7 @@ function renderCashbook(){
    inp.click();
  };
  const tlBtn=document.getElementById('cbTimely');if(tlBtn)tlBtn.onclick=()=>pickCsv(importTimelyCsv);
- const skBtn=document.getElementById('cbImpShokai');if(skBtn)skBtn.onclick=()=>pickCsv(importShokaiCsv);
- const gkBtn=document.getElementById('cbImpGetsu');if(gkBtn)gkBtn.onclick=()=>importGetsugaku();
- const evBtn=document.getElementById('cbCsvEvent');if(evBtn)evBtn.onclick=()=>cbExportCsv(true);
- const evOnly=document.getElementById('cbEventOnly');if(evOnly)evOnly.onclick=()=>{window.__cbEventOnly=!window.__cbEventOnly;render();};
- document.querySelectorAll('[data-cbev]').forEach(el=>{el.onchange=e=>{
-   const i=+e.target.dataset.cbev,cur=cbGet();cur.rows[i].event=e.target.checked;render();
- };});
+ const pvBtn=document.getElementById('cbPreview');if(pvBtn)pvBtn.onclick=()=>cbShowPreview();
  const closeBtn=document.getElementById('cbClose');if(closeBtn)closeBtn.onclick=()=>{
    const cur=cbGet();
    // 締め前チェック：未入力（日付・勘定科目・金額・担当）の行があれば止める
@@ -1970,17 +2331,39 @@ function renderCashbook(){
      if(miss.length)bad.push(`No.${i+1}：${miss.join('・')}`);
    });
    if(bad.length){infoDialog('未入力の項目があるため締められません：\n\n'+bad.join('\n')+'\n\nすべて入力してから締めてください。','締められません');return;}
-   if(endBal<=0){infoDialog('残高が0以下です。締める必要はありません。','お知らせ');return;}
-   selectDialog(
-     `月末の預金振替で残高 ¥${endBal.toLocaleString()} を出金し、残高を0にします。\n締めた担当者を選んでください。\n\n※ 締めると、この月は編集・削除ができなくなります。`,
-     STAFF,
-     (who)=>{
-       const t=new Date();
-       cur.rows.push({mon:t.getMonth()+1, day:t.getDate(), acct:1, tax:'', shop:'', item:'預金振替', kind:'out', amt:endBal, by:who, isClose:true});
-       render();
-     },
-     '預金振替で締める','この担当で締める'
-   );
+   const isEv=cbMode==='event';
+   // 締め＝手元の現金（前月繰越＋本部振替／予算＋現金入金−経費）を集計
+   let sweep=(isEv?cbEventCarryIn():0)+(Number(cur.opening)||0);
+   cur.rows.forEach(r=>{if(r.isClose)return;sweep=sweep+(r.kind==='in'?(Number(r.amt)||0):0)-(r.kind==='out'?(Number(r.amt)||0):0);});
+   if(sweep<=0){infoDialog('残高が0以下です。締める必要はありません。','お知らせ');return;}
+   const doCloseRow=(who,carry)=>{
+     const t=new Date();
+     cur.eventCarry=carry?sweep:0; // 翌月へ繰り越す残金（イベントのみ）
+     if(!carry){ // 口座へ戻す場合だけ預金振替行を追加（残高0）。繰越なら振替せず残高を手元に残す
+       cur.rows.push({mon:t.getMonth()+1, day:t.getDate(), acct:1, tax:'', shop:'', item:'預金振替', kind:'out', amt:sweep, by:who, isClose:true});
+     }else{ // 繰越：締めフラグだけ立てる（金額0の締め行で月をロック）
+       cur.rows.push({mon:t.getMonth()+1, day:t.getDate(), acct:1, tax:'', shop:'', item:`翌月繰越（¥${sweep.toLocaleString()}）`, kind:'out', amt:0, by:who, isClose:true, carry:true});
+     }
+     render();
+   };
+   if(isEv){
+     selectDialog(
+       `月末の締めをします。\nイベント予算の残金 ¥${sweep.toLocaleString()} の扱いを選んでください。\n\n・口座に戻す：今月で精算し、残金を口座へ戻します\n・翌月へ繰り越す：残金を手元に残し、翌月のイベントに使います`,
+       ['口座に戻す（今月で精算）','翌月へ繰り越す（手元に残す）'],
+       (choice)=>{
+         const carry=choice.indexOf('繰り越す')>=0;
+         selectDialog(`締めた担当者を選んでください。\n\n（${carry?'残金を翌月へ繰り越し':'残金を口座へ戻す'}）`,STAFF,(who)=>doCloseRow(who,carry),'締めの担当','この担当で締める');
+       },
+       'イベント予算の残金','選択して進む'
+     );
+   }else{
+     selectDialog(
+       `月末の預金振替で、小口現金の残高 ¥${sweep.toLocaleString()} を出金し、残高を0にします。\n（新規入園の振込売上・タイムリー現金売上は手元の小口現金には含めません。出力プレビューに反映されます）\n締めた担当者を選んでください。\n\n※ 締めると、この月は編集・削除ができなくなります。`,
+       STAFF,
+       (who)=>doCloseRow(who,false),
+       '預金振替で締める','この担当で締める'
+     );
+   }
  };
  // セル編集
  document.querySelectorAll('[data-cb]').forEach(el=>{el.onchange=e=>{
@@ -2006,7 +2389,11 @@ function renderCashbook(){
    const i=+e.target.dataset.cbdel,cur=cbGet();
    confirmDialog('この行を削除します。よろしいですか？',()=>{cur.rows.splice(i,1);render();});
  };});
- setCard('現金出納帳',`${park}（${bumon}）の現金管理`,'まず「本部から振替」の金額と担当を入れます。担当を選ぶまで明細は入力できません。行事イベント（運動会・ファッションショー等）の按分費用は、その行の「イベント」にチェックを付けると、「🎪イベント費のみ表示」で抽出でき、CSVも全体版（区分列つき）とイベント費だけの版を別々に出せます。日付は月・日に分けて入力。No.は領収書番号と照合できる連番です。勘定科目を選ぶと税区分と費目が自動。入力した行は担当を選ばないと他タブへ移動できません。月末は「預金振替で締める」で残高を0にします。収入は3種類をワンタッチで取り込めます：「💰 月謝」（現在園・対象月の月謝合計を1行で自動計算）、「🌱 新規入園CSV」（初回売上管理のCSV）、「🏫 タイムリーCSV」（受付アプリのCSV）。すべて「入金（保育園収入高）」として記帳され、上部の「収入の内訳」で月謝／新規入園／タイムリースクールを合算表示、CSVの区分列でも分別できます。','none');
+ if(isEv){
+   setCard('イベント出納帳',`${park}（${bumon}）のイベント費管理`,'運動会・ファッションショー等の行事ごとの現金を、通常の経費とは分けて管理します。まず「イベント予算（入金）」の金額と担当を入れます（本部から振り替えたイベント用の現金）。担当を選ぶと明細を入力できます。イベントの支出（経費）を入力していきます。日付は月・日に分けて入力。No.は領収書番号と照合できる連番です。足りなくなったら「＋現金入金」で補充できます。月末は「預金振替で締める」で残金を口座へ戻します。締めると「👁 出力プレビュー」が出て、イベント経費の一覧とExcel出力ができます。通常の経費は「現金出納帳」で管理してください。','none');
+ }else{
+   setCard('現金出納帳',`${park}（${bumon}）の現金管理`,'まず「本部から振替」の金額と担当を入れます。担当を選ぶまで明細は入力できません。小口の現金支出（経費）を入力していきます。日付は月・日に分けて入力。No.は領収書番号と照合できる連番です。勘定科目を選ぶと税区分と費目が自動。入力した行は担当を選ばないと他タブへ移動できません。足りなくなったら「＋現金入金」で補充できます。月末は「預金振替で締める」で残高を0にします。締めると「👁 出力プレビュー」が出ます。プレビューはタブ式で、上部でタイムリー一時預かりのCSVを読み込み、売上（現金＋振込）・経費・総合（MF用）を切り替えて確認し、それぞれExcel出力できます。マネーフォワードへインポートするのは総合タブのExcelです。新規入園は初回売上管理で「入金済み」にした園児が当月分の振込売上として自動反映されます。月謝は月謝管理から別途出力するため、ここには含めません。イベント費は別の「イベント出納帳」で管理します。','none');
+ }
 }
 function cbExportCsv(eventOnly){
  const cb=cbGet();const bumon=CB_BUMON[park]||park;
@@ -2016,13 +2403,15 @@ function cbExportCsv(eventOnly){
    rows.push(['','','','','','','','繰越金','','',0,'']);
    rows.push(['',`${yy}/${mm}/1`,'通常',1,'現金',bumon,'','本部から振替',cb.opening||0,'',cb.opening||0,cb.openingBy||'']);
  }
- cb.rows.forEach((r,i)=>{const inn=r.kind==='in'?(Number(r.amt)||0):0,out=r.kind==='out'?(Number(r.amt)||0):0;bal=bal+inn-out;
+ cbAllRows(cb).forEach((r,i)=>{const inn=r.kind==='in'?(Number(r.amt)||0):0,out=r.kind==='out'?(Number(r.amt)||0):0;bal=bal+inn-out;
    if(eventOnly&&!r.event)return; // イベント費のみ出力
-   const a=CB_ACCT_BY[+r.acct];
-   const tekiyo=`${i+1}${r.shop||''}${r.shop&&r.item?'　':''}${r.item||''}`;
+   const a=r.src?{name:'保育園収入高'}:CB_ACCT_BY[+r.acct];
+   const acctCode=r.src?128:(r.acct||'');
+   const noLabel=r.src==='timely'?'現金':(r.src==='shokai'?'振込':(i+1)); // タイムリー現金売上=現金／新規入園=振込／出金=連番
+   const tekiyo=`${noLabel}${r.shop||''}${r.shop&&r.item?'　':''}${r.item||''}`;
    const mo=(r.mon!=null&&r.mon!=='')?r.mon:mm;
    const kubun=r.src?(CB_SRC_LABEL[r.src]||'収入'):(r.event?'イベント費':'通常');
-   rows.push([i+1, r.day?`${yy}/${mo}/${r.day}`:'', kubun, r.acct||'', a?a.name:'', bumon, r.tax||'', tekiyo, inn||'', out||'', (eventOnly?'':bal), r.by||'']);
+   rows.push([noLabel, r.day?`${yy}/${mo}/${r.day}`:'', kubun, acctCode, a?a.name:'', bumon, r.tax||'', tekiyo, inn||'', out||'', (eventOnly?'':bal), r.by||'']);
  });
  if(eventOnly){
    const evSum=cb.rows.filter(r=>r.event).reduce((s,r)=>s+(r.kind==='out'?(Number(r.amt)||0):0),0);
@@ -2030,6 +2419,430 @@ function cbExportCsv(eventOnly){
  }
  const fn=eventOnly?`現金出納帳_イベント費_${yy}年${mm}月_${park}.csv`:`現金出納帳_${yy}年${mm}月_${park}.csv`;
  downloadCsv(fn, rows);
+}
+// 当園・当月の通常／イベント帳簿を直接取得（モードに依存しない。MF合算用）
+function cbStoreGet(store){
+ const k=ymKey();
+ if(!store[park])store[park]={};
+ if(!store[park][k])store[park][k]={opening:0, rows:[]};
+ return store[park][k];
+}
+// MF合算用：通常出納帳＋イベント出納帳の全行を、日付順に並べた共通リストを作る。
+// 戻り値は {date, acctName, tax, tekiyo, inn, out, dnum} の配列（残高は呼び出し側で通し計算）。
+// 売上（新規入園振込・タイムリー現金）は通常側のみ。月謝は別管理のため含めない。
+function cbCollectMfRows(){
+ const bumon=CB_BUMON[park]||park;
+ const items=[];
+ const dnum=(mo,day)=>day?((+mo)*100+(+day)):0; // 日なし（繰越・本部振替）は先頭へ
+ const ds=(mo,day)=>day?`${yy}/${mo}/${day}`:`${yy}/${mm}/1`;
+ const add=(mo,day,acctName,tax,tekiyo,inn,out,order)=>{
+   items.push({date:ds(mo,day),acctName,tax,tekiyo,inn:inn||0,out:out||0,dnum:dnum(mo,day),order:order||0});
+ };
+ // 通常・イベントの両帳簿を回す（cbModeに依存せず直接取得）
+ [cbStoreGet(cashbook), cbStoreGet(cashbookEvent)].forEach((cb,idx)=>{
+   const isEv=idx===1;
+   // イベント側：前月から繰り越したイベント残金（手元に残っている現金）を先頭の繰越金として計上
+   if(isEv){
+     const carryIn=cbEventCarryIn();
+     if(carryIn>0){
+       add(mm,1,'本部より振替','対象外','イベント費 前月繰越',carryIn,0,-1);
+     }
+   }
+   // 本部より振替（イベントはイベント予算）。order=0で日付先頭に置く
+   if((Number(cb.opening)||0)>0){
+     add(mm,1,'本部より振替','対象外',isEv?'イベント予算 振替':'本部から振替',Number(cb.opening)||0,0,-1);
+   }
+   (cb.rows||[]).forEach(r=>{
+     const mo=(r.mon!=null&&r.mon!=='')?r.mon:mm;
+     // 現金入金（補充）
+     if(r.isCash&&r.kind==='in'&&!r.isClose){
+       add(mo,r.day,'本部より振替',(r.tax||'対象外'),isEv?'イベント費 現金補充':'現金入金（補充）',Number(r.amt)||0,0);return;
+     }
+     // 締めの預金振替（出金）。繰越（carry, amt=0）は帳簿に出さない
+     if(r.isClose){
+       if(r.carry)return; // 翌月繰越：現金箱から出ていないので行を出さない
+       add(mo,r.day,'本部より振替','対象外',isEv?'イベント予算 預金振替':'預金振替',0,Number(r.amt)||0,9);return;
+     }
+     // 経費（出金）
+     if(r.kind==='out'){
+       const a=CB_ACCT_BY[+r.acct];
+       add(mo,r.day,a?a.name:'',r.tax||(a&&a.tax)||'',`${r.shop||''}${r.shop&&r.item?'　':''}${r.item||''}`,0,Number(r.amt)||0);return;
+     }
+   });
+ });
+ // 売上（通常側のみ）：新規入園（振込）・タイムリー（現金）
+ const cbN=cbStoreGet(cashbook);
+ shokaiAutoRowsFor(false).forEach(r=>{const mo=(r.mon!=null&&r.mon!=='')?r.mon:mm;add(mo,r.day,'保育園収入高','非課税売上',`【振込】${r.item||''}`,Number(r.amt)||0,0);});
+ (timelyData[park]&&timelyData[park][ymKey()]||[]).forEach(r=>{add((r.mon||mm),r.day,'保育園収入高','非課税売上',`【現金】${r.item||''}`,Number(r.amt)||0,0);});
+ // 日付順（order→dnum）で安定ソート
+ items.sort((a,b)=>(a.order-b.order)||(a.dnum-b.dnum));
+ return items;
+}
+// 新規入園の振込売上行（モード非依存版。MF合算で使用）
+function shokaiAutoRowsFor(){
+ const cand=roster.filter(r=>r.isNew&&r.name).filter(r=>park==='全施設'||r.park===park);
+ const out=[];const k=ymKey();
+ cand.forEach(p=>{
+   const log=initSaleLog[p.name];if(!log||!log.paid||!log.paidDate)return;
+   const d=String(log.paidDate);const m=d.match(/(\d{4})-(\d{2})-(\d{2})/);if(!m)return;
+   if(+m[1]!==yy||+m[2]!==mm)return;
+   const amt=initSaleAmount(p);if(!(amt>0))return;
+   out.push({mon:+m[2],day:+m[3],item:`新規入園 ${p.name} 初回月謝`,amt,by:(STAFF.includes(log.by)?log.by:'')});
+ });
+ return out;
+}
+// マネーフォワード様式のExcel（現金出納帳インポート用）を出力
+// 本物テンプレートのレイアウトに準拠：B列開始・Ver表記・E列に勘定科目コードのVLOOKUP・右側にマスター表
+function cbExportMF(){
+ const cb=cbGet();const bumon=CB_BUMON[park]||park;
+ // MF勘定科目マスター（コード・名称・カテゴリ）— テンプレートの右側マスターと同一
+ const MF_ACCTS=[[99,'当期商品仕入高','その他'],[100,'役員報酬',''],[101,'給与手当','仕入関係'],[102,'賞与',''],
+   [103,'法定福利費',''],[104,'諸会費',''],[105,'広告宣伝費',''],[106,'旅費交通費',''],[107,'交際接待費',''],
+   [108,'委託費',''],[109,'手数料',''],[110,'支払利息',''],[111,'租税公課',''],[112,'賃借料',''],[113,'水道光熱費',''],
+   [114,'通信費',''],[115,'地代家賃',''],[116,'保険料',''],[117,'修繕費',''],[118,'消耗品費',''],[119,'事務用品費',''],
+   [120,'行事費用等',''],[121,'会議費',''],[122,'厚生費',''],[123,'顧問報酬',''],[125,'車輌費',''],[126,'管理諸費',''],
+   [127,'雑費',''],[128,'保育園収入高','売上関係'],[129,'売上値引・返品',''],[131,'助成金収入',''],
+   [1,'現金',''],[2,'売掛金',''],[3,'立替金',''],[0,'複合','']];
+ // セル直接指定で本物レイアウトを再現
+ const ws={};
+ const set=(addr,v,t)=>{ws[addr]={v:v,t:t||(typeof v==='number'?'n':'s')};};
+ const setF=(addr,formula,val)=>{ // 数式セル（vに計算済みの値を入れておくと開いた瞬間から正しく表示され▲が出ない）
+   if(val===''||val==null){ws[addr]={t:'s',v:'',f:formula};} // 空欄結果は文字型で
+   else{ws[addr]={t:'n',v:val,f:formula};}
+ };
+ // 見出し部
+ set('B1','現金出納帳');set('F1','事業者名／事業者番号');set('K1','ハイアイランド株式会社');set('L1','部門');set('M1',bumon);
+ set('B2','Ver e4.0');set('C2','現金出納帳');set('L2','補助科目');
+ // 取引ヘッダ（3行目）
+ set('B3','日付');set('D3','相手勘定科目');set('F3','相手補助科目');set('G3','相手部門');set('H3','相手取引先');
+ set('I3','相手税区分');set('J3','相手インボイス');set('K3','摘要');set('L3','入金');set('M3','出金');set('N3','残高');
+ // 繰越金（4行目）：本物テンプレートでは残高欄は空（=0扱い）。本部より振替の行で残高が立つ
+ set('K4','繰越金');set('N4',0);
+ // 名称→コードの対応（勘定科目コードを直接入れる。数式を使わないので▲が一切出ない）
+ const MF_CODE_BY_NAME={};MF_ACCTS.forEach(([code,name])=>{MF_CODE_BY_NAME[name]=code;});
+ // データ行（5行目〜）：通常出納帳＋イベント出納帳を合算した明細を日付順に出力。残高は通し計算。
+ let row=5;
+ let runBal=0;
+ const put=(it)=>{
+   runBal=runBal+(it.inn||0)-(it.out||0);
+   if(it.date)set('B'+row,it.date);
+   if(it.acctName)set('D'+row,it.acctName);
+   const code=MF_CODE_BY_NAME[it.acctName];
+   if(code!=null)set('E'+row,code);
+   // 先頭の本部振替（本部から振替/イベント予算 振替）は部門空。それ以外は部門を入れる
+   const isOpening=it.acctName==='本部より振替'&&(it.tekiyo==='本部から振替'||it.tekiyo==='イベント予算 振替');
+   if(!isOpening)set('G'+row,bumon);
+   if(it.tax)set('I'+row,it.tax);
+   if(it.tekiyo)set('K'+row,it.tekiyo);
+   if(it.inn)set('L'+row,it.inn);
+   if(it.out)set('M'+row,it.out);
+   set('N'+row,runBal);
+   row++;
+ };
+ cbCollectMfRows().forEach(put);
+ const lastDataRow=row-1;
+ // 右側マスター表（VLOOKUP参照先）Q6〜R45：コード・名称
+ set('Q4','科目\nコード');set('R4','勘定科目名称');set('V4','カテゴリ');
+ let mr=6;
+ MF_ACCTS.forEach(([code,name,cat])=>{
+   set('Q'+mr,code);set('R'+mr,name);if(cat)set('V'+mr,cat);mr++;
+ });
+ // シート範囲
+ const maxRow=Math.max(lastDataRow,mr,46);
+ ws['!ref']=`A1:Z${maxRow}`;
+ ws['!cols']=[{wch:2},{wch:11},{wch:2},{wch:15},{wch:6},{wch:12},{wch:14},{wch:12},{wch:16},{wch:6},{wch:30},{wch:11},{wch:11},{wch:11}];
+ const wb=XLSX.utils.book_new();
+ XLSX.utils.book_append_sheet(wb,ws,'現金出納帳');
+ XLSX.writeFile(wb,`MF_現金出納帳_${yy}年${mm}月_${bumon}.xlsx`);
+ infoDialog(`マネーフォワード用Excelを書き出しました。\n\n現金出納帳とイベント出納帳を1つに合算し、本物テンプレートと同じレイアウト（B列開始・Ver表記・勘定科目コード・残高つき）で出力しています。\nそのままマネーフォワードの「現金出納帳」インポートに使えます。\n\nファイル：MF_現金出納帳_${yy}年${mm}月_${bumon}.xlsx`,'Excel出力完了');
+}
+// 当月の出納帳を「売上」と「支出」に分けて取り出す（タイムリーはプレビュー読込分も合算）
+function cbSplitData(cb){
+ const bumon=CB_BUMON[park]||park;
+ const sales=[],expenses=[];
+ let cashAddNormal=0,cashAddEvent=0; // 通常の補充入金／イベント費予算の入金
+ cbAllRows(cb).forEach(r=>{
+   const mo=(r.mon!=null&&r.mon!=='')?r.mon:mm;
+   const date=r.day?`${yy}/${mo}/${r.day}`:'';
+   if(r.isClose)return; // 預金振替（締め行）は除く
+   if(r.isCash&&r.kind==='in'){ // 現金入金（補充／イベント予算）
+     if(r.evBudget)cashAddEvent+=Number(r.amt)||0; else cashAddNormal+=Number(r.amt)||0;
+     return;
+   }
+   if(r.kind==='out'){ // 支出（経費）
+     const a=CB_ACCT_BY[+r.acct];
+     expenses.push({date, acct:a?a.name:'', tax:r.tax||'', shop:r.shop||'', item:r.item||'', amt:Number(r.amt)||0, by:r.by||'', event:!!r.event});
+   }
+ });
+ // 新規入園（振込売上）
+ cbShokaiRows(cb).forEach(r=>{
+   const mo=(r.mon!=null&&r.mon!=='')?r.mon:mm;
+   sales.push({date:r.day?`${yy}/${mo}/${r.day}`:'', kubun:'振込', item:r.item||'', amt:Number(r.amt)||0, by:r.by||''});
+ });
+ // タイムリー現金売上（プレビュー内で読み込んだ分）
+ (cbTimelyGet()||[]).forEach(r=>{
+   sales.push({date:r.day?`${yy}/${r.mon||mm}/${r.day}`:'', kubun:'現金', item:r.item||'', amt:Number(r.amt)||0, by:r.by||''});
+ });
+ // 日付順（月→日の数値順）に並べる
+ const dnum=s=>{const m=String(s.date||'').match(/(\d+)\/(\d+)\/(\d+)/);return m?(+m[2])*100+(+m[3]):9999;};
+ sales.sort((a,b)=>dnum(a)-dnum(b));
+ return {sales, expenses, bumon, cashAddNormal, cashAddEvent};
+}
+// MF出力と同じ並び・項目のプレビュー行（通常＋イベント合算・日付順・残高つき）
+function cbMfRows(cb){
+ const items=cbCollectMfRows();
+ let bal=0;
+ return items.map(it=>{bal=bal+(it.inn||0)-(it.out||0);return Object.assign({},it,{bal});});
+}
+// 売上だけのExcel（見やすい一覧表）
+function cbExportSalesXlsx(){
+ const cb=cbGet();const {sales,bumon}=cbSplitData(cb);
+ const aoa=[[`${bumon}　${yy}年${mm}月　売上一覧`],[],['日付','区分','内容','担当','金額']];
+ let sum=0;sales.forEach(s=>{sum+=s.amt;aoa.push([s.date,s.kubun,s.item,s.by,s.amt]);});
+ aoa.push([]);aoa.push(['','','','合計',sum]);
+ const ws=XLSX.utils.aoa_to_sheet(aoa);
+ ws['!cols']=[{wch:12},{wch:8},{wch:36},{wch:10},{wch:12}];
+ const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'売上一覧');
+ XLSX.writeFile(wb,`売上一覧_${yy}年${mm}月_${bumon}.xlsx`);
+}
+// 支出だけのExcel（見やすい一覧表）
+function cbExportExpenseXlsx(){
+ const cb=cbGet();const {expenses,bumon}=cbSplitData(cb);
+ const aoa=[[`${bumon}　${yy}年${mm}月　支出（経費）一覧`],[],['日付','勘定科目','税区分','店舗名','内容','担当','イベント','金額']];
+ let sum=0;expenses.forEach(e=>{sum+=e.amt;aoa.push([e.date,e.acct,e.tax,e.shop,e.item,e.by,e.event?'○':'',e.amt]);});
+ aoa.push([]);aoa.push(['','','','','','','合計',sum]);
+ const ws=XLSX.utils.aoa_to_sheet(aoa);
+ ws['!cols']=[{wch:12},{wch:14},{wch:18},{wch:18},{wch:20},{wch:10},{wch:8},{wch:12}];
+ const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'支出一覧');
+ XLSX.writeFile(wb,`支出一覧_${yy}年${mm}月_${bumon}.xlsx`);
+}
+// 費用（イベント費のみ）のExcel
+function cbExportEventXlsx(){
+ const cb=cbGet();const {expenses,bumon}=cbSplitData(cb);
+ const evs=expenses.filter(e=>e.event);
+ const aoa=[[`${bumon}　${yy}年${mm}月　行事イベント費一覧`],[],['日付','勘定科目','店舗名','内容','担当','金額']];
+ let sum=0;evs.forEach(e=>{sum+=e.amt;aoa.push([e.date,e.acct,e.shop,e.item,e.by,e.amt]);});
+ aoa.push([]);aoa.push(['','','','','合計',sum]);
+ const ws=XLSX.utils.aoa_to_sheet(aoa);
+ ws['!cols']=[{wch:12},{wch:14},{wch:18},{wch:22},{wch:10},{wch:12}];
+ const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'イベント費');
+ XLSX.writeFile(wb,`イベント費一覧_${yy}年${mm}月_${bumon}.xlsx`);
+}
+// 出力プレビュー画面（タブ切り替え式：売上／経費／費用／総合）
+function cbShowPreview(){
+ const cb=cbGet();const {sales,expenses,bumon,cashAddNormal,cashAddEvent}=cbSplitData(cb);
+ const salesSum=sales.reduce((s,r)=>s+r.amt,0);
+ const expSum=expenses.reduce((s,r)=>s+r.amt,0);
+ const cashSum=sales.filter(s=>s.kubun==='現金').reduce((s,r)=>s+r.amt,0);
+ const furiSum=sales.filter(s=>s.kubun==='振込').reduce((s,r)=>s+r.amt,0);
+ const tl=cbTimelyGet()||[];
+ const esc=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;');
+ const isEv=cbMode==='event';
+ const tab=window.__cbPvTab||(isEv?'expense':'sales');
+ const evList=expenses.filter(e=>e.event);
+ const evSum=evList.reduce((s,r)=>s+r.amt,0);
+ const tabBtn=(id,label)=>`<button onclick="window.__cbPvTab='${id}';cbShowPreview()" style="padding:9px 18px;font-size:13px;font-weight:700;border:none;border-bottom:3px solid ${tab===id?'var(--berry)':'transparent'};background:none;color:${tab===id?'var(--berry)':'#999'};cursor:pointer;font-family:inherit">${label}</button>`;
+ let h=`<div id="cbPvOverlay" style="position:fixed;inset:0;background:rgba(20,12,16,.78);z-index:10000;display:flex;align-items:center;justify-content:center;padding:16px" onclick="if(event.target===this)this.remove()">`+
+   `<div style="background:#fff;border-radius:14px;max-width:1180px;width:100%;height:94vh;max-height:94vh;display:flex;flex-direction:column;box-shadow:0 18px 60px rgba(0,0,0,.5);border:1px solid #e6dcd0;overflow:hidden">`+
+   `<div style="padding:20px 26px 0 26px;flex-shrink:0">`+
+   `<div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">`+
+     `<span style="font-size:18px;font-weight:700;color:var(--berry)">出力プレビュー</span>`+
+     `<span style="font-size:13px;color:#777">${bumon}・${yy}年${mm}月</span>`+
+     `<div style="flex:1"></div>`+
+     `<span style="cursor:pointer;font-size:24px;color:#999;line-height:1" onclick="document.getElementById('cbPvOverlay').remove()">×</span>`+
+   `</div>`+
+   (isEv?'':`<div style="background:#faf6f1;border:1px solid #e6dcd0;border-radius:10px;padding:12px 16px;margin-bottom:14px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">`+
+     `<span style="font-size:13px;font-weight:700;color:#9a6b2f">🏫 タイムリー一時預かりの現金売上</span>`+
+     `<span style="font-size:12px;color:#777">${tl.length?`取込済み ${tl.length}件・¥${cashSum.toLocaleString()}`:'まだ取り込んでいません'}</span>`+
+     `<div style="flex:1"></div>`+
+     `<button class="btn btn-ghost" style="padding:6px 14px;font-size:12px;background:#fff" onclick="cbPvPickTimely()">${tl.length?'再読み込み':'CSVを読み込む'}</button>`+
+   `</div>`)+
+   `<div style="display:flex;gap:2px;justify-content:center;border-bottom:1px solid #e6dcd0">`+
+     (isEv?'':tabBtn('sales','売上'))+tabBtn('expense','経費')+tabBtn('total','総合（MF用）')+
+   `</div>`+
+   `</div>`+
+   `<div style="padding:18px 26px 24px 26px;overflow-y:auto;flex:1">`;
+ // ---- 売上タブ ----
+ if(tab==='sales'){
+   h+=`<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px"><span style="font-weight:700;color:var(--leaf);font-size:14px">売上（現金＋振込の合算）</span><span style="font-size:12px;color:#777">現金 ¥${cashSum.toLocaleString()}／<b style="color:var(--berry)">振込 ¥${furiSum.toLocaleString()}</b>／合計 ¥${salesSum.toLocaleString()}</span><div style="flex:1"></div>`+
+     `<button class="btn btn-ghost" style="padding:6px 14px;font-size:12px;border-color:var(--leaf);color:var(--leaf)" onclick="cbExportSalesXlsx()">📄 売上をExcel出力</button></div>`;
+   if(sales.length){
+     h+=`<div style="max-height:calc(94vh - 320px);overflow:auto;border:1px solid #eee;border-radius:6px"><table style="width:100%;font-size:12px;border-collapse:collapse">`+
+       `<tr style="background:var(--leaf);color:#fff"><th style="text-align:left;padding:6px 8px">日付</th><th style="text-align:left;padding:6px 8px">区分</th><th style="text-align:left;padding:6px 8px">内容</th><th style="text-align:left;padding:6px 8px">担当</th><th style="text-align:right;padding:6px 8px">金額</th></tr>`;
+     sales.forEach((s,idx)=>{
+       const furi=s.kubun==='振込';
+       const bg=furi?'#fdeef3':(idx%2?'#f7faf5':'#fff'); // 振込の行は薄ピンクで強調
+       const badge=furi
+         ? '<span style="font-size:11px;font-weight:700;color:#fff;background:var(--berry);padding:2px 10px;border-radius:8px;box-shadow:0 1px 3px rgba(190,30,90,.4)">振込</span>'
+         : '<span style="font-size:10px;color:#fff;background:#b9a99a;padding:1px 8px;border-radius:7px">現金</span>';
+       h+=`<tr style="background:${bg};border-bottom:1px solid #eee"><td style="padding:5px 8px">${esc(s.date)}</td><td style="padding:5px 8px">${badge}</td><td style="padding:5px 8px${furi?';font-weight:600':''}">${esc(s.item)}</td><td style="padding:5px 8px;color:#777">${esc(s.by)||'—'}</td><td style="padding:5px 8px;text-align:right;font-weight:600${furi?';color:var(--berry)':''}">¥${s.amt.toLocaleString()}</td></tr>`;});
+     h+=`<tr style="background:var(--leafsoft);font-weight:700"><td colspan="4" style="padding:6px 8px;text-align:right">売上合計</td><td style="padding:6px 8px;text-align:right;color:var(--leaf)">¥${salesSum.toLocaleString()}</td></tr></table></div>`;
+   }else{h+=`<div style="font-size:13px;color:#777;padding:20px;text-align:center">売上はまだありません。<br>上のタイムリーCSVを読み込むか、初回売上管理で新規入園を入金済みにすると表示されます。</div>`;}
+ }
+ // ---- 経費タブ ----
+ else if(tab==='expense'){
+   h+=`<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px"><span style="font-weight:700;color:var(--berry);font-size:14px">経費（支出）</span><span style="font-size:12px;color:#777">合計 ¥${expSum.toLocaleString()}（${expenses.length}件）</span><div style="flex:1"></div>`+
+     `<button class="btn btn-ghost" style="padding:6px 14px;font-size:12px;border-color:var(--berry);color:var(--berry)" onclick="cbExportExpenseXlsx()">📄 経費をExcel出力</button></div>`;
+   if(expenses.length){
+     h+=`<div style="max-height:calc(94vh - 320px);overflow:auto;border:1px solid #eee;border-radius:6px"><table style="width:100%;font-size:12px;border-collapse:collapse">`+
+       `<tr style="background:var(--berry);color:#fff"><th style="text-align:left;padding:6px 8px">日付</th><th style="text-align:left;padding:6px 8px">勘定科目</th><th style="text-align:left;padding:6px 8px">店舗名</th><th style="text-align:left;padding:6px 8px">内容</th><th style="text-align:right;padding:6px 8px">金額</th></tr>`;
+     expenses.forEach((e,idx)=>{const bg=idx%2?'#fdf6f3':'#fff';h+=`<tr style="background:${bg};border-bottom:1px solid #eee"><td style="padding:5px 8px">${esc(e.date)}</td><td style="padding:5px 8px">${esc(e.acct)}</td><td style="padding:5px 8px">${esc(e.shop)}</td><td style="padding:5px 8px">${esc(e.item)}${e.event?' <span style="font-size:10px;color:#9a6b2f">[イベント]</span>':''}</td><td style="padding:5px 8px;text-align:right;font-weight:600">¥${e.amt.toLocaleString()}</td></tr>`;});
+     h+=`<tr style="background:#fdeee9;font-weight:700"><td colspan="4" style="padding:6px 8px;text-align:right">経費合計</td><td style="padding:6px 8px;text-align:right;color:var(--berry)">¥${expSum.toLocaleString()}</td></tr></table></div>`;
+   }else{h+=`<div style="font-size:13px;color:#777;padding:20px;text-align:center">経費はまだありません。締める前に小口の現金支出を入力してください。</div>`;}
+   // 小口現金の残金（本部から振替 ＋ 現金補充 − 経費）
+   const opening=Number(cb.opening)||0;
+   const cashIn=Number(cashAddNormal)||0;
+   const koguchi=opening+cashIn-expSum;
+   h+=`<div style="margin-top:24px;background:#faf6f1;border:2px solid #e6dcd0;border-radius:14px;padding:24px 28px;text-align:center">`+
+     `<div style="font-size:15px;font-weight:700;color:#9a6b2f;margin-bottom:20px">${isEv?'イベント予算の確認 ── この残金を口座に戻して締めます':'小口現金の確認 ── この残金を口座に戻して締めます'}</div>`+
+     `<div style="display:flex;gap:14px;align-items:center;justify-content:center;flex-wrap:wrap">`+
+       `<div style="min-width:120px"><div style="color:#777;font-size:12px;margin-bottom:4px">${isEv?'イベント予算':'本部から振替'}</div><div style="font-weight:700;font-size:20px">¥${opening.toLocaleString()}</div></div>`+
+       `<div style="color:#bbb;font-size:24px">＋</div>`+
+       `<div style="min-width:120px"><div style="color:#777;font-size:12px;margin-bottom:4px">現金補充</div><div style="font-weight:700;font-size:20px">¥${cashIn.toLocaleString()}</div></div>`+
+       `<div style="color:#bbb;font-size:24px">−</div>`+
+       `<div style="min-width:120px"><div style="color:#777;font-size:12px;margin-bottom:4px">${isEv?'イベント費（使用）':'経費合計'}</div><div style="font-weight:700;font-size:20px;color:var(--berry)">¥${expSum.toLocaleString()}</div></div>`+
+       `<div style="color:#bbb;font-size:24px">＝</div>`+
+       `<div style="min-width:200px;background:#fff;border:2px solid ${koguchi<0?'var(--berry)':'var(--leaf)'};border-radius:12px;padding:14px 24px"><div style="color:#777;font-size:12px;margin-bottom:4px">${isEv?(cb.eventCarry>0?'イベント予算の残金（翌月へ繰越）':'イベント予算の残金（口座へ戻す額）'):'小口現金の残金（口座へ戻す額）'}</div><div style="font-weight:800;font-size:34px;color:${koguchi<0?'var(--berry)':(isEv&&cb.eventCarry>0?'#9a6b2f':'var(--leaf)')}">¥${koguchi.toLocaleString()}</div>${isEv&&cb.eventCarry>0?'<div style="font-size:11px;color:#9a6b2f;margin-top:4px;font-weight:700">翌月へ繰り越し</div>':''}</div>`+
+     `</div>`+
+     `<div style="font-size:12px;color:#999;margin-top:18px;line-height:1.7">途中で入金した「現金補充」も差し引き後の残金に反映されます。${isEv?(cb.eventCarry>0?'<br>この残金は翌月へ繰り越し（口座に戻さず手元に残す）として締めています。':'<br>この残金を口座に戻して締めます。'):'<br>※ 現金売上（タイムリー）・振込売上（新規入園）は含みません。'}手元の現金とこの残金が一致するか確認してから締めてください。</div>`+
+   `</div>`;
+ }
+ // ---- 費用タブ（イベント費のみ） ----
+ else if(tab==='event'){
+   h+=`<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px"><span style="font-weight:700;color:#9a6b2f;font-size:14px">費用（行事イベント費のみ）</span><span style="font-size:12px;color:#777">合計 ¥${evSum.toLocaleString()}（${evList.length}件）</span><div style="flex:1"></div>`+
+     `<button class="btn btn-ghost" style="padding:6px 14px;font-size:12px;border-color:#9a6b2f;color:#9a6b2f" onclick="cbExportEventXlsx()">📄 イベント費をExcel出力</button></div>`;
+   if(evList.length){
+     h+=`<div style="max-height:calc(94vh - 320px);overflow:auto;border:1px solid #eee;border-radius:6px"><table style="width:100%;font-size:12px;border-collapse:collapse">`+
+       `<tr style="background:#9a6b2f;color:#fff"><th style="text-align:left;padding:6px 8px">日付</th><th style="text-align:left;padding:6px 8px">勘定科目</th><th style="text-align:left;padding:6px 8px">店舗名</th><th style="text-align:left;padding:6px 8px">内容</th><th style="text-align:right;padding:6px 8px">金額</th></tr>`;
+     evList.forEach((e,idx)=>{const bg=idx%2?'#faf6ef':'#fff';h+=`<tr style="background:${bg};border-bottom:1px solid #eee"><td style="padding:5px 8px">${esc(e.date)}</td><td style="padding:5px 8px">${esc(e.acct)}</td><td style="padding:5px 8px">${esc(e.shop)}</td><td style="padding:5px 8px">${esc(e.item)}</td><td style="padding:5px 8px;text-align:right;font-weight:600">¥${e.amt.toLocaleString()}</td></tr>`;});
+     h+=`<tr style="background:#f3ead9;font-weight:700"><td colspan="4" style="padding:6px 8px;text-align:right">イベント費合計</td><td style="padding:6px 8px;text-align:right;color:#9a6b2f">¥${evSum.toLocaleString()}</td></tr></table></div>`;
+   }else{h+=`<div style="font-size:13px;color:#777;padding:24px;text-align:center;line-height:1.8">この出納帳にイベント費はありません。<br>イベント費は別の「イベント出納帳」で管理します。</div>`;}
+ }
+ // ---- 総合タブ ----
+ else{
+   // 通常＋イベントを合算した明細から集計（MF出力と完全一致）
+   const uni=cbCollectMfRows();
+   const openSum=uni.filter(it=>it.order===-1).reduce((s,it)=>s+(it.inn||0),0); // 本部からの振替（通常＋イベント、先頭）
+   const uCashSum=uni.filter(it=>String(it.tekiyo).indexOf('【現金】')>=0).reduce((s,it)=>s+(it.inn||0),0);
+   const uFuriSum=uni.filter(it=>String(it.tekiyo).indexOf('【振込】')>=0).reduce((s,it)=>s+(it.inn||0),0);
+   const uHojuSum=uni.filter(it=>it.acctName==='本部より振替'&&it.order!==-1&&it.inn>0).reduce((s,it)=>s+(it.inn||0),0); // 現金補充
+   const uExpSum=uni.filter(it=>!(it.acctName==='本部より振替'&&it.out>0)).reduce((s,it)=>s+(it.out||0),0); // 経費（締めの預金振替は除く）
+   const inTotal=openSum+uHojuSum+uCashSum+uFuriSum;
+   h+=`<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px"><span style="font-weight:700;color:var(--leaf);font-size:14px">総合（マネーフォワード出力用・通常＋イベント合算）</span><div style="flex:1"></div>`+
+     `<button class="btn btn-ghost" style="padding:7px 16px;font-size:13px;border-color:var(--leaf);color:var(--leaf)" onclick="cbExportMF()">📊 マネーフォワード用Excelを出力</button></div>`+
+     `<div style="background:#faf6f1;border:1px solid #e6dcd0;border-radius:10px;padding:16px 18px">`+
+       `<p style="font-size:13px;color:#555;margin:0 0 12px"><b>現金出納帳とイベント出納帳を1つに合算</b>し、売上（タイムリー現金・新規入園振込）と経費（通常＋イベント）をまとめて、マネーフォワードの「現金出納帳」インポート様式（B列開始・勘定科目コード・残高つき）でxlsx出力します。明細は日付順です。</p>`+
+       `<div style="display:flex;gap:24px;flex-wrap:wrap;font-size:13px">`+
+         `<div><div style="color:#777;font-size:11px">本部振替＋繰越<br>（通常＋イベント）</div><div style="font-weight:700">¥${openSum.toLocaleString()}</div></div>`+
+         `<div><div style="color:#777;font-size:11px">売上（現金）</div><div style="font-weight:700;color:var(--leaf)">¥${uCashSum.toLocaleString()}</div></div>`+
+         `<div><div style="color:#777;font-size:11px">売上（振込）</div><div style="font-weight:700;color:var(--leaf)">¥${uFuriSum.toLocaleString()}</div></div>`+
+         `<div><div style="color:#777;font-size:11px">入金計</div><div style="font-weight:700">¥${inTotal.toLocaleString()}</div></div>`+
+         `<div><div style="color:#777;font-size:11px">出金計（経費）</div><div style="font-weight:700;color:var(--berry)">¥${uExpSum.toLocaleString()}</div></div>`+
+       `</div>`+
+     `</div>`+
+     `<p style="font-size:12px;color:#999;margin-top:10px">※ マネーフォワードへインポートするのは、この総合タブのExcelです。下の表が、出力されるExcelの中身です（現金出納帳・イベント出納帳どちらのタブから出しても同じ合算ファイルになります）。</p>`;
+   // MF出力と同じ中身のプレビュー表
+   const mfRows=cbMfRows(cb);
+   if(mfRows.length){
+     h+=`<div style="max-height:calc(94vh - 430px);overflow:auto;border:1px solid #eee;border-radius:6px;margin-top:8px"><table style="width:100%;font-size:11.5px;border-collapse:collapse">`+
+       `<tr style="background:var(--leaf);color:#fff"><th style="text-align:left;padding:6px 8px">日付</th><th style="text-align:left;padding:6px 8px">相手勘定科目</th><th style="text-align:left;padding:6px 8px">税区分</th><th style="text-align:left;padding:6px 8px">摘要</th><th style="text-align:right;padding:6px 8px">入金</th><th style="text-align:right;padding:6px 8px">出金</th><th style="text-align:right;padding:6px 8px">残高</th></tr>`;
+     mfRows.forEach((r,idx)=>{const bg=idx%2?'#f7faf5':'#fff';h+=`<tr style="background:${bg};border-bottom:1px solid #eee"><td style="padding:5px 8px;white-space:nowrap">${esc(r.date)}</td><td style="padding:5px 8px">${esc(r.acctName)}</td><td style="padding:5px 8px;color:#777">${esc(r.tax)}</td><td style="padding:5px 8px">${esc(r.tekiyo)}</td><td style="padding:5px 8px;text-align:right;color:var(--leaf)">${r.inn?'¥'+r.inn.toLocaleString():''}</td><td style="padding:5px 8px;text-align:right;color:var(--berry)">${r.out?'¥'+r.out.toLocaleString():''}</td><td style="padding:5px 8px;text-align:right">¥${r.bal.toLocaleString()}</td></tr>`;});
+     h+=`</table></div>`;
+   }
+ }
+ h+=`</div></div></div>`;
+ const ex=document.getElementById('cbPvOverlay');if(ex)ex.remove();
+ const div=document.createElement('div');div.innerHTML=h;document.body.appendChild(div.firstChild);
+}
+// プレビュー内：タイムリーCSV読み込み
+function cbPvPickTimely(){
+ const inp=document.createElement('input');inp.type='file';inp.accept='.csv,text/csv';
+ inp.onchange=e=>{const f=e.target.files[0];if(!f)return;
+   const fr=new FileReader();
+   fr.onload=ev=>{try{importTimelyCsv(String(ev.target.result||''));}catch(err){infoDialog('CSVの読み込み中にエラーが発生しました。\n'+err.message,'取込できません');}};
+   fr.readAsText(f);};
+ inp.click();
+}
+// ===== 月売上表（本部提出・通帳照合用）=====
+// 当月の売上（タイムリー現金売上＋新規入園振込売上）を施設別に一覧表示
+function salesRowsForPark(pk){
+ // タイムリー：プレビュー内で読み込んだ timelyData[施設][対象月]
+ const out=[];
+ const k=ymKey();
+ const tl=(timelyData[pk]&&timelyData[pk][k])?timelyData[pk][k]:[];
+ tl.forEach(r=>{out.push({mon:r.mon||mm,day:r.day||'',kind:'現金',item:r.item||'',amt:Number(r.amt)||0,by:r.by||'',park:pk});});
+ // 新規入園：初回売上管理で入金済み・入金日が対象年月の園児
+ roster.filter(r=>r.isNew&&r.name&&r.park===pk).forEach(p=>{
+   const log=initSaleLog[p.name];if(!log||!log.paid)return;
+   const m=String(log.paidDate||'').match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);if(!m)return;
+   if(+m[1]!==yy||+m[2]!==mm)return;
+   const amt=initSaleAmount(p);if(amt<=0)return;
+   out.push({mon:+m[2],day:+m[3],kind:'振込',item:`新規入園 ${p.name} 初回月謝`,amt:amt,by:(STAFF.includes(log.by)?log.by:''),park:pk});
+ });
+ // 日付順
+ out.sort((a,b)=>(a.day||0)-(b.day||0));
+ return out;
+}
+function renderSalesReport(){
+ const parks=(park==='全施設')?['月寒園','白石園','サッポロファクトリー園','幼稚舎','資生館保育園']:[park];
+ let h='<div style="padding:8px 0">';
+ let grandCash=0,grandFuri=0,grandTotal=0;
+ parks.forEach(pk=>{
+   const rows=salesRowsForPark(pk);
+   const bumon=CB_BUMON[pk]||pk;
+   const cash=rows.filter(r=>r.kind==='現金').reduce((s,r)=>s+r.amt,0);
+   const furi=rows.filter(r=>r.kind==='振込').reduce((s,r)=>s+r.amt,0);
+   const tot=cash+furi;
+   grandCash+=cash;grandFuri+=furi;grandTotal+=tot;
+   h+=`<div style="margin:0 0 22px">`+
+     `<div style="display:flex;align-items:baseline;gap:12px;padding:8px 4px;border-bottom:2px solid var(--leaf)">`+
+       `<span style="font-weight:700;color:var(--leaf);font-size:15px">${pk}</span>`+
+       `<span style="font-size:12px;color:var(--mut)">${bumon}・${yy}年${mm}月</span>`+
+       `<div style="flex:1"></div>`+
+       `<span style="font-size:12px">現金 <b>¥${cash.toLocaleString()}</b></span>`+
+       `<span style="font-size:12px">振込 <b>¥${furi.toLocaleString()}</b></span>`+
+       `<span style="font-size:13px">合計 <b style="color:var(--leaf)">¥${tot.toLocaleString()}</b></span>`+
+     `</div>`;
+   if(rows.length===0){
+     h+=`<div style="padding:16px 8px;color:var(--mut);font-size:13px">この施設・月の売上はまだありません。タイムリースクールCSVの取込、または初回売上管理での入金チェックをすると表示されます。</div>`;
+   }else{
+     h+='<div class="tablewrap"><table style="font-size:13px"><thead><tr>'+
+       '<th style="width:90px">日付</th><th style="width:80px">区分</th><th>内容</th><th style="width:90px">担当</th><th style="width:110px;text-align:right">金額</th>'+
+       '</tr></thead><tbody>';
+     rows.forEach(r=>{
+       const badge=r.kind==='現金'
+         ? '<span style="font-size:11px;color:#fff;background:#b9a99a;padding:1px 8px;border-radius:8px">現金</span>'
+         : '<span style="font-size:11px;font-weight:700;color:#fff;background:var(--berry);padding:2px 10px;border-radius:8px;box-shadow:0 1px 3px rgba(190,30,90,.4)">振込</span>';
+       h+=`<tr><td>${yy}/${r.mon}/${r.day}</td><td>${badge}</td><td>${r.item}</td><td style="color:var(--mut)">${r.by||'—'}</td><td class="num">¥${r.amt.toLocaleString()}</td></tr>`;
+     });
+     h+=`<tr style="background:var(--leafsoft);font-weight:700"><td colspan="4" style="text-align:right">${pk} 売上合計</td><td class="num" style="color:var(--leaf)">¥${tot.toLocaleString()}</td></tr>`;
+     h+='</tbody></table></div>';
+   }
+   h+='</div>';
+ });
+ if(park==='全施設'){
+   h+=`<div style="margin-top:8px;padding:12px 16px;background:var(--leafsoft);border-radius:10px;display:flex;gap:20px;align-items:center;flex-wrap:wrap">`+
+     `<span style="font-weight:700;color:var(--leaf)">全施設 売上合計</span>`+
+     `<span>現金（タイムリー）：<b>¥${grandCash.toLocaleString()}</b></span>`+
+     `<span>振込（新規入園）：<b>¥${grandFuri.toLocaleString()}</b></span>`+
+     `<div style="flex:1"></div>`+
+     `<span style="font-size:15px">総合計：<b style="color:var(--leaf)">¥${grandTotal.toLocaleString()}</b></span>`+
+   `</div>`;
+ }
+ h+=`<div class="noprint" style="margin-top:16px;display:flex;gap:10px">`+
+   `<button id="srCsv" class="btn btn-ghost" style="padding:8px 16px;font-size:13px;border-color:var(--leaf);color:var(--leaf)">📄 月売上表をCSV出力</button>`+
+   `</div>`;
+ h+='</div>';
+ document.getElementById('body').innerHTML=h;
+ setCard('月売上表','タイムリー売上＋新規入園売上の一覧',`${park==='全施設'?'全施設':park}の${yy}年${mm}月の売上を、現金（タイムリー一時預かり）と振込（新規入園）に分けて一覧にします。本部提出や通帳との照合にお使いください。タイムリーは現金出納帳に取り込んだ分、新規入園は初回売上管理で入金済みにした分が反映されます。`,'none');
+ const csvBtn=document.getElementById('srCsv');if(csvBtn)csvBtn.onclick=()=>{
+   const rows=[['施設','日付','区分','内容','担当','金額']];
+   let sum=0;
+   parks.forEach(pk=>{salesRowsForPark(pk).forEach(r=>{sum+=r.amt;
+     rows.push([pk,`${yy}/${r.mon}/${r.day}`,r.kind,r.item,r.by||'',r.amt]);});});
+   rows.push(['合計','','','','',sum]);
+   downloadCsv(`月売上表_${yy}年${mm}月_${park}.csv`, rows);
+ };
 }
 // CSVテキストを行配列にパース（ダブルクオート対応・BOM除去）
 function parseCsv(text){
@@ -2049,13 +2862,18 @@ function parseCsv(text){
 // 収入区分の表示ラベル（CSV区分列・行表示に使う）
 const CB_SRC_LABEL={timely:'タイムリースクール', shokai:'新規入園', getsugaku:'月謝'};
 // タイムリースクールCSVを現金出納帳の入金行として取り込む
+function cbTimelyGet(){ // タイムリー売上の保存先（施設・対象月）
+ if(cbMode==='event')return []; // イベント出納帳には売上なし
+ const k=ymKey();
+ if(!timelyData[park])timelyData[park]={};
+ if(!timelyData[park][k])timelyData[park][k]=[];
+ return timelyData[park][k];
+}
 function importTimelyCsv(text){
- const cb=cbGet();
  const rows=parseCsv(text);
  if(rows.length<2){infoDialog('CSVにデータが見つかりませんでした。','取込できません');return;}
  const head=rows[0].map(h=>String(h).trim());
  const idx=name=>head.findIndex(h=>h===name);
- // 中身でサマリー／明細を自動判別
  const isSummary=idx('利用者数')>=0;
  const isDetail=idx('氏名')>=0||idx('領収書番号')>=0;
  if(!isSummary&&!isDetail){
@@ -2067,12 +2885,10 @@ function importTimelyCsv(text){
    rows.slice(1).forEach(r=>{
      const d=cbParseDate(r[di]);const amt=Number(String(r[ai]||'').replace(/[^\d.-]/g,''))||0;
      if(!d)return;
-     if(d.mon!==mm){skipped.push(`${d.mon}/${d.day}`);return;} // 対象月以外は取り込まない
+     if(d.mon!==mm){skipped.push(`${d.mon}/${d.day}`);return;}
      if(amt<=0)return;
      const cnt=ni>=0?(Number(String(r[ni]||'').replace(/[^\d.-]/g,''))||0):0;
-     added.push({mon:d.mon,day:d.day,acct:128,tax:'非課税売上',shop:'',
-       item:`タイムリースクール ${d.mon}/${d.day}分${cnt?`（利用${cnt}名）`:''}`,
-       kind:'in',amt:amt,by:cb.openingBy||'',src:'timely'});
+     added.push({mon:d.mon,day:d.day,item:`タイムリースクール ${d.mon}/${d.day}分${cnt?`（利用${cnt}名）`:''}`,amt:amt,by:''});
    });
  }else{
    const di=idx('利用日'),ni=idx('氏名'),ki=idx('区分'),ai=idx('合計'),ri=idx('受領者'),bi=idx('領収書番号');
@@ -2085,12 +2901,20 @@ function importTimelyCsv(text){
      const kb=ki>=0?String(r[ki]||'').trim():'';
      const rno=bi>=0?String(r[bi]||'').trim():'';
      const rcv=ri>=0?String(r[ri]||'').trim():'';
-     added.push({mon:d.mon,day:d.day,acct:128,tax:'非課税売上',shop:'',
-       item:`タイムリースクール ${nm}${kb?`（${kb}）`:''}${rno?` 領収No.${rno}`:''}`,
-       kind:'in',amt:amt,by:STAFF.includes(rcv)?rcv:(cb.openingBy||''),src:'timely'});
+     added.push({mon:d.mon,day:d.day,item:`タイムリースクール ${nm}${kb?`（${kb}）`:''}${rno?` 領収No.${rno}`:''}`,amt:amt,by:STAFF.includes(rcv)?rcv:''});
    });
  }
- cbConfirmImport(added,skipped,'タイムリースクール');
+ if(added.length===0){
+   const sk=skipped.length?`\n\n対象月（${mm}月）以外の ${[...new Set(skipped)].length} 件は取り込みませんでした。`:'';
+   infoDialog(`取り込めるデータがありませんでした。${sk}\n\n上部の対象年月が正しいか確認してください。`,'取込できません');return;
+ }
+ const skMsg=skipped.length?`\n（対象月以外の ${[...new Set(skipped)].length} 件は除外）`:'';
+ const total=added.reduce((s,r)=>s+r.amt,0);
+ confirmDialog(
+   `タイムリースクールの現金売上 ${added.length} 件・合計 ¥${total.toLocaleString()} を取り込みます。${skMsg}\n\n※ 同じ月に再度読み込むと、前回分は置き換えられます。`,
+   ()=>{ const store=cbTimelyGet(); store.length=0; store.push(...added); saveState(); cbShowPreview(); },
+   'タイムリースクールCSVの取込','取り込む'
+ );
 }
 // 新規入園（初回売上）CSVを現金出納帳の入金行として取り込む
 // 初回売上CSV列：[入金日, 区分, 施設, 園児名, 摘要, 金額, 担当事務]
@@ -2121,28 +2945,6 @@ function importShokaiCsv(text){
      kind:'in',amt:amt,by:STAFF.includes(rcv)?rcv:(cb.openingBy||''),src:'shokai'});
  });
  cbConfirmImport(added,skipped,'新規入園');
-}
-// 月謝：現在の園・対象月の月謝合計を1行で自動追加（CSV不要）
-function importGetsugaku(){
- const cb=cbGet();
- // 現在園の在園児（＋新規）の月謝合計
- const list=allPupils().filter(r=>r.park===park);
- let total=0,cnt=0;
- list.forEach(r=>{const c=calc(r);if(r.status==='在園中'||c.isNew){total+=c.total;cnt++;}});
- if(total<=0){infoDialog('この施設・対象月の月謝合計が0です。園児台帳・月次計算をご確認ください。','取込できません');return;}
- // 既に同月の月謝行があれば重複警告
- const dup=cb.rows.some(r=>r.src==='getsugaku');
- const dupMsg=dup?'\n\n※ この月にはすでに月謝の行があります。重複しないようご注意ください。':'';
- confirmDialog(
-   `${park} の ${yy}年${mm}月の月謝合計 ¥${total.toLocaleString()}（${cnt}名分）を\n現金出納帳に「入金」として1行追加します。${dupMsg}\n\nよろしいですか？`,
-   ()=>{
-     cb.rows.push({mon:mm,day:27,acct:128,tax:'非課税売上',shop:'',
-       item:`月謝 ${yy}年${mm}月分（${cnt}名）`,
-       kind:'in',amt:total,by:cb.openingBy||'',src:'getsugaku'});
-     render();infoDialog(`月謝合計 ¥${total.toLocaleString()} を1行追加しました。`,'取込完了');
-   },
-   '月謝の取込','取り込む'
- );
 }
 // 取込の共通確認ダイアログ
 function cbConfirmImport(added,skipped,label){
@@ -2214,7 +3016,7 @@ function exportXlsx(){const wb=XLSX.utils.book_new();const add=(n,a)=>XLSX.utils
 // init
 M.facilities.forEach(f=>{const o=document.createElement('option');o.textContent=f.name;if(f.name===park)o.selected=true;document.getElementById('park').appendChild(o);});
 const mmSel=document.getElementById('mm');for(let i=1;i<=12;i++){const o=document.createElement('option');o.value=i;o.textContent=i+'月';if(i===mm)o.selected=true;mmSel.appendChild(o);}
-const TABS=[['settings','設定'],['roster','園児台帳'],['newcomer','新規入園',1],['sched','年間スケジュール'],['monthly','月次計算',1],['lookmee','ルクミー出力',1],['hq','本部用集計'],['pdf','初回案内PDF出力'],['initsale','初回売上管理',1],['cashbook','現金出納帳',1],['reissue','再振替・再振込案内',1],['addon','追加申込み',1],['meals','給食記録',1],['readme','README']];
+const TABS=[['settings','設定'],['roster','園児台帳'],['newcomer','新規入園',1],['sched','年間スケジュール'],['monthly','月次計算',1],['lookmee','ルクミー出力',1],['hq','本部用集計'],['pdf','初回案内PDF出力'],['initsale','初回売上管理',1],['cashbook','現金出納帳',1],['cashbookEvent','イベント出納帳',1],['salesreport','月売上表',1],['reissue','再振替・再振込案内',1],['addon','追加申込み',1],['meals','給食記録',1],['readme','README']];
 function tabVisible(k){ if(k==='meals') return (park==='幼稚舎'||park==='全施設'); return true; }
 function syncTabs(){const el=document.getElementById('tabs');el.innerHTML='';
  // 非表示タブを開いていたら設定に戻す
@@ -2224,6 +3026,7 @@ function syncTabs(){const el=document.getElementById('tabs');el.innerHTML='';
    if(tab==='lookmee'&&k!=='lookmee'){const bad=lookmeeGuard();if(bad){infoDialog('ルクミー出力で、チェック済みなのに担当者が未設定の園児がいます：\n\n'+bad.join('、')+'\n\n担当者を設定してから移動してください。','移動できません');return;}}
    if(tab==='initsale'&&k!=='initsale'){const bad=initSaleGuard();if(bad){infoDialog('初回売上管理で、入金確認済みなのに担当事務が未設定の園児がいます：\n\n'+bad.join('、')+'\n\n担当事務を選んでから移動してください。','移動できません');return;}}
    if(tab==='cashbook'&&k!=='cashbook'){const bad=cashbookGuard();if(bad){infoDialog('現金出納帳で、入力済みなのに担当が未設定の行があります：\n\n'+bad.join('\n')+'\n\n担当を選んでから移動してください。','移動できません');return;}}
+   if(tab==='cashbookEvent'&&k!=='cashbookEvent'){const bad=cashbookEventGuard();if(bad){infoDialog('イベント出納帳で、入力済みなのに担当が未設定の行があります：\n\n'+bad.join('\n')+'\n\n担当を選んでから移動してください。','移動できません');return;}}
    tab=k;syncTabs();render();};el.appendChild(t);});}
 const FAC_COLORS={'月寒園':'#3d7355','白石園':'#4a5a82','サッポロファクトリー園':'#a8466a','幼稚舎':'#9a6b2f','資生館保育園':'#6a548c','全施設':'var(--leaf)'};
 function applyParkColor(){const sel=document.getElementById('park');const c=FAC_COLORS[park]||'var(--leaf)';
