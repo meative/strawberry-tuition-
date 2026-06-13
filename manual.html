@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="ja"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>STRAWBERRY FIELD 月謝管理アプリ ｜ 操作マニュアル</title>
+<link href="https://fonts.googleapis.com/css2?family=Zen+Old+Mincho:wght@600;700;900&family=Zen+Kaku+Gothic+New:wght@400;500;700&family=Spline+Sans+Mono:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+ --bg:#f7efe9; --panel:#fffbf7; --panel2:#faf3ed; --line:#e8d9cf; --line2:#dac6b8;
+ --ink:#3e3029; --mut:#917b6f; --leaf:#a36a55; --leaf2:#c48b76; --leafsoft:#f3e5dc;
+ --berry:#c2185b; --berry2:#e8417a; --berrysoft:#fbe3ec; --gold:#b1803a; --goldsoft:#f4ead4;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--ink);
+ font-family:'Zen Kaku Gothic New',sans-serif;line-height:1.9;font-size:15px;
+ -webkit-font-smoothing:antialiased}
+.wrap{max-width:920px;margin:0 auto;padding:0 20px 80px}
+header.top{background:linear-gradient(135deg,#7a2540,#3d2030);color:#fff;padding:40px 20px 34px;text-align:center;margin-bottom:0}
+header.top h1{font-family:'Zen Old Mincho',serif;font-size:26px;font-weight:900;margin:0 0 6px;letter-spacing:.04em}
+header.top .sub{font-size:13px;opacity:.85;letter-spacing:.18em;text-transform:uppercase}
+header.top .ver{margin-top:14px;display:inline-block;font-size:12.5px;background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.3);padding:4px 14px;border-radius:20px}
+h2{font-family:'Zen Old Mincho',serif;font-size:21px;color:var(--berry);margin:46px 0 14px;padding-bottom:10px;border-bottom:2px solid var(--line);display:flex;align-items:center;gap:10px}
+h2 .n{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;background:var(--berry);color:#fff;border-radius:50%;font-size:14px;font-family:'Spline Sans Mono',monospace;flex:0 0 auto}
+h3{font-family:'Zen Old Mincho',serif;font-size:16.5px;color:var(--leaf);margin:28px 0 8px}
+p{margin:8px 0}
+a{color:var(--berry)}
+code{font-family:'Spline Sans Mono',monospace;background:var(--panel2);border:1px solid var(--line);border-radius:5px;padding:1px 7px;font-size:13px;color:var(--berry)}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:22px 26px;margin:16px 0;box-shadow:0 2px 14px rgba(120,80,60,.05)}
+ol,ul{margin:8px 0 8px;padding-left:24px}
+li{margin:5px 0}
+ol.steps{counter-reset:s;list-style:none;padding-left:0}
+ol.steps>li{counter-increment:s;position:relative;padding:8px 8px 8px 46px;margin:8px 0;border-bottom:1px dashed var(--line)}
+ol.steps>li:last-child{border-bottom:none}
+ol.steps>li::before{content:counter(s);position:absolute;left:6px;top:8px;width:28px;height:28px;background:var(--leafsoft);color:var(--leaf);border:1.5px solid var(--leaf2);border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;font-family:'Spline Sans Mono',monospace}
+.note{border-radius:12px;padding:14px 18px;margin:14px 0;font-size:14px;line-height:1.8}
+.note .lab{font-weight:700;display:block;margin-bottom:3px}
+.tip{background:var(--leafsoft);border:1px solid var(--leaf2)}
+.tip .lab{color:var(--leaf)}
+.warn{background:var(--berrysoft);border:1px solid var(--berry2)}
+.warn .lab{color:var(--berry)}
+.info{background:var(--goldsoft);border:1px solid var(--gold)}
+.info .lab{color:var(--gold)}
+table{width:100%;border-collapse:collapse;margin:14px 0;font-size:13.5px}
+th,td{border:1px solid var(--line);padding:8px 11px;text-align:left;vertical-align:top}
+th{background:var(--panel2);color:var(--leaf);font-weight:700}
+.toc{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:18px 26px;margin:26px 0}
+.toc h2{border:none;margin:0 0 8px;font-size:17px;color:var(--ink);padding:0}
+.toc ol{columns:2;column-gap:28px}
+@media(max-width:640px){.toc ol{columns:1}}
+.toc a{text-decoration:none}
+.toc a:hover{text-decoration:underline}
+.bar{display:inline-block;font-family:'Spline Sans Mono',monospace;font-size:12px;font-weight:700;padding:2px 9px;border-radius:14px;border:1px solid}
+.bar.ok{color:var(--leaf);border-color:var(--leaf2);background:var(--leafsoft)}
+.bar.busy{color:var(--gold);border-color:var(--gold);background:var(--goldsoft)}
+.bar.err{color:var(--berry);border-color:var(--berry2);background:var(--berrysoft)}
+.foot{margin-top:54px;padding-top:22px;border-top:1px solid var(--line);text-align:center;color:var(--mut);font-size:12.5px;line-height:1.9}
+.kbd{font-family:'Spline Sans Mono',monospace;background:#fff;border:1px solid var(--line2);border-bottom-width:2px;border-radius:6px;padding:1px 7px;font-size:12.5px}
+.btn-sample{display:inline-block;background:var(--berry);color:#fff;border-radius:22px;padding:4px 14px;font-size:12.5px;font-weight:700}
+.top-link{position:fixed;right:18px;bottom:18px;background:var(--berry);color:#fff;text-decoration:none;border-radius:50%;width:46px;height:46px;display:flex;align-items:center;justify-content:center;font-size:20px;box-shadow:0 4px 16px rgba(0,0,0,.2)}
+@media print{
+ body{background:#fff;font-size:11.5px}
+ header.top{background:#7a2540!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+ .card,.note,th{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+ .top-link{display:none}
+ h2{page-break-after:avoid}
+ .card{page-break-inside:avoid;box-shadow:none}
+}
+</style></head>
+<body>
+<a href="#top" class="top-link" title="先頭へ">↑</a>
+<header class="top" id="top">
+ <h1>STRAWBERRY FIELD 月謝管理アプリ</h1>
+ <div class="sub">操作マニュアル ／ Multi-Garden Tuition System</div>
+ <div class="ver">クラウド同期版 ｜ 2026年6月 最新版</div>
+</header>
+<div class="wrap">
+
+<div class="card" style="margin-top:26px">
+<p>このアプリは、<b>STRAWBERRY FIELD Children's Garden（運営：ハイアイランド株式会社）</b>の5施設の月謝管理と会計（現金出納帳・本部集計）を、1つの画面でまとめて行うためのものです。</p>
+<p><b>2026年6月から「クラウド同期」に対応しました。</b>ログインすれば、職員全員のパソコン・iPadで<b>同じデータを共有</b>できます。誰かが入力すると、ほかの端末にも自動で反映されます。</p>
+<p style="margin-bottom:0">本番URL：<a href="https://meative.github.io/strawberry-tuition-/">https://meative.github.io/strawberry-tuition-/</a></p>
+</div>
+
+<div class="toc">
+<h2>もくじ</h2>
+<ol>
+<li><a href="#login">ログインとクラウド同期（最初に読む）</a></li>
+<li><a href="#flow">毎月の作業の流れ</a></li>
+<li><a href="#tabs">各タブの使い方</a></li>
+<li><a href="#cashbook">現金出納帳・イベント出納帳</a></li>
+<li><a href="#hq">本部用集計（年度収支・消費税区分）</a></li>
+<li><a href="#backup">データのバックアップ</a></li>
+<li><a href="#trouble">困ったときは</a></li>
+<li><a href="#rules">料金ルール早見表</a></li>
+</ol>
+</div>
+
+<!-- ===== 1. ログイン ===== -->
+<h2 id="login"><span class="n">1</span>ログインとクラウド同期</h2>
+<p>このアプリで一番大切な、新しい仕組みです。最初にここを読んでください。</p>
+
+<h3>① ログインする</h3>
+<div class="card">
+<p>アプリを開くと、赤い背景の<b>ログイン画面</b>が出ます。事務員共通のメールアドレスとパスワードを入力して「ログイン」を押してください。</p>
+<table>
+<tr><th>メールアドレス</th><td><code>staff@strawberry.com</code></td></tr>
+<tr><th>パスワード</th><td>（園で共有しているパスワード）</td></tr>
+</table>
+<div class="note tip"><span class="lab">💡 一度ログインすれば記憶されます</span>次回からは、同じ端末・同じブラウザなら自動でログイン状態が続きます。毎回入力する必要はありません。</div>
+</div>
+
+<h3>② 「あなたのお名前」を選ぶ</h3>
+<div class="card">
+<p>ログインの後、<b>「担当者の確認」</b>が出ます。一覧から<b>自分の名前</b>（細野・佐藤・伊藤・小野・水野・小林）を選んで「これで進む」を押してください。</p>
+<div class="note info"><span class="lab">なぜ選ぶの？</span>共通のIDでログインするため、そのままでは「誰が更新したか」が分かりません。お名前を選んでおくと、クラウドに<b>「最終更新：〇〇」</b>として記録され、誰が直したか全員で確認できます。</div>
+<p style="margin-bottom:0">名前を変えたいときは、画面上の <span class="btn-sample">👤 お名前</span> ボタンを押せばいつでも選び直せます。</p>
+</div>
+
+<h3>③ 「鮮度バー」で同期の状態を確認する</h3>
+<div class="card">
+<p>画面の上のほう（タブのすぐ上）に、クラウドの状態を示す<b>鮮度バー</b>があります。表示の意味は次のとおりです。</p>
+<table>
+<tr><th>表示</th><th>意味</th></tr>
+<tr><td><span class="bar ok">☁ 同期 最新</span></td><td>クラウドと一致しています。安心して使えます。</td></tr>
+<tr><td><span class="bar busy">☁ 保存中…</span></td><td>いま入力内容をクラウドに送っています（数秒で「最新」に変わります）。</td></tr>
+<tr><td><span class="bar busy">☁ 未保存…</span></td><td>変更があり、もうすぐ保存されます。</td></tr>
+<tr><td><span class="bar err">⚠ 接続エラー / 保存失敗</span></td><td>ネットにつながっていない可能性。電波・Wi-Fiを確認してください。</td></tr>
+</table>
+<p>バーの右側には <b>最終更新：〇〇 日時</b>（最後に誰がいつ更新したか）も表示されます。</p>
+<p style="margin-bottom:0"><span class="btn-sample">🔄 取得</span> ボタンを押すと、クラウドの最新内容を<b>今すぐ読み込み直す</b>ことができます。</p>
+</div>
+
+<h3>④ 自動で全端末に共有されます</h3>
+<div class="card">
+<p>入力・変更すると<b>自動でクラウドに保存</b>され、ほかの端末で開いている画面にも<b>数秒で反映</b>されます。「保存ボタン」を押す必要はありません。</p>
+<div class="note tip"><span class="lab">💡 はじめて使う端末では</span>その端末でログインすると、クラウドにある最新データが自動で表示されます。常に全員が同じ内容を見られます。</div>
+</div>
+
+<h3>⑤ 同時に編集したとき（競合）</h3>
+<div class="card">
+<p>あなたが編集している最中に、別の人が同じデータを更新すると、画面の下に<b>お知らせバー</b>が出ます。</p>
+<div class="note warn"><span class="lab">⚠ 〇〇さんがクラウドを更新しました</span>
+<ul style="margin:6px 0 0">
+<li><b>最新を読み込む</b>＝相手の変更を取り込みます（自分のいまの変更は消えます）</li>
+<li><b>自分の変更を優先</b>＝自分の内容で上書き保存します（相手の変更が消えます）</li>
+</ul>
+</div>
+<p style="margin-bottom:0">基本は「後から保存した方が残る」仕組みです。<b>同じ園・同じ月を2人で同時に触らない</b>ようにすると、こうした上書きを避けられます。</p>
+</div>
+
+<!-- ===== 2. 毎月の流れ ===== -->
+<h2 id="flow"><span class="n">2</span>毎月の作業の流れ</h2>
+<div class="card">
+<ol class="steps">
+<li>画面上部で<b>「現在の園」</b>と<b>「対象年・対象月」</b>を選ぶ</li>
+<li><b>新規入園・追加申込み</b>があれば入力する（月次計算に自動で反映されます）</li>
+<li><b>年間スケジュール</b>で、その月の行事・イベント費を確定する</li>
+<li><b>月次計算</b>で、フラグ（●）が付いた園児を確認する</li>
+<li><b>ルクミー出力</b>を園別に確認する</li>
+<li>新規入園者には<b>初回案内</b>を渡す</li>
+<li>引落しできなかった園児は、月次計算で「再請求チェック」→<b>再振替・再振込案内</b>タブで督促状を作る</li>
+<li>現金の経費は<b>現金出納帳</b>に記帳し、月末に締める</li>
+<li><b>本部用集計</b>で園別＋全園の合計を確認する</li>
+<li>必要に応じて<b>「スプレッドシート(xlsx)に出力」</b>でファイルに書き出す</li>
+</ol>
+</div>
+<div class="note info"><span class="lab">引落し・案内の予定日</span>引落し＝毎月27日／案内＝15〜16日 が目安です。</div>
+
+<!-- ===== 3. 各タブ ===== -->
+<h2 id="tabs"><span class="n">3</span>各タブの使い方</h2>
+<p>画面上部の青いタブで切り替えます。<span class="bar busy" style="font-family:inherit">連動</span> マークの付いたタブは、入力が月次計算などに自動反映されます。</p>
+
+<div class="card">
+<h3>⚙ 設定</h3>
+<p>料金体系・施設・振込先などの基本設定。データの<b>書き出し／読み込み</b>（バックアップ）もここにあります。通常は触りませんが、料金が変わったときに更新します。</p>
+
+<h3>🌱 新規入園</h3>
+<p>新しく入る園児を登録します。確定すると園児台帳・月次計算に反映されます。入金確認（初回売上の管理）もここで行い、入金済みにすると現金出納帳・月売上表に「振込」売上として反映されます。</p>
+
+<h3>📅 年間スケジュール</h3>
+<p>遠足・運動会などの行事と費用を登録。<b>その月のイベント費を「確定」</b>すると、対象の園児の月次計算に上乗せされます。</p>
+
+<h3>📖 園児台帳</h3>
+<p>全園児の名簿。氏名・枠区分・クラス・口座名義・入園年月日・納入方法（引落／振込）などを管理します。文字をクリックすると直接編集できます。</p>
+
+<h3>➕ 追加申込み</h3>
+<p>制服・マットレス交換などの単発の申込みを入力。指定した年月の請求に反映されます。</p>
+
+<h3>🍞 給食記録（幼稚舎）</h3>
+<p>お弁当・パンを忘れた園児の実費を記録します。<b>昼食¥500／パン¥100</b>。記録は<b>翌月の請求</b>に乗ります。</p>
+
+<h3>🧮 月次計算 <span class="bar busy" style="font-family:inherit">連動</span></h3>
+<p>その月の園児ごとの請求額を自動計算。基本月謝＋教材費＋兄弟割引＋途中入園の半額補正＋イベント費＋追加申込み＋手数料を合算します。引落しできなかった園児に<b>「再請求チェック」</b>を入れると、再振替タブに督促状が出ます。</p>
+
+<h3>📋 ルクミー出力</h3>
+<p>ルクミー（保護者アプリ）に取り込む形式で、園別に請求内容を出力します。</p>
+
+<h3>🔁 再振替・再振込案内</h3>
+<p>引落不能だった園児へ渡す<b>督促状</b>（月謝＋事務手数料）を一人ずつ表示。ブラウザの印刷でPDF化し、連絡帳に添付できます。</p>
+
+<h3>📊 月売上表</h3>
+<p>タイムリースクール（現金）＋新規入園（振込）の売上を、施設別・日付順に一覧。本部提出・通帳照合に使います。CSV出力可。</p>
+
+<h3>📕 README</h3>
+<p>アプリ内の簡単な使い方メモです。</p>
+</div>
+
+<!-- ===== 4. 現金出納帳 ===== -->
+<h2 id="cashbook"><span class="n">4</span>現金出納帳・イベント出納帳</h2>
+<div class="card">
+<p>施設ごとに、現金の小口経費を記帳します。上部の「現在の園」で施設を選んでから使ってください（「全施設」では記帳できません）。</p>
+
+<h3>通常 と イベントの切り替え</h3>
+<p>タブ内のボタンで <span class="btn-sample">💴 通常</span> と <span class="btn-sample">🎪 イベント</span> を切り替えます。<b>通常＝日々の小口経費／イベント＝行事の予算と費用</b>を分けて管理します。</p>
+
+<h3>記帳のしかた</h3>
+<ol class="steps">
+<li>「本部から振替」された金額（手元の現金）を最初に入れる</li>
+<li>経費が出たら行を追加し、日付・勘定科目・店舗・商品・金額・<b>担当</b>を入力</li>
+<li>残高は自動計算されます</li>
+</ol>
+<div class="note warn"><span class="lab">⚠ 担当の入力を忘れずに</span>金額を入れたのに担当が空のままだと、ほかのタブへ移動できません（入力ミス防止のためです）。担当を選んでから移動してください。</div>
+
+<h3>月末の「締め」</h3>
+<p>その月の記帳が終わったら<b>締め処理</b>をします。手元に残った現金を「預金振替」として精算し、残高を0にします（イベントの場合は「口座に戻す」か「翌月へ繰り越す」を選べます）。</p>
+
+<h3>出力（マネーフォワード用）</h3>
+<p>締めたあと <span class="btn-sample">👁 出力プレビュー</span> が出ます。<b>売上／経費／総合(MF用)</b> のタブで内容を確認し、マネーフォワード様式のExcelを書き出せます（通常＋イベントを合算した1ファイル）。</p>
+</div>
+
+<!-- ===== 5. 本部用集計 ===== -->
+<h2 id="hq"><span class="n">5</span>本部用集計（年度収支・消費税区分）</h2>
+<div class="card">
+<p>「現在の園」を<b>全施設</b>にすると、園別＋全園合計の集計が見られます。3つのまとまりがあります。</p>
+<h3>① 在園・請求サマリー</h3>
+<p>当月の在園数・定員・充足率・請求合計（うち月謝系／制服代／行事費）を施設別に表示します。</p>
+<h3>② 年度収支まとめ 💰</h3>
+<p>会計年度（4月〜翌3月）の<b>収入−支出</b>を、施設別・月別に集計します。収入＝新規入園（振込）＋タイムリー（現金）。支出＝現金出納帳＋イベント出納帳の出金。<b>月謝は別管理のため含みません。</b>年度を選び、CSV出力もできます。</p>
+<h3>③ 消費税区分 🧾</h3>
+<p>会計士確認用。<b>単体購入の制服＝課税売上</b>、月謝と一括徴収の制服や保育料＝非課税売上、として当月の請求を区分表示します。年度の月別推移とCSV出力もあります。</p>
+</div>
+
+<!-- ===== 6. バックアップ ===== -->
+<h2 id="backup"><span class="n">6</span>データのバックアップ</h2>
+<div class="card">
+<p>データはクラウドに保存されますが、念のため手元にも控えを取れます（<b>設定タブ</b>にあります）。</p>
+<ul>
+<li><b>⬇️ データ書き出し</b>…今のデータをファイル（.json）に保存。別PCへの受け渡しや、万一に備えた控えに。</li>
+<li><b>⬆️ データ読み込み</b>…書き出したファイルを取り込みます。<span style="color:var(--berry)">※今ある内容は上書きされます。</span></li>
+</ul>
+<div class="note tip"><span class="lab">💡 おすすめ</span>大きな変更の前や月末締めの前に、一度「書き出し」で控えを取っておくと安心です。</div>
+</div>
+
+<!-- ===== 7. 困ったとき ===== -->
+<h2 id="trouble"><span class="n">7</span>困ったときは</h2>
+<div class="card">
+<table>
+<tr><th>症状</th><th>対処</th></tr>
+<tr><td>ログインできない（赤いエラー）</td><td>メールアドレス・パスワードの打ち間違いがないか確認。半角になっているか確認してください。</td></tr>
+<tr><td>鮮度バーが <span class="bar err">⚠ 接続エラー</span></td><td>インターネット（Wi-Fi・電波）を確認。つながれば自動で「同期 最新」に戻ります。</td></tr>
+<tr><td>ほかの端末の変更が反映されない</td><td><span class="btn-sample">🔄 取得</span> を押す。それでもだめならページを再読み込み（<span class="kbd">⌘R</span>）。</td></tr>
+<tr><td>画面が更新されない／表示が古い</td><td>シークレットウィンドウ（<span class="kbd">⌘+Shift+N</span>）で開き直すとキャッシュの影響を避けられます。</td></tr>
+<tr><td>別タブへ移動できない</td><td>入力済みなのに「担当」が空の行があります。担当を選んでから移動してください。</td></tr>
+<tr><td>うっかり消してしまった</td><td>設定タブの「データ書き出し」で控えがあれば「読み込み」で戻せます。</td></tr>
+</table>
+</div>
+
+<!-- ===== 8. 料金ルール ===== -->
+<h2 id="rules"><span class="n">8</span>料金ルール早見表</h2>
+<div class="card">
+<table>
+<tr><th>項目</th><th>内容</th></tr>
+<tr><td>引落し / 案内</td><td>引落し＝毎月27日 ／ 案内＝15〜16日</td></tr>
+<tr><td>途中入園</td><td>1〜15日入園＝満額 ／ 16日以降＝半額</td></tr>
+<tr><td>兄弟割引</td><td>同じ園に下のお子さんがいる園児に −¥8,000（従業員枠は対象外）</td></tr>
+<tr><td>付帯費</td><td>教材費¥10,000 ／ マットレス¥2,000 ／ 事務手数料¥110</td></tr>
+<tr><td>給食（幼稚舎）</td><td>昼食¥500 ／ パン¥100（忘れたとき実費・翌月請求）</td></tr>
+</table>
+<div class="note info"><span class="lab">体系A 単価（保育園）</span>地域枠¥35,000 ／ 企業提携枠¥25,000 ／ 旧企業提携枠¥15,000 など、枠区分ごとに単価が決まっています。詳しくは「設定」タブを確認してください。</div>
+</div>
+
+<div class="foot">
+STRAWBERRY FIELD Children's Garden ／ ハイアイランド株式会社<br>
+月謝管理アプリ 操作マニュアル（クラウド同期版）｜ 2026年6月 最新版<br>
+このページは印刷（<span class="kbd">⌘P</span>）してPDF化・配布できます。
+</div>
+
+</div>
+</body></html>
