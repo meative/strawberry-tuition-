@@ -57,13 +57,21 @@ th{background:var(--panel2);color:var(--leaf);font-weight:700}
 .kbd{font-family:'Spline Sans Mono',monospace;background:#fff;border:1px solid var(--line2);border-bottom-width:2px;border-radius:6px;padding:1px 7px;font-size:12.5px}
 .btn-sample{display:inline-block;background:var(--berry);color:#fff;border-radius:22px;padding:4px 14px;font-size:12.5px;font-weight:700}
 .top-link{position:fixed;right:18px;bottom:18px;background:var(--berry);color:#fff;text-decoration:none;border-radius:50%;width:46px;height:46px;display:flex;align-items:center;justify-content:center;font-size:20px;box-shadow:0 4px 16px rgba(0,0,0,.2)}
+/* 図解（SVG） */
+figure.fig{margin:18px 0;text-align:center}
+figure.fig svg{max-width:100%;height:auto;border:1px solid var(--line);border-radius:14px;background:var(--panel2);box-shadow:0 3px 14px rgba(120,80,60,.08)}
+figure.fig figcaption{font-size:12.5px;color:var(--mut);margin-top:8px}
+.fig svg text{font-family:'Zen Kaku Gothic New',sans-serif}
+.fig svg .ttl{font-family:'Zen Old Mincho',serif}
+.fig svg .mono{font-family:'Spline Sans Mono',monospace}
 @media print{
  body{background:#fff;font-size:11.5px}
  header.top{background:#7a2540!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
- .card,.note,th{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+ .card,.note,th,figure.fig svg{-webkit-print-color-adjust:exact;print-color-adjust:exact}
  .top-link{display:none}
  h2{page-break-after:avoid}
- .card{page-break-inside:avoid;box-shadow:none}
+ .card,figure.fig{page-break-inside:avoid}
+ .card{box-shadow:none}
 }
 </style></head>
 <body>
@@ -88,6 +96,8 @@ th{background:var(--panel2);color:var(--leaf);font-weight:700}
 <li><a href="#flow">毎月の作業の流れ</a></li>
 <li><a href="#tabs">各タブの使い方</a></li>
 <li><a href="#cashbook">現金出納帳・イベント出納帳</a></li>
+<li><a href="#rebill">引落しが失敗したときの対応（再振替・再振込案内）</a></li>
+<li><a href="#cashmf">現金出納帳をマネーフォワードに取り込む</a></li>
 <li><a href="#hq">本部用集計（年度収支・消費税区分）</a></li>
 <li><a href="#backup">データのバックアップ</a></li>
 <li><a href="#trouble">困ったときは</a></li>
@@ -102,23 +112,89 @@ th{background:var(--panel2);color:var(--leaf);font-weight:700}
 <h3>① ログインする</h3>
 <div class="card">
 <p>アプリを開くと、赤い背景の<b>ログイン画面</b>が出ます。事務員共通のメールアドレスとパスワードを入力して「ログイン」を押してください。</p>
-<table>
-<tr><th>メールアドレス</th><td><code>staff@strawberry.com</code></td></tr>
-<tr><th>パスワード</th><td>（園で共有しているパスワード）</td></tr>
-</table>
+<figure class="fig">
+<svg viewBox="0 0 600 340" width="600" role="img" aria-label="ログイン画面のイメージ">
+ <rect x="0" y="0" width="600" height="340" rx="14" fill="#7a2540"/>
+ <rect x="185" y="46" width="230" height="248" rx="18" fill="#ffffff"/>
+ <text class="ttl" x="300" y="92" text-anchor="middle" font-size="17" font-weight="700" fill="#7a2540">STRAWBERRY FIELD</text>
+ <text x="300" y="112" text-anchor="middle" font-size="10.5" fill="#888">月謝管理アプリ ｜ クラウド同期版</text>
+ <rect x="210" y="132" width="180" height="34" rx="9" fill="#fff" stroke="#d8c4cc"/>
+ <text x="222" y="154" font-size="12" fill="#9a8">staff@strawberry.com</text>
+ <rect x="210" y="174" width="180" height="34" rx="9" fill="#fff" stroke="#d8c4cc"/>
+ <text x="222" y="197" font-size="14" fill="#777">••••••</text>
+ <rect x="210" y="222" width="180" height="40" rx="20" fill="#7a2540"/>
+ <text x="300" y="247" text-anchor="middle" font-size="14" font-weight="700" fill="#fff">ログイン</text>
+</svg>
+<figcaption>▲ ログイン画面（メール＝staff@strawberry.com）</figcaption>
+</figure>
 <div class="note tip"><span class="lab">💡 一度ログインすれば記憶されます</span>次回からは、同じ端末・同じブラウザなら自動でログイン状態が続きます。毎回入力する必要はありません。</div>
 </div>
 
 <h3>② 「あなたのお名前」を選ぶ</h3>
 <div class="card">
 <p>ログインの後、<b>「担当者の確認」</b>が出ます。一覧から<b>自分の名前</b>（細野・佐藤・伊藤・小野・水野・小林）を選んで「これで進む」を押してください。</p>
+<figure class="fig">
+<svg viewBox="0 0 600 250" width="600" role="img" aria-label="担当者選択ダイアログのイメージ">
+ <rect x="0" y="0" width="600" height="250" rx="14" fill="#efe6df"/>
+ <rect x="160" y="40" width="280" height="170" rx="16" fill="#fffbf7" stroke="#e8d9cf"/>
+ <text class="ttl" x="300" y="78" text-anchor="middle" font-size="15" font-weight="700" fill="#3e3029">担当者の確認</text>
+ <text x="300" y="100" text-anchor="middle" font-size="11" fill="#917b6f">あなたのお名前を選んでください。</text>
+ <rect x="200" y="116" width="200" height="34" rx="8" fill="#fff" stroke="#dac6b8"/>
+ <text x="214" y="138" font-size="12.5" fill="#3e3029">細野</text>
+ <text x="384" y="138" font-size="12" fill="#917b6f">▾</text>
+ <rect x="200" y="164" width="92" height="32" rx="16" fill="#faf3ed" stroke="#e8d9cf"/>
+ <text x="246" y="185" text-anchor="middle" font-size="11.5" fill="#3e3029">キャンセル</text>
+ <rect x="304" y="164" width="96" height="32" rx="16" fill="#c2185b"/>
+ <text x="352" y="185" text-anchor="middle" font-size="11.5" font-weight="700" fill="#fff">これで進む</text>
+</svg>
+<figcaption>▲ 自分の名前を選ぶ（更新者の記録に使われます）</figcaption>
+</figure>
 <div class="note info"><span class="lab">なぜ選ぶの？</span>共通のIDでログインするため、そのままでは「誰が更新したか」が分かりません。お名前を選んでおくと、クラウドに<b>「最終更新：〇〇」</b>として記録され、誰が直したか全員で確認できます。</div>
 <p style="margin-bottom:0">名前を変えたいときは、画面上の <span class="btn-sample">👤 お名前</span> ボタンを押せばいつでも選び直せます。</p>
 </div>
 
 <h3>③ 「鮮度バー」で同期の状態を確認する</h3>
 <div class="card">
-<p>画面の上のほう（タブのすぐ上）に、クラウドの状態を示す<b>鮮度バー</b>があります。表示の意味は次のとおりです。</p>
+<p>画面の上のほう（タブのすぐ上）に、クラウドの状態を示す<b>鮮度バー</b>があります。</p>
+<figure class="fig">
+<svg viewBox="0 0 600 250" width="600" role="img" aria-label="画面上部と鮮度バーの位置">
+ <rect x="0" y="0" width="600" height="250" rx="14" fill="#fffbf7"/>
+ <!-- header -->
+ <rect x="0" y="0" width="600" height="40" rx="14" fill="#7a2540"/>
+ <text class="ttl" x="20" y="26" font-size="14" font-weight="700" fill="#fff">STRAWBERRY FIELD 月謝管理</text>
+ <!-- controls -->
+ <rect x="20" y="54" width="120" height="34" rx="8" fill="#fff" stroke="#e8d9cf"/>
+ <text x="32" y="76" font-size="11.5" fill="#3e3029">全施設 ▾</text>
+ <rect x="150" y="54" width="80" height="34" rx="8" fill="#fff" stroke="#e8d9cf"/>
+ <text x="162" y="76" font-size="11.5" fill="#3e3029">2026年 ▾</text>
+ <rect x="240" y="54" width="70" height="34" rx="8" fill="#fff" stroke="#e8d9cf"/>
+ <text x="252" y="76" font-size="11.5" fill="#3e3029">6月 ▾</text>
+ <rect x="430" y="52" width="150" height="38" rx="9" fill="#fbe3ec"/>
+ <text x="505" y="76" text-anchor="middle" font-size="11" fill="#c2185b">合計請求額 ¥4,580,250</text>
+ <!-- cloud bar (highlighted) -->
+ <rect x="8" y="104" width="584" height="40" rx="9" fill="#f3e5dc" stroke="#c2185b" stroke-width="2"/>
+ <text x="22" y="129" font-size="13" font-weight="700" fill="#a36a55">☁ 同期 最新</text>
+ <text x="120" y="129" font-size="11.5" fill="#917b6f">｜ 最終更新：細野　6/13 16:32</text>
+ <rect x="400" y="113" width="74" height="22" rx="11" fill="#fff" stroke="#e8d9cf"/>
+ <text x="437" y="128" text-anchor="middle" font-size="10.5" fill="#3e3029">👤 細野</text>
+ <rect x="482" y="113" width="74" height="22" rx="11" fill="#fff" stroke="#e8d9cf"/>
+ <text x="519" y="128" text-anchor="middle" font-size="10.5" fill="#3e3029">🔄 取得</text>
+ <text x="300" y="166" text-anchor="middle" font-size="11.5" font-weight="700" fill="#c2185b">↑ これが「鮮度バー」</text>
+ <!-- tabs -->
+ <rect x="20" y="186" width="70" height="28" rx="14" fill="#c2185b"/>
+ <text x="55" y="204" text-anchor="middle" font-size="10.5" fill="#fff">設定</text>
+ <rect x="98" y="186" width="80" height="28" rx="14" fill="#fff" stroke="#e8d9cf"/>
+ <text x="138" y="204" text-anchor="middle" font-size="10.5" fill="#3e3029">新規入園</text>
+ <rect x="186" y="186" width="80" height="28" rx="14" fill="#fff" stroke="#e8d9cf"/>
+ <text x="226" y="204" text-anchor="middle" font-size="10.5" fill="#3e3029">園児台帳</text>
+ <rect x="274" y="186" width="80" height="28" rx="14" fill="#fff" stroke="#e8d9cf"/>
+ <text x="314" y="204" text-anchor="middle" font-size="10.5" fill="#3e3029">月次計算</text>
+ <rect x="362" y="186" width="96" height="28" rx="14" fill="#fff" stroke="#e8d9cf"/>
+ <text x="410" y="204" text-anchor="middle" font-size="10.5" fill="#3e3029">現金出納帳</text>
+</svg>
+<figcaption>▲ ヘッダの下にある「鮮度バー」で同期の状態が分かります</figcaption>
+</figure>
+<p>表示の意味は次のとおりです。</p>
 <table>
 <tr><th>表示</th><th>意味</th></tr>
 <tr><td><span class="bar ok">☁ 同期 最新</span></td><td>クラウドと一致しています。安心して使えます。</td></tr>
@@ -126,20 +202,63 @@ th{background:var(--panel2);color:var(--leaf);font-weight:700}
 <tr><td><span class="bar busy">☁ 未保存…</span></td><td>変更があり、もうすぐ保存されます。</td></tr>
 <tr><td><span class="bar err">⚠ 接続エラー / 保存失敗</span></td><td>ネットにつながっていない可能性。電波・Wi-Fiを確認してください。</td></tr>
 </table>
-<p>バーの右側には <b>最終更新：〇〇 日時</b>（最後に誰がいつ更新したか）も表示されます。</p>
-<p style="margin-bottom:0"><span class="btn-sample">🔄 取得</span> ボタンを押すと、クラウドの最新内容を<b>今すぐ読み込み直す</b>ことができます。</p>
+<p style="margin-bottom:0">バー右側の <b>最終更新：〇〇 日時</b> で誰がいつ更新したか分かります。<span class="btn-sample">🔄 取得</span> でクラウドの最新を今すぐ読み込み直せます。</p>
 </div>
 
 <h3>④ 自動で全端末に共有されます</h3>
 <div class="card">
 <p>入力・変更すると<b>自動でクラウドに保存</b>され、ほかの端末で開いている画面にも<b>数秒で反映</b>されます。「保存ボタン」を押す必要はありません。</p>
+<figure class="fig">
+<svg viewBox="0 0 600 240" width="600" role="img" aria-label="全端末で自動共有されるイメージ">
+ <rect x="0" y="0" width="600" height="240" rx="14" fill="#fffbf7"/>
+ <!-- cloud -->
+ <ellipse cx="300" cy="56" rx="120" ry="38" fill="#f3e5dc" stroke="#a36a55"/>
+ <text x="300" y="52" text-anchor="middle" font-size="14" font-weight="700" fill="#a36a55">☁ クラウド</text>
+ <text x="300" y="72" text-anchor="middle" font-size="10.5" fill="#917b6f">（Firestore）全員のデータ</text>
+ <!-- devices -->
+ <g>
+  <rect x="60" y="160" width="120" height="58" rx="8" fill="#fff" stroke="#e8d9cf"/>
+  <text x="120" y="184" text-anchor="middle" font-size="12" fill="#3e3029">💻 事務所PC</text>
+  <text x="120" y="203" text-anchor="middle" font-size="10" fill="#917b6f">細野</text>
+ </g>
+ <g>
+  <rect x="240" y="160" width="120" height="58" rx="8" fill="#fff" stroke="#e8d9cf"/>
+  <text x="300" y="184" text-anchor="middle" font-size="12" fill="#3e3029">📱 iPad</text>
+  <text x="300" y="203" text-anchor="middle" font-size="10" fill="#917b6f">佐藤</text>
+ </g>
+ <g>
+  <rect x="420" y="160" width="120" height="58" rx="8" fill="#fff" stroke="#e8d9cf"/>
+  <text x="480" y="184" text-anchor="middle" font-size="12" fill="#3e3029">💻 自宅PC</text>
+  <text x="480" y="203" text-anchor="middle" font-size="10" fill="#917b6f">水野</text>
+ </g>
+ <!-- arrows -->
+ <line x1="120" y1="158" x2="240" y2="96" stroke="#c48b76" stroke-width="2"/>
+ <line x1="300" y1="158" x2="300" y2="96" stroke="#c48b76" stroke-width="2"/>
+ <line x1="480" y1="158" x2="360" y2="96" stroke="#c48b76" stroke-width="2"/>
+ <text x="300" y="128" text-anchor="middle" font-size="10.5" fill="#a36a55">自動で双方向に同期</text>
+</svg>
+<figcaption>▲ 誰かが入力すると、全員の画面に自動で反映されます</figcaption>
+</figure>
 <div class="note tip"><span class="lab">💡 はじめて使う端末では</span>その端末でログインすると、クラウドにある最新データが自動で表示されます。常に全員が同じ内容を見られます。</div>
 </div>
 
 <h3>⑤ 同時に編集したとき（競合）</h3>
 <div class="card">
 <p>あなたが編集している最中に、別の人が同じデータを更新すると、画面の下に<b>お知らせバー</b>が出ます。</p>
-<div class="note warn"><span class="lab">⚠ 〇〇さんがクラウドを更新しました</span>
+<figure class="fig">
+<svg viewBox="0 0 600 170" width="600" role="img" aria-label="同時編集時のお知らせバー">
+ <rect x="0" y="0" width="600" height="170" rx="14" fill="#efe6df"/>
+ <rect x="70" y="34" width="460" height="104" rx="14" fill="#7a2540"/>
+ <text x="92" y="66" font-size="13.5" font-weight="700" fill="#fff">⚠ 佐藤さんがクラウドを更新しました（16:40）</text>
+ <text x="92" y="88" font-size="11" fill="#f0d8e0">あなたも編集中です。どちらを残しますか？</text>
+ <rect x="92" y="100" width="190" height="28" rx="14" fill="#fff"/>
+ <text x="187" y="119" text-anchor="middle" font-size="11" font-weight="700" fill="#7a2540">最新を読み込む</text>
+ <rect x="294" y="100" width="200" height="28" rx="14" fill="none" stroke="#fff"/>
+ <text x="394" y="119" text-anchor="middle" font-size="11" font-weight="700" fill="#fff">自分の変更を優先</text>
+</svg>
+<figcaption>▲ 同時編集になったときだけ出るお知らせ（画面の下）</figcaption>
+</figure>
+<div class="note warn"><span class="lab">どちらを押す？</span>
 <ul style="margin:6px 0 0">
 <li><b>最新を読み込む</b>＝相手の変更を取り込みます（自分のいまの変更は消えます）</li>
 <li><b>自分の変更を優先</b>＝自分の内容で上書き保存します（相手の変更が消えます）</li>
@@ -150,6 +269,30 @@ th{background:var(--panel2);color:var(--leaf);font-weight:700}
 
 <!-- ===== 2. 毎月の流れ ===== -->
 <h2 id="flow"><span class="n">2</span>毎月の作業の流れ</h2>
+<figure class="fig">
+<svg viewBox="0 0 600 150" width="600" role="img" aria-label="毎月の流れの図">
+ <rect x="0" y="0" width="600" height="150" rx="14" fill="#fffbf7"/>
+ <g font-size="11.5" text-anchor="middle">
+  <rect x="20" y="50" width="96" height="50" rx="10" fill="#f3e5dc" stroke="#a36a55"/>
+  <text x="68" y="72" fill="#3e3029">園・年月</text><text x="68" y="89" fill="#3e3029">を選ぶ</text>
+  <rect x="146" y="50" width="96" height="50" rx="10" fill="#fff" stroke="#e8d9cf"/>
+  <text x="194" y="72" fill="#3e3029">入園・申込み</text><text x="194" y="89" fill="#3e3029">を入力</text>
+  <rect x="272" y="50" width="96" height="50" rx="10" fill="#fff" stroke="#e8d9cf"/>
+  <text x="320" y="72" fill="#3e3029">月次計算</text><text x="320" y="89" fill="#3e3029">を確認</text>
+  <rect x="398" y="50" width="96" height="50" rx="10" fill="#fff" stroke="#e8d9cf"/>
+  <text x="446" y="72" fill="#3e3029">現金出納帳</text><text x="446" y="89" fill="#3e3029">を締める</text>
+  <rect x="524" y="50" width="60" height="50" rx="10" fill="#fbe3ec" stroke="#c2185b"/>
+  <text x="554" y="72" fill="#c2185b">本部</text><text x="554" y="89" fill="#c2185b">集計</text>
+  <g stroke="#c48b76" stroke-width="2" fill="#c48b76">
+   <line x1="116" y1="75" x2="142" y2="75"/><polygon points="142,75 135,71 135,79"/>
+   <line x1="242" y1="75" x2="268" y2="75"/><polygon points="268,75 261,71 261,79"/>
+   <line x1="368" y1="75" x2="394" y2="75"/><polygon points="394,75 387,71 387,79"/>
+   <line x1="494" y1="75" x2="520" y2="75"/><polygon points="520,75 513,71 513,79"/>
+  </g>
+ </g>
+</svg>
+<figcaption>▲ 毎月の大きな流れ</figcaption>
+</figure>
 <div class="card">
 <ol class="steps">
 <li>画面上部で<b>「現在の園」</b>と<b>「対象年・対象月」</b>を選ぶ</li>
@@ -169,6 +312,28 @@ th{background:var(--panel2);color:var(--leaf);font-weight:700}
 <!-- ===== 3. 各タブ ===== -->
 <h2 id="tabs"><span class="n">3</span>各タブの使い方</h2>
 <p>画面上部の青いタブで切り替えます。<span class="bar busy" style="font-family:inherit">連動</span> マークの付いたタブは、入力が月次計算などに自動反映されます。</p>
+<figure class="fig">
+<svg viewBox="0 0 600 130" width="600" role="img" aria-label="タブの並び">
+ <rect x="0" y="0" width="600" height="130" rx="14" fill="#fffbf7"/>
+ <g font-size="10.5" text-anchor="middle">
+  <rect x="16" y="20" width="56" height="26" rx="13" fill="#c2185b"/><text x="44" y="37" fill="#fff">設定</text>
+  <rect x="78" y="20" width="70" height="26" rx="13" fill="#fff" stroke="#e8d9cf"/><text x="113" y="37" fill="#3e3029">新規入園</text>
+  <rect x="154" y="20" width="92" height="26" rx="13" fill="#fff" stroke="#e8d9cf"/><text x="200" y="37" fill="#3e3029">年間スケジュール</text>
+  <rect x="252" y="20" width="70" height="26" rx="13" fill="#fff" stroke="#e8d9cf"/><text x="287" y="37" fill="#3e3029">園児台帳</text>
+  <rect x="328" y="20" width="70" height="26" rx="13" fill="#fff" stroke="#e8d9cf"/><text x="363" y="37" fill="#3e3029">追加申込み</text>
+  <rect x="404" y="20" width="70" height="26" rx="13" fill="#fff" stroke="#e8d9cf"/><text x="439" y="37" fill="#3e3029">給食記録</text>
+  <rect x="480" y="20" width="70" height="26" rx="13" fill="#fff" stroke="#e8d9cf"/><text x="515" y="37" fill="#3e3029">月次計算</text>
+  <rect x="16" y="54" width="84" height="26" rx="13" fill="#fff" stroke="#e8d9cf"/><text x="58" y="71" fill="#3e3029">ルクミー出力</text>
+  <rect x="106" y="54" width="118" height="26" rx="13" fill="#fff" stroke="#e8d9cf"/><text x="165" y="71" fill="#3e3029">再振替・再振込案内</text>
+  <rect x="230" y="54" width="84" height="26" rx="13" fill="#fff" stroke="#e8d9cf"/><text x="272" y="71" fill="#3e3029">現金出納帳</text>
+  <rect x="320" y="54" width="70" height="26" rx="13" fill="#fff" stroke="#e8d9cf"/><text x="355" y="71" fill="#3e3029">月売上表</text>
+  <rect x="396" y="54" width="84" height="26" rx="13" fill="#fff" stroke="#e8d9cf"/><text x="438" y="71" fill="#3e3029">本部用集計</text>
+  <rect x="486" y="54" width="64" height="26" rx="13" fill="#fff" stroke="#e8d9cf"/><text x="518" y="71" fill="#3e3029">README</text>
+ </g>
+ <text x="300" y="104" text-anchor="middle" font-size="11" fill="#917b6f">赤色＝いま開いているタブ。クリックで切り替えます。</text>
+</svg>
+<figcaption>▲ タブの並び（園を「幼稚舎」以外にすると給食記録は隠れます）</figcaption>
+</figure>
 
 <div class="card">
 <h3>⚙ 設定</h3>
@@ -207,9 +372,41 @@ th{background:var(--panel2);color:var(--leaf);font-weight:700}
 
 <!-- ===== 4. 現金出納帳 ===== -->
 <h2 id="cashbook"><span class="n">4</span>現金出納帳・イベント出納帳</h2>
-<div class="card">
 <p>施設ごとに、現金の小口経費を記帳します。上部の「現在の園」で施設を選んでから使ってください（「全施設」では記帳できません）。</p>
+<figure class="fig">
+<svg viewBox="0 0 600 270" width="600" role="img" aria-label="現金出納帳の画面イメージ">
+ <rect x="0" y="0" width="600" height="270" rx="14" fill="#fffbf7"/>
+ <!-- toggle -->
+ <rect x="20" y="18" width="86" height="30" rx="15" fill="#c2185b"/><text x="63" y="38" text-anchor="middle" font-size="11.5" fill="#fff">💴 通常</text>
+ <rect x="114" y="18" width="92" height="30" rx="15" fill="#fff" stroke="#e8d9cf"/><text x="160" y="38" text-anchor="middle" font-size="11.5" fill="#3e3029">🎪 イベント</text>
+ <!-- table head -->
+ <g font-size="11">
+  <rect x="20" y="62" width="560" height="30" fill="#faf3ed" stroke="#e8d9cf"/>
+  <text x="36" y="82" fill="#a36a55">日付</text>
+  <text x="120" y="82" fill="#a36a55">勘定科目</text>
+  <text x="250" y="82" fill="#a36a55">商品名</text>
+  <text x="380" y="82" fill="#a36a55" text-anchor="end">出金</text>
+  <text x="470" y="82" fill="#a36a55" text-anchor="end">残高</text>
+  <text x="510" y="82" fill="#a36a55">担当</text>
+ </g>
+ <!-- rows -->
+ <g font-size="11" fill="#3e3029">
+  <rect x="20" y="92" width="560" height="28" fill="#fff" stroke="#f0e6dd"/>
+  <text x="36" y="110">6/2</text><text x="120" y="110">本部から振替</text><text x="380" y="110" text-anchor="end">—</text><text x="470" y="110" text-anchor="end">30,000</text><text x="510" y="110">細野</text>
+  <rect x="20" y="120" width="560" height="28" fill="#fff" stroke="#f0e6dd"/>
+  <text x="36" y="138">6/5</text><text x="120" y="138">消耗品費</text><text x="250" y="138">画用紙</text><text x="380" y="138" text-anchor="end">1,200</text><text x="470" y="138" text-anchor="end">28,800</text><text x="510" y="138">佐藤</text>
+  <rect x="20" y="148" width="560" height="28" fill="#fff" stroke="#f0e6dd"/>
+  <text x="36" y="166">6/12</text><text x="120" y="166">旅費交通費</text><text x="250" y="166">ガソリン</text><text x="380" y="166" text-anchor="end">3,500</text><text x="470" y="166" text-anchor="end">25,300</text><text x="510" y="166">水野</text>
+ </g>
+ <!-- close + preview -->
+ <rect x="20" y="196" width="120" height="32" rx="16" fill="#fff" stroke="#c2185b"/><text x="80" y="216" text-anchor="middle" font-size="11.5" fill="#c2185b">月末に締める</text>
+ <rect x="152" y="196" width="140" height="32" rx="16" fill="#c2185b"/><text x="222" y="216" text-anchor="middle" font-size="11.5" fill="#fff">👁 出力プレビュー</text>
+ <text x="20" y="252" font-size="11" fill="#917b6f">「通常」＝日々の小口経費／「イベント」＝行事の予算と費用。金額を入れたら担当も必ず選びます。</text>
+</svg>
+<figcaption>▲ 現金出納帳（通常／イベントの切り替え・締め・出力）</figcaption>
+</figure>
 
+<div class="card">
 <h3>通常 と イベントの切り替え</h3>
 <p>タブ内のボタンで <span class="btn-sample">💴 通常</span> と <span class="btn-sample">🎪 イベント</span> を切り替えます。<b>通常＝日々の小口経費／イベント＝行事の予算と費用</b>を分けて管理します。</p>
 
@@ -225,13 +422,160 @@ th{background:var(--panel2);color:var(--leaf);font-weight:700}
 <p>その月の記帳が終わったら<b>締め処理</b>をします。手元に残った現金を「預金振替」として精算し、残高を0にします（イベントの場合は「口座に戻す」か「翌月へ繰り越す」を選べます）。</p>
 
 <h3>出力（マネーフォワード用）</h3>
-<p>締めたあと <span class="btn-sample">👁 出力プレビュー</span> が出ます。<b>売上／経費／総合(MF用)</b> のタブで内容を確認し、マネーフォワード様式のExcelを書き出せます（通常＋イベントを合算した1ファイル）。</p>
+<p>締めたあと <span class="btn-sample">👁 出力プレビュー</span> が出ます。<b>売上／経費／総合(MF用)</b> のタブで内容を確認し、マネーフォワード様式のExcelを書き出せます（通常＋イベントを合算した1ファイル）。<b>くわしい月末の取り込み手順は「6. 現金出納帳をマネーフォワードに取り込む」を参照してください。</b></p>
 </div>
 
-<!-- ===== 5. 本部用集計 ===== -->
-<h2 id="hq"><span class="n">5</span>本部用集計（年度収支・消費税区分）</h2>
+<!-- ===== 5. 再振替・再振込案内（詳細） ===== -->
+<h2 id="rebill"><span class="n">5</span>引落しが失敗したときの対応（再振替・再振込案内）</h2>
+<p>月謝は毎月27日に口座から引落しします。残高不足などで<b>引落しできなかった園児</b>が出ることがあります。対応は2通りあり、状況で使い分けます。</p>
+<ul>
+<li><b>再振替</b>＝もう一度、口座から引き落とす</li>
+<li><b>再振込案内</b>＝保護者に振込をお願いする（督促状を渡す）</li>
+</ul>
+
 <div class="card">
-<p>「現在の園」を<b>全施設</b>にすると、園別＋全園合計の集計が見られます。3つのまとまりがあります。</p>
+<h3>まず：引落し結果を確認する</h3>
+<ol class="steps">
+<li><b>再振替・再振込案内</b>タブを開く</li>
+<li>画面上部で<b>対象の年月</b>を選ぶ</li>
+<li>引落しできなかった（未収の）園児が一覧に出るので確認する</li>
+</ol>
+<figure class="fig"><div style="border:2px dashed var(--line2);border-radius:14px;padding:30px 18px;background:var(--panel);color:var(--mut);font-size:13.5px;line-height:1.7">📷 ここに「引落しできなかった園児の一覧」の画面が入ります<br><span style="font-size:11.5px">（あとで実際のスクリーンショットに差し替えられます）</span></div><figcaption>▲ 引落しできなかった園児の一覧</figcaption></figure>
+</div>
+
+<div class="card">
+<h3>方法1：再振替（もう一度、口座から引き落とす）</h3>
+<div class="note info"><span class="lab">こんなときに</span>口座は使えて、次の引落しでもう一度試せるケース（残高不足など）。</div>
+<ol class="steps">
+<li>一覧から<b>対象の園児</b>を選ぶ</li>
+<li><b>再振替の対象月</b>を指定する</li>
+<li><b>再振替データ／案内</b>を出力する</li>
+<li>出力した内容を<b>引落し処理</b>に回す</li>
+</ol>
+<figure class="fig"><div style="border:2px dashed var(--line2);border-radius:14px;padding:30px 18px;background:var(--panel);color:var(--mut);font-size:13.5px;line-height:1.7">📷 ここに「再振替の対象を選ぶ」画面が入ります<br><span style="font-size:11.5px">（あとで実際のスクリーンショットに差し替えられます）</span></div><figcaption>▲ 再振替の対象を選ぶ画面</figcaption></figure>
+</div>
+
+<div class="card">
+<h3>方法2：再振込案内（保護者に振込をお願いする）</h3>
+<div class="note info"><span class="lab">こんなときに</span>口座引落しが難しく、振込で払ってもらうケース（口座変更・解約など）。</div>
+<ol class="steps">
+<li>一覧から<b>対象の園児</b>を選ぶ</li>
+<li><b>振込先・金額・期日</b>が入った案内（督促状）を確認する</li>
+<li><b>印刷／PDF出力</b>する</li>
+<li>保護者へ<b>渡す／送付</b>する</li>
+</ol>
+<div class="note tip"><span class="lab">💡 振込先（園ごとの口座）の確認</span>案内に載る振込先の口座は「<b>設定</b>」タブで確認・編集できます。正しい口座が載っているか、出す前に確認しましょう。</div>
+<figure class="fig"><div style="border:2px dashed var(--line2);border-radius:14px;padding:30px 18px;background:var(--panel);color:var(--mut);font-size:13.5px;line-height:1.7">📷 ここに「再振込案内（督促状）の出力」画面が入ります<br><span style="font-size:11.5px">（あとで実際のスクリーンショットに差し替えられます）</span></div><figcaption>▲ 再振込案内（督促状）の出力画面</figcaption></figure>
+</div>
+
+<div class="card">
+<h3>どちらを選ぶ？（使い分けの目安）</h3>
+<table>
+<tr><th>状況</th><th>おすすめ</th><th>理由</th></tr>
+<tr><td>残高不足で口座は使える</td><td><b>再振替</b></td><td>もう一度引き落とせば回収できる</td></tr>
+<tr><td>口座変更・解約などで引落し不可</td><td><b>再振込案内</b></td><td>振込で確実に回収できる</td></tr>
+<tr><td>急いで回収したい</td><td><b>再振込案内</b></td><td>次の引落しを待たなくてよい</td></tr>
+</table>
+<div class="note warn"><span class="lab">⚠ よくある注意点</span>
+<ul style="margin:6px 0 0">
+<li>再振替の<b>対象月を間違えない</b></li>
+<li>再振込案内の<b>金額・期日を必ず確認</b>する</li>
+<li><b>回収できたら</b>、その園児を処理済みに反映する</li>
+</ul>
+</div>
+</div>
+
+<!-- ===== 6. 現金出納帳→MF ===== -->
+<h2 id="cashmf"><span class="n">6</span>現金出納帳をマネーフォワードに取り込む（月末の流れ）</h2>
+<p>現金出納帳タブで現金の収入・支出を記録し、月末に締めてから<b>マネーフォワード様式のファイル</b>を書き出します。それを会計ソフト<b>マネーフォワード（MoneyForward）</b>に<b>取り込み（インポート）</b>すると、会計に反映されます。流れは「アプリで書き出す → マネーフォワードに取り込む」です。</p>
+<div class="note info"><span class="lab">出力されるのはExcelファイルです</span>マネーフォワードへの取り込みに使うのは、出力プレビューの<b>「総合（MF用）」タブから書き出すExcel（.xlsx）</b>です。アプリ内の案内にも「インポートするのは総合タブのExcel」と書かれています。</div>
+
+<div class="card">
+<h3>ステップ1：現金出納帳の内容を確認する</h3>
+<ol class="steps">
+<li><b>現金出納帳</b>タブを開く</li>
+<li><b>対象の園</b>と<b>年月</b>を選ぶ</li>
+<li>収入・支出・残高が合っているか、<b>記入漏れがないか</b>確認する</li>
+</ol>
+<figure class="fig"><div style="border:2px dashed var(--line2);border-radius:14px;padding:30px 18px;background:var(--panel);color:var(--mut);font-size:13.5px;line-height:1.7">📷 ここに「現金出納帳の一覧（収入・支出・残高）」の画面が入ります<br><span style="font-size:11.5px">（あとで実際のスクリーンショットに差し替えられます）</span></div><figcaption>▲ 現金出納帳の一覧</figcaption></figure>
+</div>
+
+<div class="card">
+<h3>ステップ2：月末締め（ロック）を行う</h3>
+<ol class="steps">
+<li>入力がすべて終わったことを確認する</li>
+<li><span class="btn-sample">🔒 預金振替で締める</span> を押す（これが「締め＝ロック」です）</li>
+</ol>
+<div class="note tip"><span class="lab">💡 なぜ締める？</span>締める（ロックする）と、あとから誤って書き換えてしまう事故を防げます。締めると次のステップの「出力プレビュー」ボタンが出ます。</div>
+<figure class="fig"><div style="border:2px dashed var(--line2);border-radius:14px;padding:30px 18px;background:var(--panel);color:var(--mut);font-size:13.5px;line-height:1.7">📷 ここに「🔒 預金振替で締める ボタンの場所」の画面が入ります<br><span style="font-size:11.5px">（あとで実際のスクリーンショットに差し替えられます）</span></div><figcaption>▲ 月末締め（ロック）ボタンの場所</figcaption></figure>
+</div>
+
+<div class="card">
+<h3>ステップ3：マネーフォワード用のファイルを書き出す</h3>
+<ol class="steps">
+<li>締めると出てくる <span class="btn-sample">👁 出力プレビュー</span> を押す</li>
+<li>プレビュー上部のタブで <b>総合（MF用）</b> を選ぶ</li>
+<li><span class="btn-sample">📊 マネーフォワード用Excelを出力</span> を押す</li>
+<li><b>保存先</b>（ダウンロードフォルダなど）に Excel が保存される</li>
+</ol>
+<div class="note info"><span class="lab">ファイル名で中身が分かります</span>例：<code>MF_現金出納帳_2026年6月_◯◯保育園.xlsx</code>（園名・年月が入ります）。通常の経費とイベント費が合算された1ファイルです。</div>
+<figure class="fig"><div style="border:2px dashed var(--line2);border-radius:14px;padding:30px 18px;background:var(--panel);color:var(--mut);font-size:13.5px;line-height:1.7">📷 ここに「出力プレビューの『総合（MF用）』タブと Excel出力ボタン」の画面が入ります<br><span style="font-size:11.5px">（あとで実際のスクリーンショットに差し替えられます）</span></div><figcaption>▲ 総合（MF用）タブ ＋ マネーフォワード用Excel出力</figcaption></figure>
+</div>
+
+<div class="card">
+<h3>ステップ4：マネーフォワードに取り込む（インポート）</h3>
+<ol class="steps">
+<li>マネーフォワードに<b>ログイン</b>する</li>
+<li><b>取り込み（インポート）</b>のメニューを開く</li>
+<li>さっき書き出した<b>Excelファイルを選んでアップロード</b>する</li>
+<li><b>勘定科目・日付・金額</b>の対応（どの列が何か）を確認する</li>
+<li><b>取り込みを確定</b>する</li>
+</ol>
+<div class="note info"><span class="lab">メニュー名について</span>マネーフォワード側のメニュー名は変わることがあります。「取り込み」「インポート」系のメニューを探してください。迷ったら管理者に確認しましょう。</div>
+<figure class="fig"><div style="border:2px dashed var(--line2);border-radius:14px;padding:30px 18px;background:var(--panel);color:var(--mut);font-size:13.5px;line-height:1.7">📷 ここに「マネーフォワードの取り込み（インポート）」画面が入ります<br><span style="font-size:11.5px">（あとで実際のスクリーンショットに差し替えられます）</span></div><figcaption>▲ マネーフォワードのインポート画面</figcaption></figure>
+</div>
+
+<div class="card">
+<h3>うまくいかないとき</h3>
+<div class="note warn"><span class="lab">⚠ チェックポイント</span>
+<ul style="margin:6px 0 0">
+<li><b>金額や日付がずれる</b>→ マネーフォワード側の「どの列が何か」の対応づけを見直す</li>
+<li><b>二重に取り込んでしまう</b>→ 同じ月を2回入れていないか確認する</li>
+<li><b>締めた後に修正が必要</b>→ <span class="btn-sample">🔓 締めを解除</span> で直し、もう一度書き出す</li>
+<li><b>文字が化ける</b>→（CSVで取り込む場合）文字コードがUTF-8になっているか確認する</li>
+</ul>
+</div>
+</div>
+
+<!-- ===== 7. 本部用集計 ===== -->
+<h2 id="hq"><span class="n">7</span>本部用集計（年度収支・消費税区分）</h2>
+<p>「現在の園」を<b>全施設</b>にすると、園別＋全園合計の集計が見られます。</p>
+<figure class="fig">
+<svg viewBox="0 0 600 230" width="600" role="img" aria-label="年度収支まとめのイメージ">
+ <rect x="0" y="0" width="600" height="230" rx="14" fill="#fffbf7"/>
+ <text class="ttl" x="20" y="32" font-size="14" font-weight="700" fill="#a36a55">💰 年度収支まとめ（2026年度）</text>
+ <g font-size="11">
+  <rect x="20" y="44" width="560" height="28" fill="#faf3ed" stroke="#e8d9cf"/>
+  <text x="34" y="63" fill="#a36a55">施設</text>
+  <text x="300" y="63" fill="#a36a55" text-anchor="end">収入合計</text>
+  <text x="420" y="63" fill="#a36a55" text-anchor="end">支出合計</text>
+  <text x="560" y="63" fill="#a36a55" text-anchor="end">年度収支</text>
+ </g>
+ <g font-size="11" fill="#3e3029">
+  <rect x="20" y="72" width="560" height="26" fill="#fff" stroke="#f0e6dd"/>
+  <text x="34" y="89">月寒園</text><text x="300" y="89" text-anchor="end">320,000</text><text x="420" y="89" text-anchor="end">98,000</text><text x="560" y="89" text-anchor="end" fill="#a36a55">+222,000</text>
+  <rect x="20" y="98" width="560" height="26" fill="#fff" stroke="#f0e6dd"/>
+  <text x="34" y="115">白石園</text><text x="300" y="115" text-anchor="end">180,000</text><text x="420" y="115" text-anchor="end">64,000</text><text x="560" y="115" text-anchor="end" fill="#a36a55">+116,000</text>
+  <rect x="20" y="124" width="560" height="26" fill="#fff" stroke="#f0e6dd"/>
+  <text x="34" y="141">資生館保育園</text><text x="300" y="141" text-anchor="end">210,000</text><text x="420" y="141" text-anchor="end">120,000</text><text x="560" y="141" text-anchor="end" fill="#a36a55">+90,000</text>
+  <rect x="20" y="150" width="560" height="28" fill="#f3e5dc" stroke="#a36a55"/>
+  <text x="34" y="169" font-weight="700" fill="#a36a55">全施設合計</text><text x="300" y="169" text-anchor="end" font-weight="700">710,000</text><text x="420" y="169" text-anchor="end" font-weight="700">282,000</text><text x="560" y="169" text-anchor="end" font-weight="700" fill="#a36a55">+428,000</text>
+ </g>
+ <text x="20" y="202" font-size="10.5" fill="#917b6f">収入＝新規入園(振込)＋タイムリー(現金)。支出＝現金・イベント出納帳の出金。月謝は別管理のため含みません。</text>
+</svg>
+<figcaption>▲ 年度収支まとめ（施設別・全施設合計／CSV出力可）</figcaption>
+</figure>
+<div class="card">
 <h3>① 在園・請求サマリー</h3>
 <p>当月の在園数・定員・充足率・請求合計（うち月謝系／制服代／行事費）を施設別に表示します。</p>
 <h3>② 年度収支まとめ 💰</h3>
@@ -240,8 +584,19 @@ th{background:var(--panel2);color:var(--leaf);font-weight:700}
 <p>会計士確認用。<b>単体購入の制服＝課税売上</b>、月謝と一括徴収の制服や保育料＝非課税売上、として当月の請求を区分表示します。年度の月別推移とCSV出力もあります。</p>
 </div>
 
-<!-- ===== 6. バックアップ ===== -->
-<h2 id="backup"><span class="n">6</span>データのバックアップ</h2>
+<!-- ===== 8. バックアップ ===== -->
+<h2 id="backup"><span class="n">8</span>データのバックアップ</h2>
+<figure class="fig">
+<svg viewBox="0 0 600 120" width="600" role="img" aria-label="バックアップのボタン">
+ <rect x="0" y="0" width="600" height="120" rx="14" fill="#fffbf7"/>
+ <text x="30" y="36" font-size="12" fill="#917b6f">設定タブ内にあります：</text>
+ <rect x="30" y="50" width="250" height="44" rx="22" fill="#c2185b"/>
+ <text x="155" y="78" text-anchor="middle" font-size="13" font-weight="700" fill="#fff">⬇️ データ書き出し（バックアップ）</text>
+ <rect x="300" y="50" width="200" height="44" rx="22" fill="#fff" stroke="#e8d9cf"/>
+ <text x="400" y="78" text-anchor="middle" font-size="13" font-weight="700" fill="#3e3029">⬆️ データ読み込み</text>
+</svg>
+<figcaption>▲ 設定タブの書き出し／読み込みボタン</figcaption>
+</figure>
 <div class="card">
 <p>データはクラウドに保存されますが、念のため手元にも控えを取れます（<b>設定タブ</b>にあります）。</p>
 <ul>
@@ -251,8 +606,17 @@ th{background:var(--panel2);color:var(--leaf);font-weight:700}
 <div class="note tip"><span class="lab">💡 おすすめ</span>大きな変更の前や月末締めの前に、一度「書き出し」で控えを取っておくと安心です。</div>
 </div>
 
-<!-- ===== 7. 困ったとき ===== -->
-<h2 id="trouble"><span class="n">7</span>困ったときは</h2>
+<!-- ===== 9. 困ったとき ===== -->
+<h2 id="trouble"><span class="n">9</span>困ったときは</h2>
+<figure class="fig">
+<svg viewBox="0 0 600 110" width="600" role="img" aria-label="エラー時の表示">
+ <rect x="0" y="0" width="600" height="110" rx="14" fill="#fffbf7"/>
+ <rect x="150" y="30" width="300" height="46" rx="9" fill="#fbe3ec" stroke="#e8417a"/>
+ <text x="300" y="58" text-anchor="middle" font-size="14" font-weight="700" fill="#c2185b">⚠ 接続エラー</text>
+ <text x="300" y="94" text-anchor="middle" font-size="11" fill="#917b6f">この表示が出たら、まずWi-Fi・電波を確認してください。</text>
+</svg>
+<figcaption>▲ ネットが切れると鮮度バーが赤くなります（つながれば自動で戻ります）</figcaption>
+</figure>
 <div class="card">
 <table>
 <tr><th>症状</th><th>対処</th></tr>
@@ -265,8 +629,20 @@ th{background:var(--panel2);color:var(--leaf);font-weight:700}
 </table>
 </div>
 
-<!-- ===== 8. 料金ルール ===== -->
-<h2 id="rules"><span class="n">8</span>料金ルール早見表</h2>
+<!-- ===== 10. 料金ルール ===== -->
+<h2 id="rules"><span class="n">10</span>料金ルール早見表</h2>
+<figure class="fig">
+<svg viewBox="0 0 600 120" width="600" role="img" aria-label="引落しは毎月27日">
+ <rect x="0" y="0" width="600" height="120" rx="14" fill="#fffbf7"/>
+ <rect x="40" y="26" width="70" height="68" rx="10" fill="#fff" stroke="#c2185b"/>
+ <rect x="40" y="26" width="70" height="20" rx="10" fill="#c2185b"/>
+ <text x="75" y="40" text-anchor="middle" font-size="11" fill="#fff">毎月</text>
+ <text x="75" y="80" text-anchor="middle" font-size="26" font-weight="900" fill="#c2185b" class="ttl">27</text>
+ <text x="150" y="52" font-size="13" fill="#3e3029">引落し ＝ 毎月 27日</text>
+ <text x="150" y="78" font-size="13" fill="#3e3029">案内　 ＝ 毎月 15〜16日ごろ</text>
+</svg>
+<figcaption>▲ 引落しは毎月27日が目安</figcaption>
+</figure>
 <div class="card">
 <table>
 <tr><th>項目</th><th>内容</th></tr>
@@ -282,7 +658,8 @@ th{background:var(--panel2);color:var(--leaf);font-weight:700}
 <div class="foot">
 STRAWBERRY FIELD Children's Garden ／ ハイアイランド株式会社<br>
 月謝管理アプリ 操作マニュアル（クラウド同期版）｜ 2026年6月 最新版<br>
-このページは印刷（<span class="kbd">⌘P</span>）してPDF化・配布できます。
+このページは印刷（<span class="kbd">⌘P</span>）してPDF化・配布できます。<br>
+<span style="color:var(--mut);font-size:11px">※図はイメージです。実際の画面と細部が異なる場合があります。</span>
 </div>
 
 </div>
