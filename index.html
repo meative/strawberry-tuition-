@@ -3261,7 +3261,17 @@ function cloudPushNow(){
  if(json.length>950000) console.warn('クラウド保存データが大きくなっています（'+json.length+'字）。1MB上限に注意。');
  cloudRef().set({ payload:json, updatedBy:currentOperator||'(不明)', deviceId:MY_DEVICE,
    updatedAt:firebase.firestore.FieldValue.serverTimestamp(), clientTime:new Date().toISOString() })
-  .then(()=>{ __cloudDirty=false; })
+  .then(()=>{ __cloudDirty=false;
+    /* SF-KINDER-MIRROR-20260630: 幼稚舎の子の name/linkPark だけを公開ミラーへ。口座情報は含めない */
+    try{
+      var __kpub=(roster||[]).filter(function(r){return r&&r.park==='幼稚舎';})
+        .map(function(r){return { name:(r.name||''), linkPark:(r.linkPark||'') };});
+      cloudDB.collection('kindergarten_public').doc('roster').set({
+        pupils:__kpub,
+        updatedAt:firebase.firestore.FieldValue.serverTimestamp()
+      }).catch(function(e){ console.error('幼稚舎ミラー保存失敗',e); });
+    }catch(e){ console.error('幼稚舎ミラー生成失敗',e); }
+  })
   .catch(e=>{ console.error('クラウド保存失敗',e); cloudBarSet('error','保存失敗'); });
 }
 function cloudManualRefresh(){
