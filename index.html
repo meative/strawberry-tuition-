@@ -828,7 +828,7 @@ function renderRoster(){const rows=visible();
    availCls.map(c=>`<button data-cls="${c}" style="padding:6px 14px;border:1px solid ${clsFilter===c?'var(--leaf)':'var(--line)'};background:${clsFilter===c?'var(--leaf)':'var(--paper)'};color:${clsFilter===c?'#fff':'var(--ink)'};border-radius:18px;font-size:12px;cursor:pointer;font-family:inherit">${c} <span style="opacity:.75">${clsCount[c]}名</span></button>`).join('')+
    '</div>';
  }
- h+='<div class="tablewrap"><table><thead><tr><th style="width:42px;text-align:center">No.</th><th>所属園</th><th>生年月日</th><th>クラス<br><small style="color:var(--mut);font-weight:400;font-size:10px">自動</small></th><th>枠区分</th><th>園児名</th><th>口座名義</th><th>兄弟</th><th>納入方法</th>'+(showOpt?'<th>オプション（月額・あり/なし）</th>':'')+'<th class="r">ルクミーID</th><th></th></tr></thead><tbody>';
+ h+='<div class="tablewrap"><table><thead><tr><th style="width:42px;text-align:center">No.</th><th>所属園</th><th>生年月日</th><th>クラス<br><small style="color:var(--mut);font-weight:400;font-size:10px">自動</small></th><th>枠区分</th><th>園児名</th><th>口座名義</th><th>兄弟</th><th>納入方法</th>'+(showOpt?'<th>オプション（月額・あり/なし）</th>':'')+'<th>連携園</th><th class="r">ルクミーID</th><th></th></tr></thead><tbody>';
  rows.forEach((r,idx)=>{const i=roster.indexOf(r);const ed=i>=0;const t=facType(r.park);
   // 生年月日があればクラスを自動計算（プルダウン編集なし）
   const autoCls=r.birth?classByBirth(r.birth,yy):'';
@@ -853,7 +853,7 @@ function renderRoster(){const rows=visible();
    `<td>${ed?`<select data-sib="${i}" class="inp" style="width:auto;padding:4px 8px;font-size:12px;color:${r.sib==='あり'?'var(--berry)':'var(--mut)'}"><option ${r.sib!=='あり'?'selected':''}>なし</option><option ${r.sib==='あり'?'selected':''}>あり</option></select>`:(r.sib||'なし')}</td>`+
    `<td>${ed?`<select data-pay="${i}" class="inp" style="width:auto;padding:4px 8px;font-size:12px;font-weight:700;color:${payMethod(r)==='振込'?'#fff':'var(--mut)'};background:${payMethod(r)==='振込'?'var(--berry)':'var(--paper)'};border-color:${payMethod(r)==='振込'?'var(--berry)':'var(--line)'}"><option ${payMethod(r)!=='振込'?'selected':''}>引落</option><option ${payMethod(r)==='振込'?'selected':''}>振込</option></select>`:`<span class="paytag" style="display:inline-block;padding:3px 10px;border-radius:10px;font-size:11px;font-weight:700;${payMethod(r)==='振込'?'background:var(--berry);color:#fff':'background:var(--paper);color:var(--mut);border:1px solid var(--line)'}">${payMethod(r)}</span>`}</td>`+
    (showOpt?`<td>${optCell}</td>`:'')+
-   `<td class="num" style="color:var(--mut)">${r.lid||'—'}</td>`+
+   `<td>${ed?`<select data-link="${i}" class="inp" style="width:auto;padding:4px 8px;font-size:12px;color:var(--berry)"><option value="">未設定</option><option value="tsukisamu" ${r.linkPark==='tsukisamu'?'selected':''}>月寒</option><option value="shiraishi" ${r.linkPark==='shiraishi'?'selected':''}>白石</option><option value="factory" ${r.linkPark==='factory'?'selected':''}>サッポロファクトリー</option><option value="shiseikan" ${r.linkPark==='shiseikan'?'selected':''}>資生館</option></select>`:(r.linkPark||'—')}</td>`+`<td class="num" style="color:var(--mut)">${r.lid||'—'}</td>`+
    `<td>${ed?`<button data-pupildel="${i}" title="この園児を削除" style="background:none;border:1px solid var(--line);border-radius:8px;color:var(--berry);cursor:pointer;font-size:13px;padding:5px 10px">削除</button>`:''}</td></tr>`;});
  h+='</tbody></table></div>';
  document.getElementById('body').innerHTML=h;bindEdit();
@@ -869,7 +869,7 @@ function renderRoster(){const rows=visible();
    const label=v==='あり'?'兄弟割引が適用':'兄弟割引が外れた';
    roster[i].sib=v;logChange(roster[i].name,'sib',label,null,v);render();};});
  document.querySelectorAll('[data-pay]').forEach(el=>{el.onchange=e=>{const i=+e.target.dataset.pay;const v=e.target.value;
-   roster[i].pay=v;logChange(roster[i].name,'pay','納入方法を'+v+'に変更',null,v);render();};});
+   roster[i].pay=v;logChange(roster[i].name,'pay','納入方法を'+v+'に変更',null,v);render();};});document.querySelectorAll('[data-link]').forEach(el=>{el.onchange=e=>{const i=+e.target.dataset.link;const v=e.target.value;const NM={tsukisamu:'月寒',shiraishi:'白石',factory:'サッポロファクトリー',shiseikan:'資生館'};roster[i].linkPark=v;logChange(roster[i].name,'linkPark','連携園を'+(NM[v]||'未設定')+'に変更',null,v);render();};});
  // オプションチェックボックス
  document.querySelectorAll('[data-opt]').forEach(el=>{el.onchange=e=>{const i=+e.target.dataset.opt,f=e.target.dataset.of;const v=e.target.checked;
    const names={optMattress:'マットレス',optBus:'バス',optDiaper:'おむつサブスク',optKnit:'制服ﾚﾝﾀﾙ:ニット',optCap:'制服ﾚﾝﾀﾙ:キャップ',optParka:'制服ﾚﾝﾀﾙ:パーカー'};
@@ -3158,9 +3158,52 @@ function cloudBarRender(){
    (info?`<span style="color:var(--mut)">｜ ${info}</span>`:'')+
    `<span style="flex:1"></span>`+
    `<button id="cloudWho" title="担当者を変更" style="background:none;border:1px solid var(--line);border-radius:14px;padding:3px 10px;cursor:pointer;font-size:12px;font-family:inherit;color:var(--ink)">${currentOperator?'👤 '+currentOperator:'👤 担当者を選ぶ'}</button>`+
-   `<button id="cloudRefresh" title="クラウドから今すぐ取得" style="background:none;border:1px solid var(--line);border-radius:14px;padding:3px 10px;cursor:pointer;font-size:12px;font-family:inherit;color:var(--ink)">🔄 取得</button>`;
+   `<button id="cloudRefresh" title="クラウドから今すぐ取得" style="background:none;border:1px solid var(--line);border-radius:14px;padding:3px 10px;cursor:pointer;font-size:12px;font-family:inherit;color:var(--ink)">🔄 取得</button>`+
+   `<button id="cloudPw" title="ログインパスワードを変更" style="background:none;border:1px solid var(--line);border-radius:14px;padding:3px 10px;cursor:pointer;font-size:12px;font-family:inherit;color:var(--ink)">🔑 パスワード変更</button>`;
  const rf=document.getElementById('cloudRefresh'); if(rf)rf.onclick=cloudManualRefresh;
  const wh=document.getElementById('cloudWho'); if(wh)wh.onclick=()=>askOperator();
+ const pw=document.getElementById('cloudPw'); if(pw)pw.onclick=changePasswordDialog;
+}
+// ログインパスワードの変更（共通アカウント。今のパスワードで本人確認→新パスワードに更新）
+function changePasswordDialog(){
+ const user=firebase.auth().currentUser;
+ if(!user){ infoDialog('ログインしていないため変更できません。','パスワード変更'); return; }
+ const ov=document.getElementById('confirmOverlay');
+ document.getElementById('confirmTitle').textContent='ログインパスワードの変更';
+ document.getElementById('confirmMsg').textContent='全員で共有しているログインパスワードを変更します。変更後は、新しいパスワードを職員に伝えてください。';
+ const extra=document.getElementById('confirmExtra');
+ const ist='width:86%;margin:5px 0;padding:9px 12px;font-size:14px;text-align:center';
+ extra.innerHTML=`<input id="pwCur" type="password" autocomplete="current-password" placeholder="今のパスワード" class="inp" style="${ist}">`+
+   `<input id="pwNew" type="password" autocomplete="new-password" placeholder="新しいパスワード（6文字以上）" class="inp" style="${ist}">`+
+   `<input id="pwNew2" type="password" autocomplete="new-password" placeholder="新しいパスワード（確認）" class="inp" style="${ist}">`+
+   `<div id="pwErr" style="color:var(--berry);font-size:12px;min-height:16px;margin-top:6px;text-align:center"></div>`;
+ const okBtn=document.getElementById('confirmOK'),cnBtn=document.getElementById('confirmCancel');
+ cnBtn.style.display=''; okBtn.disabled=false; okBtn.textContent='変更する';
+ ov.style.display='flex';
+ const close=()=>{ov.style.display='none';okBtn.onclick=null;cnBtn.onclick=null;ov.onclick=null;extra.innerHTML='';okBtn.disabled=false;};
+ cnBtn.onclick=close;
+ ov.onclick=e=>{if(e.target===ov)close();};
+ okBtn.onclick=()=>{
+  const cur=document.getElementById('pwCur').value;
+  const n1=document.getElementById('pwNew').value;
+  const n2=document.getElementById('pwNew2').value;
+  const err=document.getElementById('pwErr'); err.textContent='';
+  if(!cur||!n1||!n2){err.textContent='すべて入力してください。';return;}
+  if(n1.length<6){err.textContent='新しいパスワードは6文字以上にしてください。';return;}
+  if(n1!==n2){err.textContent='新しいパスワード（確認）が一致しません。';return;}
+  okBtn.disabled=true; okBtn.textContent='変更中…';
+  const cred=firebase.auth.EmailAuthProvider.credential(user.email,cur);
+  user.reauthenticateWithCredential(cred)
+   .then(()=>user.updatePassword(n1))
+   .then(()=>{ close(); infoDialog('パスワードを変更しました。\n新しいパスワードを職員に伝えてください。\n（すでにログイン中の端末は、次に入り直すときから新しいパスワードが必要です）','変更完了'); })
+   .catch(e=>{
+     okBtn.disabled=false; okBtn.textContent='変更する';
+     const c=e&&e.code||'';
+     if(c==='auth/wrong-password'||c==='auth/invalid-credential') err.textContent='今のパスワードが違います。';
+     else if(c==='auth/weak-password') err.textContent='新しいパスワードが弱すぎます（6文字以上）。';
+     else err.textContent='変更できませんでした（'+(c||(e&&e.message)||'不明')+'）。';
+   });
+ };
 }
 
 // --- ログイン ---
