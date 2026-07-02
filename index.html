@@ -234,6 +234,24 @@ tr.changed:hover td{background:color-mix(in srgb,var(--gold) 22%,transparent)!im
    </div>
   </div>
  </div>
+ <div id="operOverlay" style="display:none;position:fixed;inset:0;background:rgba(20,12,16,.45);z-index:10005;align-items:center;justify-content:center;backdrop-filter:blur(2px)">
+  <div style="background:var(--panel);border:1px solid var(--line);border-radius:18px;max-width:380px;width:90%;padding:28px 26px 22px;box-shadow:0 12px 48px rgba(0,0,0,.25);text-align:center">
+   <div id="operTitle" style="font-size:16px;font-weight:700;color:var(--ink);margin-bottom:12px">担当者の確認</div>
+   <div id="operMsg" style="font-size:13.5px;color:var(--mut);line-height:1.8;margin-bottom:18px;white-space:pre-line"></div>
+   <div id="operExtra"></div>
+  </div>
+ </div>
+ <div id="pinOverlay" style="display:none;position:fixed;inset:0;background:rgba(20,12,16,.45);z-index:10030;align-items:center;justify-content:center;backdrop-filter:blur(2px)">
+  <div style="background:var(--panel);border:1px solid var(--line);border-radius:18px;max-width:380px;width:90%;padding:28px 26px 22px;box-shadow:0 12px 48px rgba(0,0,0,.25);text-align:center">
+   <div id="pinTitle" style="font-size:16px;font-weight:700;color:var(--ink);margin-bottom:12px">管理者用暗証番号</div>
+   <div id="pinMsg" style="font-size:13.5px;color:var(--mut);line-height:1.8;margin-bottom:22px;white-space:pre-line"></div>
+   <div id="pinExtra" style="margin-bottom:22px"></div>
+   <div style="display:flex;gap:10px;justify-content:center">
+    <button id="pinCancel" style="padding:10px 24px;border:1px solid var(--line);background:var(--panel2);color:var(--ink);border-radius:24px;font-size:13.5px;cursor:pointer;font-family:inherit;font-weight:600">キャンセル</button>
+    <button id="pinOK" style="padding:10px 24px;border:none;background:var(--berry);color:#fff;border-radius:24px;font-size:13.5px;cursor:pointer;font-family:inherit;font-weight:600">確認</button>
+   </div>
+  </div>
+ </div>
 </div>
 <div class="actions">
  <button class="btn btn-primary" onclick="exportXlsx()">📊 スプレッドシート(xlsx)に出力</button>
@@ -309,8 +327,93 @@ function infoDialog(msg,title){
 let changeLog={};
 // ルクミー手入力の確認チェック：'YYYY-M' → { 園児名: {done:true, by:'氏名', at:'日時'} }
 let lookmeeCheck={};
-// 事務員（受領者・アドバイザー）一覧
-const STAFF=['細野','佐藤','伊藤','小野','水野','小林'];
+// 事務員（受領者・アドバイザー）一覧：端末に保存（追加・削除可能）。初期値は下記6名。
+const STAFF_KEY='sf_staff_list';
+const STAFF_DEFAULT=['細野','佐藤','伊藤','小野','水野','小林'];
+function loadStaffList(){
+ try{const raw=localStorage.getItem(STAFF_KEY);if(raw){const a=JSON.parse(raw);if(Array.isArray(a)&&a.length)return a;}}catch(e){}
+ return STAFF_DEFAULT.slice();
+}
+function saveStaffList(){ try{localStorage.setItem(STAFF_KEY,JSON.stringify(STAFF));}catch(e){} }
+let STAFF=loadStaffList();
+// ===== 管理者用暗証番号（4桁）：管理操作の前段で本人確認に使う =====
+const ADMIN_PIN_KEY='sf_admin_pin';
+const ADMIN_PIN_DEFAULT='5963';
+function getAdminPin(){ return localStorage.getItem(ADMIN_PIN_KEY)||ADMIN_PIN_DEFAULT; }
+function setAdminPin(pin){ try{localStorage.setItem(ADMIN_PIN_KEY,pin);}catch(e){} }
+// 管理者用暗証番号を入力させ、正しければ then() を実行。違えば赤字表示して中止。
+function requireAdminPin(then){
+ const ov=document.getElementById('pinOverlay');
+ document.getElementById('pinTitle').textContent='管理者用暗証番号';
+ document.getElementById('pinMsg').textContent='この操作には管理者用の暗証番号（4桁）が必要です。';
+ const extra=document.getElementById('pinExtra');
+ extra.innerHTML=`<input id="pinInput" class="inp" type="password" inputmode="numeric" maxlength="4" autocomplete="off" placeholder="4桁の暗証番号" style="width:70%;padding:9px 12px;font-size:18px;text-align:center;letter-spacing:.4em">`+
+   `<div id="pinErr" style="color:var(--berry);font-size:12px;min-height:16px;margin-top:8px;text-align:center"></div>`;
+ const okBtn=document.getElementById('pinOK'),cnBtn=document.getElementById('pinCancel');
+ okBtn.textContent='確認'; cnBtn.style.display='';
+ ov.style.display='flex';
+ const inp=document.getElementById('pinInput'); setTimeout(()=>{try{inp.focus();}catch(e){}},50);
+ const close=()=>{ov.style.display='none';okBtn.onclick=null;cnBtn.onclick=null;ov.onclick=null;extra.innerHTML='';};
+ const submit=()=>{
+  const v=(document.getElementById('pinInput').value||'').trim();
+  if(v===getAdminPin()){ close(); if(typeof then==='function')then(); }
+  else{ document.getElementById('pinErr').textContent='暗証番号が違います'; }
+ };
+ okBtn.onclick=submit;
+ inp.onkeydown=e=>{if(e.key==='Enter')submit();};
+ cnBtn.onclick=close;
+ ov.onclick=e=>{if(e.target===ov)close();};
+}
+// 管理者用暗証番号の変更（今の暗証番号で確認 → 新しい4桁を2回入力）
+function changePinDialog(){
+ requireAdminPin(()=>{
+  const ov=document.getElementById('confirmOverlay');
+  document.getElementById('confirmTitle').textContent='管理者用暗証番号の変更';
+  document.getElementById('confirmMsg').textContent='新しい暗証番号（4桁の数字）を入力してください。';
+  const extra=document.getElementById('confirmExtra');
+  const ist='width:70%;margin:5px 0;padding:9px 12px;font-size:18px;text-align:center;letter-spacing:.4em';
+  extra.innerHTML=`<input id="pinNew" class="inp" type="password" inputmode="numeric" maxlength="4" autocomplete="off" placeholder="新しい暗証番号" style="${ist}">`+
+    `<input id="pinNew2" class="inp" type="password" inputmode="numeric" maxlength="4" autocomplete="off" placeholder="新しい暗証番号（確認）" style="${ist}">`+
+    `<div id="pinChErr" style="color:var(--berry);font-size:12px;min-height:16px;margin-top:6px;text-align:center"></div>`;
+  const okBtn=document.getElementById('confirmOK'),cnBtn=document.getElementById('confirmCancel');
+  cnBtn.style.display=''; okBtn.disabled=false; okBtn.textContent='変更する';
+  ov.style.display='flex';
+  const close=()=>{ov.style.display='none';okBtn.onclick=null;cnBtn.onclick=null;ov.onclick=null;extra.innerHTML='';};
+  cnBtn.onclick=close; ov.onclick=e=>{if(e.target===ov)close();};
+  okBtn.onclick=()=>{
+   const a=(document.getElementById('pinNew').value||'').trim();
+   const b=(document.getElementById('pinNew2').value||'').trim();
+   const err=document.getElementById('pinChErr'); err.textContent='';
+   if(!/^\d{4}$/.test(a)){err.textContent='暗証番号は4桁の数字で入力してください。';return;}
+   if(a!==b){err.textContent='確認用の暗証番号が一致しません。';return;}
+   setAdminPin(a); close(); infoDialog('暗証番号を変更しました。\n以後は新しい暗証番号が有効です。','変更完了');
+  };
+ });
+}
+// 担当者の追加：名前を入力してリストへ（呼び出し前に requireAdminPin で確認済み）
+function promptStaffName(after){
+ const ov=document.getElementById('confirmOverlay');
+ document.getElementById('confirmTitle').textContent='担当者の追加';
+ document.getElementById('confirmMsg').textContent='新しい担当者の名前を入力してください。';
+ const extra=document.getElementById('confirmExtra');
+ extra.innerHTML=`<input id="newStaffName" class="inp" type="text" placeholder="担当者名" style="width:80%;padding:9px 12px;font-size:14px;text-align:center">`+
+   `<div id="newStaffErr" style="color:var(--berry);font-size:12px;min-height:16px;margin-top:6px;text-align:center"></div>`;
+ const okBtn=document.getElementById('confirmOK'),cnBtn=document.getElementById('confirmCancel');
+ cnBtn.style.display=''; okBtn.disabled=false; okBtn.textContent='追加する';
+ ov.style.display='flex';
+ const inp=document.getElementById('newStaffName'); setTimeout(()=>{try{inp.focus();}catch(e){}},50);
+ const close=()=>{ov.style.display='none';okBtn.onclick=null;cnBtn.onclick=null;ov.onclick=null;inp.onkeydown=null;extra.innerHTML='';};
+ const submit=()=>{
+  const v=(inp.value||'').trim();
+  const err=document.getElementById('newStaffErr');
+  if(!v){err.textContent='名前を入力してください。';return;}
+  if(STAFF.includes(v)){err.textContent='同じ名前の担当者がすでにいます。';return;}
+  STAFF.push(v); saveStaffList(); close(); if(typeof after==='function')after();
+ };
+ okBtn.onclick=submit; inp.onkeydown=e=>{if(e.key==='Enter')submit();};
+ cnBtn.onclick=close;
+ ov.onclick=e=>{if(e.target===ov)close();};
+}
 // 台帳変更を記録（現在の対象年月の変更として）。元の値に戻したらその月のログを消す
 let rosterBase=JSON.parse(JSON.stringify(M.roster)); // 直近で「確定」された基準状態（前月扱い）
 function ymKey(){return yy+'-'+mm;}
@@ -693,6 +796,11 @@ function renderSettings(){
    `</div>`+
    `<div style="font-size:12px;color:var(--mut);margin-top:10px;line-height:1.7">・「書き出し」で、データをファイルに保存できます（他のPC・iPadへの受け渡しや、万一に備えたバックアップ用）。<br>・「読み込み」で、書き出したファイルを取り込めます（今ある内容は上書きされます）。</div>`+
  `</div>`;
+ // 管理者用暗証番号
+ h+='<div class="setblock"><h3>🔐 管理者用暗証番号</h3>'+
+   `<div style="font-size:13px;color:var(--ink);line-height:1.8;margin-bottom:12px">担当者の追加・削除、ログインパスワードの変更などの管理操作に使う暗証番号（4桁）です。</div>`+
+   `<button id="btnChangePin" class="btn btn-ghost" style="padding:8px 18px;font-size:13px">🔑 管理者用暗証番号の変更</button>`+
+ `</div>`;
  // 運用パラメータ（編集可能）
  h+='<div class="setblock"><h3>運用パラメータ</h3>'+
    `<div style="display:flex;gap:24px;flex-wrap:wrap;font-size:13.5px;align-items:center">`+
@@ -777,6 +885,8 @@ function renderSettings(){
  const be=document.getElementById('btnExport');if(be)be.onclick=exportBackup;
  const bi=document.getElementById('btnImport');const fi=document.getElementById('fileImport');
  if(bi&&fi){bi.onclick=()=>fi.click();fi.onchange=e=>{if(e.target.files&&e.target.files[0])importBackup(e.target.files[0]);e.target.value='';};}
+ // 管理者用暗証番号の変更
+ const bp=document.getElementById('btnChangePin');if(bp)bp.onclick=changePinDialog;
  // 編集ハンドラ
  document.querySelectorAll('[data-bank]').forEach(el=>{el.onblur=e=>{const i=+e.target.dataset.bank,pk=e.target.dataset.pk;bank[i][pk]=e.target.textContent.trim();saveState();};});
  document.querySelectorAll('[data-param]').forEach(el=>{el.onchange=e=>{M[e.target.dataset.param]=+e.target.value;render();};});
@@ -1734,7 +1844,7 @@ function renderPDF(){
      `<div class="titleline"><span class="ld"></span><span class="dot"></span><span class="ld"></span></div>`+
     `</div>`+
     `<div class="body">`+
-     `<div class="addr">${p.name} <small>様</small></div>`+
+     `<div class="addr">${p.koza||p.name} <small>様</small></div>`+
      `<div class="greet">拝啓　時下ますますご清栄のこととお慶び申し上げます。<br>このたびはお子様のご入園、誠におめでとうございます。<br>初月の月謝につきまして、下記のとおりご案内申し上げます。</div>`+
 
      `<div class="sec2"><span class="num">01</span><span class="lbl">入園情報</span><span class="line"></span></div>`+
@@ -1894,7 +2004,7 @@ function renderReissue(){
     `<div class="titleJP">月謝納入のお願い</div>`+
    `</div>`+
    `<div class="body">`+
-    `<div class="addr">${p.name} <small>様</small></div>`+
+    `<div class="addr">${p.koza||p.name} <small>様</small></div>`+
     `<div class="greet">${isFuri?greetFuri:greetSai}</div>`+
     `<div class="sec2"><span class="num">01</span><span class="lbl">ご請求金額</span><span class="line"></span></div>`+
     `<div class="amtbox">`+
@@ -3164,18 +3274,21 @@ function cloudBarRender(){
  const wh=document.getElementById('cloudWho'); if(wh)wh.onclick=()=>askOperator();
  const pw=document.getElementById('cloudPw'); if(pw)pw.onclick=changePasswordDialog;
 }
-// ログインパスワードの変更（共通アカウント。今のパスワードで本人確認→新パスワードに更新）
+// ログインパスワードの変更（管理者用暗証番号で本人確認→新パスワードに更新）
 function changePasswordDialog(){
  const user=firebase.auth().currentUser;
  if(!user){ infoDialog('ログインしていないため変更できません。','パスワード変更'); return; }
+ requireAdminPin(()=>openPwForm(user));
+}
+function openPwForm(user){
  const ov=document.getElementById('confirmOverlay');
  document.getElementById('confirmTitle').textContent='ログインパスワードの変更';
  document.getElementById('confirmMsg').textContent='全員で共有しているログインパスワードを変更します。変更後は、新しいパスワードを職員に伝えてください。';
  const extra=document.getElementById('confirmExtra');
  const ist='width:86%;margin:5px 0;padding:9px 12px;font-size:14px;text-align:center';
- extra.innerHTML=`<input id="pwCur" type="password" autocomplete="current-password" placeholder="今のパスワード" class="inp" style="${ist}">`+
-   `<input id="pwNew" type="password" autocomplete="new-password" placeholder="新しいパスワード（6文字以上）" class="inp" style="${ist}">`+
+ extra.innerHTML=`<input id="pwNew" type="password" autocomplete="new-password" placeholder="新しいパスワード（6文字以上）" class="inp" style="${ist}">`+
    `<input id="pwNew2" type="password" autocomplete="new-password" placeholder="新しいパスワード（確認）" class="inp" style="${ist}">`+
+   `<input id="pwCur" type="password" autocomplete="current-password" placeholder="今のパスワード（再確認を求められた場合のみ）" class="inp" style="${ist};display:none">`+
    `<div id="pwErr" style="color:var(--berry);font-size:12px;min-height:16px;margin-top:6px;text-align:center"></div>`;
  const okBtn=document.getElementById('confirmOK'),cnBtn=document.getElementById('confirmCancel');
  cnBtn.style.display=''; okBtn.disabled=false; okBtn.textContent='変更する';
@@ -3184,25 +3297,35 @@ function changePasswordDialog(){
  cnBtn.onclick=close;
  ov.onclick=e=>{if(e.target===ov)close();};
  okBtn.onclick=()=>{
-  const cur=document.getElementById('pwCur').value;
   const n1=document.getElementById('pwNew').value;
   const n2=document.getElementById('pwNew2').value;
+  const curEl=document.getElementById('pwCur');
   const err=document.getElementById('pwErr'); err.textContent='';
-  if(!cur||!n1||!n2){err.textContent='すべて入力してください。';return;}
+  if(!n1||!n2){err.textContent='新しいパスワードを入力してください。';return;}
   if(n1.length<6){err.textContent='新しいパスワードは6文字以上にしてください。';return;}
   if(n1!==n2){err.textContent='新しいパスワード（確認）が一致しません。';return;}
   okBtn.disabled=true; okBtn.textContent='変更中…';
-  const cred=firebase.auth.EmailAuthProvider.credential(user.email,cur);
-  user.reauthenticateWithCredential(cred)
-   .then(()=>user.updatePassword(n1))
-   .then(()=>{ close(); infoDialog('パスワードを変更しました。\n新しいパスワードを職員に伝えてください。\n（すでにログイン中の端末は、次に入り直すときから新しいパスワードが必要です）','変更完了'); })
-   .catch(e=>{
-     okBtn.disabled=false; okBtn.textContent='変更する';
-     const c=e&&e.code||'';
-     if(c==='auth/wrong-password'||c==='auth/invalid-credential') err.textContent='今のパスワードが違います。';
-     else if(c==='auth/weak-password') err.textContent='新しいパスワードが弱すぎます（6文字以上）。';
-     else err.textContent='変更できませんでした（'+(c||(e&&e.message)||'不明')+'）。';
-   });
+  const done=()=>{ close(); infoDialog('パスワードを変更しました。\n新しいパスワードを職員に伝えてください。\n（すでにログイン中の端末は、次に入り直すときから新しいパスワードが必要です）','変更完了'); };
+  const fail=e=>{ okBtn.disabled=false; okBtn.textContent='変更する'; const c=e&&e.code||'';
+    if(c==='auth/weak-password') err.textContent='新しいパスワードが弱すぎます（6文字以上）。';
+    else if(c==='auth/wrong-password'||c==='auth/invalid-credential') err.textContent='今のパスワードが違います。';
+    else err.textContent='変更できませんでした（'+(c||(e&&e.message)||'不明')+'）。';
+  };
+  if(curEl.style.display!=='none'){
+    // 再認証フォールバック：現在のパスワードで確認してから更新
+    const cur=curEl.value;
+    if(!cur){err.textContent='今のパスワードを入力してください。';okBtn.disabled=false;okBtn.textContent='変更する';return;}
+    const cred=firebase.auth.EmailAuthProvider.credential(user.email,cur);
+    user.reauthenticateWithCredential(cred).then(()=>user.updatePassword(n1)).then(done).catch(fail);
+  } else {
+    user.updatePassword(n1).then(done).catch(e=>{
+      const c=e&&e.code||'';
+      if(c==='auth/requires-recent-login'){
+        curEl.style.display=''; okBtn.disabled=false; okBtn.textContent='変更する';
+        err.textContent='安全確認のため、今のパスワードを入力してもう一度「変更する」を押してください。';
+      } else fail(e);
+    });
+  }
  };
 }
 
@@ -3219,9 +3342,38 @@ function doLogin(){
   .catch(e=>{ err.textContent='ログインできませんでした（'+(e.code||e.message)+'）'; btn.disabled=false; btn.textContent='ログイン'; });
 }
 function askOperator(then){
- selectDialog('あなたのお名前を選んでください。\n（クラウドの「最終更新者」として記録されます）',STAFF,(v)=>{
-  currentOperator=v; localStorage.setItem('sf_operator',v); cloudBarRender(); if(typeof then==='function')then();
- },'担当者の確認','これで進む');
+ const ov=document.getElementById('operOverlay');
+ const close=()=>{ov.style.display='none';ov.onclick=null;document.getElementById('operExtra').innerHTML='';};
+ const draw=()=>{
+  const list=STAFF.map((s)=>
+    `<div style="display:flex;align-items:center;gap:8px;padding:2px 0">`+
+     `<button class="operPick" data-name="${s}" style="flex:1;text-align:center;padding:9px 12px;border:1.5px solid var(--line2);background:var(--panel);color:var(--ink);border-radius:11px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit">${s}</button>`+
+     (STAFF.length>1?`<button class="operDel" data-name="${s}" title="${s}さんを削除" style="border:1px solid var(--line);background:var(--panel2);color:var(--mut);border-radius:50%;width:26px;height:26px;line-height:1;cursor:pointer;font-size:13px;font-family:inherit">×</button>`:'')+
+    `</div>`).join('');
+  document.getElementById('operExtra').innerHTML=
+    `<div style="display:flex;flex-direction:column;gap:6px;text-align:left">${list}</div>`+
+    `<button id="operAdd" style="margin-top:12px;width:100%;padding:9px 12px;border:1px dashed var(--line2);background:var(--panel2);color:var(--leaf);border-radius:11px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">＋ 新しい担当者を追加</button>`;
+  document.querySelectorAll('#operExtra .operPick').forEach(b=>{b.onclick=()=>{
+    const v=b.dataset.name; currentOperator=v; localStorage.setItem('sf_operator',v); cloudBarRender(); close(); if(typeof then==='function')then();
+  };});
+  document.querySelectorAll('#operExtra .operDel').forEach(b=>{b.onclick=()=>{
+    const nm=b.dataset.name;
+    if(STAFF.length<=1){ infoDialog('担当者は最低1人必要です。最後の1人は削除できません。','削除できません'); return; }
+    requireAdminPin(()=>{
+      confirmDialog(`${nm}さんを担当者から削除しますか？`,()=>{
+        const idx=STAFF.indexOf(nm); if(idx>=0)STAFF.splice(idx,1); saveStaffList();
+        if(currentOperator===nm){currentOperator='';localStorage.removeItem('sf_operator');cloudBarRender();}
+        draw();
+      },'担当者の削除','削除する');
+    });
+  };});
+  document.getElementById('operAdd').onclick=()=>{ requireAdminPin(()=>{ promptStaffName(()=>draw()); }); };
+ };
+ document.getElementById('operTitle').textContent='担当者の確認';
+ document.getElementById('operMsg').textContent='あなたのお名前を選んでください。\n（クラウドの「最終更新者」として記録されます）';
+ ov.style.display='flex';
+ ov.onclick=e=>{if(e.target===ov)close();};
+ draw();
 }
 
 // --- 同期本体 ---
@@ -3261,17 +3413,7 @@ function cloudPushNow(){
  if(json.length>950000) console.warn('クラウド保存データが大きくなっています（'+json.length+'字）。1MB上限に注意。');
  cloudRef().set({ payload:json, updatedBy:currentOperator||'(不明)', deviceId:MY_DEVICE,
    updatedAt:firebase.firestore.FieldValue.serverTimestamp(), clientTime:new Date().toISOString() })
-  .then(()=>{ __cloudDirty=false;
-    /* SF-KINDER-MIRROR-20260630: 幼稚舎の子の name/linkPark だけを公開ミラーへ。口座情報は含めない */
-    try{
-      var __kpub=(roster||[]).filter(function(r){return r&&r.park==='幼稚舎';})
-        .map(function(r){return { name:(r.name||''), linkPark:(r.linkPark||'') };});
-      cloudDB.collection('kindergarten_public').doc('roster').set({
-        pupils:__kpub,
-        updatedAt:firebase.firestore.FieldValue.serverTimestamp()
-      }).catch(function(e){ console.error('幼稚舎ミラー保存失敗',e); });
-    }catch(e){ console.error('幼稚舎ミラー生成失敗',e); }
-  })
+  .then(()=>{ __cloudDirty=false; })
   .catch(e=>{ console.error('クラウド保存失敗',e); cloudBarSet('error','保存失敗'); });
 }
 function cloudManualRefresh(){
