@@ -3288,7 +3288,7 @@ function openPwForm(user){
  const ist='width:86%;margin:5px 0;padding:9px 12px;font-size:14px;text-align:center';
  extra.innerHTML=`<input id="pwNew" type="password" autocomplete="new-password" placeholder="新しいパスワード（6文字以上）" class="inp" style="${ist}">`+
    `<input id="pwNew2" type="password" autocomplete="new-password" placeholder="新しいパスワード（確認）" class="inp" style="${ist}">`+
-   `<input id="pwCur" type="password" autocomplete="current-password" placeholder="今のパスワード（再確認を求められた場合のみ）" class="inp" style="${ist};display:none">`+
+   `<input id="pwCur" type="password" autocomplete="current-password" placeholder="今のパスワード（安全確認用）" class="inp" style="${ist};display:none">`+
    `<div id="pwErr" style="color:var(--berry);font-size:12px;min-height:16px;margin-top:6px;text-align:center"></div>`;
  const okBtn=document.getElementById('confirmOK'),cnBtn=document.getElementById('confirmCancel');
  cnBtn.style.display=''; okBtn.disabled=false; okBtn.textContent='変更する';
@@ -3322,6 +3322,7 @@ function openPwForm(user){
       const c=e&&e.code||'';
       if(c==='auth/requires-recent-login'){
         curEl.style.display=''; okBtn.disabled=false; okBtn.textContent='変更する';
+        setTimeout(()=>{try{curEl.focus();}catch(e){}},50);
         err.textContent='安全確認のため、今のパスワードを入力してもう一度「変更する」を押してください。';
       } else fail(e);
     });
