@@ -2624,23 +2624,23 @@ function cbCollectMfRows(){
    if(isEv){
      const carryIn=cbEventCarryIn();
      if(carryIn>0){
-       add(mm,1,'本部より振替','対象外','イベント費 前月繰越',carryIn,0,-1);
+       add(mm,1,'普通預金','対象外','イベント費 前月繰越',carryIn,0,-1);
      }
    }
    // 本部より振替（イベントはイベント予算）。order=0で日付先頭に置く
    if((Number(cb.opening)||0)>0){
-     add(mm,1,'本部より振替','対象外',isEv?'イベント予算 振替':'本部から振替',Number(cb.opening)||0,0,-1);
+     add(mm,1,'普通預金','対象外',isEv?'イベント予算 振替':'本部から振替',Number(cb.opening)||0,0,-1);
    }
    (cb.rows||[]).forEach(r=>{
      const mo=(r.mon!=null&&r.mon!=='')?r.mon:mm;
      // 現金入金（補充）
      if(r.isCash&&r.kind==='in'&&!r.isClose){
-       add(mo,r.day,'本部より振替',(r.tax||'対象外'),isEv?'イベント費 現金補充':'現金入金（補充）',Number(r.amt)||0,0);return;
+       add(mo,r.day,'普通預金',(r.tax||'対象外'),isEv?'イベント費 現金補充':'現金入金（補充）',Number(r.amt)||0,0);return;
      }
      // 締めの預金振替（出金）。繰越（carry, amt=0）は帳簿に出さない
      if(r.isClose){
        if(r.carry)return; // 翌月繰越：現金箱から出ていないので行を出さない
-       add(mo,r.day,'本部より振替','対象外',isEv?'イベント予算 預金振替':'預金振替',0,Number(r.amt)||0,9);return;
+       add(mo,r.day,'普通預金','対象外',isEv?'イベント予算 預金振替':'預金振替',0,Number(r.amt)||0,9);return;
      }
      // 経費（出金）
      if(r.kind==='out'){
@@ -2681,7 +2681,7 @@ function cbExportMF(){
    [114,'通信費',''],[115,'地代家賃',''],[116,'保険料',''],[117,'修繕費',''],[118,'消耗品費',''],[119,'事務用品費',''],
    [120,'行事費用等',''],[121,'会議費',''],[122,'厚生費',''],[123,'顧問報酬',''],[125,'車輌費',''],[126,'管理諸費',''],
    [127,'雑費',''],[128,'保育園収入高','売上関係'],[129,'売上値引・返品',''],[131,'助成金収入',''],
-   [1,'現金',''],[2,'売掛金',''],[3,'立替金',''],[0,'複合','']];
+   [1,'現金',''],[2,'売掛金',''],[3,'立替金',''],[4,'普通預金',''],[0,'複合','']];
  // セル直接指定で本物レイアウトを再現
  const ws={};
  const set=(addr,v,t)=>{ws[addr]={v:v,t:t||(typeof v==='number'?'n':'s')};};
@@ -2703,13 +2703,18 @@ function cbExportMF(){
  let row=5;
  let runBal=0;
  const put=(it)=>{
+   if(!(it.inn||0)&&!(it.out||0))return; // 入金も出金も0の行はMFが弾くので出力しない（残高は増減0なので通し計算に影響なし）
    runBal=runBal+(it.inn||0)-(it.out||0);
-   if(it.date)set('B'+row,it.date);
+   if(it.date){ // 文字列ではなく本物の日付型で出力（MFインポートが日付列を認識できるようにする）
+     const dm=String(it.date).match(/(\d+)\/(\d+)\/(\d+)/);
+     if(dm)ws['B'+row]={t:'d',v:new Date(+dm[1],(+dm[2])-1,+dm[3]),z:'yyyy/m/d'};
+     else set('B'+row,it.date);
+   }
    if(it.acctName)set('D'+row,it.acctName);
    const code=MF_CODE_BY_NAME[it.acctName];
    if(code!=null)set('E'+row,code);
    // 先頭の本部振替（本部から振替/イベント予算 振替）は部門空。それ以外は部門を入れる
-   const isOpening=it.acctName==='本部より振替'&&(it.tekiyo==='本部から振替'||it.tekiyo==='イベント予算 振替');
+   const isOpening=it.acctName==='普通預金'&&(it.tekiyo==='本部から振替'||it.tekiyo==='イベント予算 振替');
    if(!isOpening)set('G'+row,bumon);
    if(it.tax)set('I'+row,it.tax);
    if(it.tekiyo)set('K'+row,it.tekiyo);
@@ -2904,8 +2909,8 @@ function cbShowPreview(){
    const openSum=uni.filter(it=>it.order===-1).reduce((s,it)=>s+(it.inn||0),0); // 本部からの振替（通常＋イベント、先頭）
    const uCashSum=uni.filter(it=>String(it.tekiyo).indexOf('【現金】')>=0).reduce((s,it)=>s+(it.inn||0),0);
    const uFuriSum=uni.filter(it=>String(it.tekiyo).indexOf('【振込】')>=0).reduce((s,it)=>s+(it.inn||0),0);
-   const uHojuSum=uni.filter(it=>it.acctName==='本部より振替'&&it.order!==-1&&it.inn>0).reduce((s,it)=>s+(it.inn||0),0); // 現金補充
-   const uExpSum=uni.filter(it=>!(it.acctName==='本部より振替'&&it.out>0)).reduce((s,it)=>s+(it.out||0),0); // 経費（締めの預金振替は除く）
+   const uHojuSum=uni.filter(it=>it.acctName==='普通預金'&&it.order!==-1&&it.inn>0).reduce((s,it)=>s+(it.inn||0),0); // 現金補充
+   const uExpSum=uni.filter(it=>!(it.acctName==='普通預金'&&it.out>0)).reduce((s,it)=>s+(it.out||0),0); // 経費（締めの預金振替は除く）
    const inTotal=openSum+uHojuSum+uCashSum+uFuriSum;
    h+=`<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px"><span style="font-weight:700;color:var(--leaf);font-size:14px">総合（マネーフォワード出力用・通常＋イベント合算）</span><div style="flex:1"></div>`+
      `<button class="btn btn-ghost" style="padding:7px 16px;font-size:13px;border-color:var(--leaf);color:var(--leaf)" onclick="cbExportMF()">📊 マネーフォワード用Excelを出力</button></div>`+
