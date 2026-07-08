@@ -2228,11 +2228,11 @@ function renderInitSale(){
 // 実際に使う勘定科目（used:true＝プルダウンに出す。false＝右側に薄く表示してロック）
 const CB_ACCTS=[
  {code:1,  name:'現金',        used:true,  side:'both'},
- {code:99, name:'当期商品仕入高',used:true,  side:'out', tax:'非課税対応仕入 (軽)8%', femoku:'食品代'},
- {code:106,name:'旅費交通費',   used:true,  side:'out', tax:'非課税対応仕入 10%',   femoku:'交通費（ガソリン代）'},
- {code:108,name:'委託費',       used:true,  side:'out', tax:'非課税対応仕入 10%',   femoku:'英語代', shop:'オークツリー'},
- {code:114,name:'通信費',       used:true,  side:'out', tax:'非課税対応仕入 10%',   femoku:'切手代'},
- {code:118,name:'消耗品費',     used:true,  side:'out', tax:'非課税対応仕入 10%',   femoku:'備品代'},
+ {code:99, name:'当期商品仕入高',used:true,  side:'out', tax:'課税仕入 (軽)8%', femoku:'食品代'},
+ {code:106,name:'旅費交通費',   used:true,  side:'out', tax:'課税仕入 10%',   femoku:'交通費（ガソリン代）'},
+ {code:108,name:'委託費',       used:true,  side:'out', tax:'課税仕入 10%',   femoku:'英語代', shop:'オークツリー'},
+ {code:114,name:'通信費',       used:true,  side:'out', tax:'課税仕入 10%',   femoku:'切手代'},
+ {code:118,name:'消耗品費',     used:true,  side:'out', tax:'課税仕入 10%',   femoku:'備品代'},
  {code:100,name:'役員報酬',used:false},{code:101,name:'給与手当',used:false},{code:102,name:'賞与',used:false},
  {code:103,name:'法定福利費',used:false},{code:104,name:'諸会費',used:false},{code:105,name:'広告宣伝費',used:false},
  {code:107,name:'交際接待費',used:false},{code:109,name:'手数料',used:false},{code:110,name:'支払利息',used:false},
@@ -2245,7 +2245,7 @@ const CB_ACCTS=[
 ];
 const CB_ACCT_BY=Object.fromEntries(CB_ACCTS.map(a=>[a.code,a]));
 const CB_USED=CB_ACCTS.filter(a=>a.used&&a.code!==1); // 明細の勘定科目（現金は通常使わないので除外）
-const CB_TAXES=['非課税対応仕入 10%','非課税対応仕入 (軽)8%','非課税売上','非課税仕入','対象外仕入','対象外売上'];
+const CB_TAXES=['課税仕入 10%','課税仕入 (軽)8%','非課税売上','非課税仕入','対象外仕入','対象外売上'];
 // 摘要によく出る店名・取引先（予測変換候補）
 // 店舗・取引先（予測変換／プルダウン候補）。yomi＝五十音ソート用の読み。ローマ字始まりは最後にアルファベット順
 const CB_SHOPS_RAW=[
@@ -2478,7 +2478,7 @@ function renderCashbook(){
  // ハンドラ
  document.getElementById('cbOpening')&&(document.getElementById('cbOpening').onchange=e=>{cbGet().opening=Number(e.target.value)||0;render();});
  const opBy=document.getElementById('cbOpeningBy');if(opBy)opBy.onchange=e=>{cbGet().openingBy=e.target.value;render();};
- const addBtn=document.getElementById('cbAdd');if(addBtn)addBtn.onclick=()=>{cbGet().rows.push({mon:mm,day:'',acct:'',tax:'非課税対応仕入 10%',shop:'',item:'',kind:'out',amt:'',by:''});render();};
+ const addBtn=document.getElementById('cbAdd');if(addBtn)addBtn.onclick=()=>{cbGet().rows.push({mon:mm,day:'',acct:'',tax:'課税仕入 10%',shop:'',item:'',kind:'out',amt:'',by:''});render();};
  const addCashBtn=document.getElementById('cbAddCash');if(addCashBtn)addCashBtn.onclick=()=>{
    cbGet().rows.push({mon:mm,day:'',acct:1,tax:'',shop:'',item:'現金入金',kind:'in',amt:'',by:'',isCash:true});render();
  };
@@ -2704,15 +2704,16 @@ function cbExportMF(){
  let runBal=0;
  const put=(it)=>{
    if(!(it.inn||0)&&!(it.out||0))return; // 入金も出金も0の行はMFが弾くので出力しない（残高は増減0なので通し計算に影響なし）
+   const code=MF_CODE_BY_NAME[it.acctName]; // 相手勘定科目コード（公式テンプレはD列にコードを入力）
+   if(code==null){console.warn('MF出力: 科目コード未登録のため行をスキップしました:',it.acctName,it);return;} // 引けない行は出さない（runBal更新前なので残高も汚さない）
    runBal=runBal+(it.inn||0)-(it.out||0);
    if(it.date){ // 文字列ではなく本物の日付型で出力（MFインポートが日付列を認識できるようにする）
      const dm=String(it.date).match(/(\d+)\/(\d+)\/(\d+)/);
      if(dm)ws['B'+row]={t:'d',v:new Date(+dm[1],(+dm[2])-1,+dm[3]),z:'yyyy/m/d'};
      else set('B'+row,it.date);
    }
-   if(it.acctName)set('D'+row,it.acctName);
-   const code=MF_CODE_BY_NAME[it.acctName];
-   if(code!=null)set('E'+row,code);
+   set('D'+row,code,'n'); // D列＝相手勘定科目コード（数値, t:'n'）※公式テンプレに合わせコードを入力
+   if(it.acctName)set('E'+row,it.acctName); // E列＝科目名称（公式ではVLOOKUP表示。ここでは名称を直接出力）
    // 先頭の本部振替（本部から振替/イベント予算 振替）は部門空。それ以外は部門を入れる
    const isOpening=it.acctName==='普通預金'&&(it.tekiyo==='本部から振替'||it.tekiyo==='イベント予算 振替');
    if(!isOpening)set('G'+row,bumon);
@@ -2725,11 +2726,15 @@ function cbExportMF(){
  };
  cbCollectMfRows().forEach(put);
  const lastDataRow=row-1;
- // 右側マスター表（VLOOKUP参照先）Q6〜R45：コード・名称
+ // 右側マスター表（VLOOKUP参照先）Q6〜R36：コード・名称。公式テンプレの入力規則リスト範囲に収める。
+ // 実際に出力で使われ得る科目のみを優先順で詰める（used:false の未使用科目はマスター表から省略）。
  set('Q4','科目\nコード');set('R4','勘定科目名称');set('V4','カテゴリ');
+ const MF_MASTER_CODES=[99,106,108,114,118,128,4,1]; // 仕入高/旅費交通費/委託費/通信費/消耗品費/保育園収入高/普通預金/現金
+ const MF_ACCT_BY_CODE={};MF_ACCTS.forEach(a=>{MF_ACCT_BY_CODE[a[0]]=a;});
  let mr=6;
- MF_ACCTS.forEach(([code,name,cat])=>{
-   set('Q'+mr,code);set('R'+mr,name);if(cat)set('V'+mr,cat);mr++;
+ MF_MASTER_CODES.forEach(code=>{
+   const a=MF_ACCT_BY_CODE[code];if(!a)return;
+   set('Q'+mr,a[0]);set('R'+mr,a[1]);if(a[2])set('V'+mr,a[2]);mr++; // mrは最大 6+8=14 → Q36 に十分収まる
  });
  // シート範囲
  const maxRow=Math.max(lastDataRow,mr,46);
