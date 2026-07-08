@@ -2707,10 +2707,9 @@ function cbExportMF(){
    const code=MF_CODE_BY_NAME[it.acctName]; // 相手勘定科目コード（公式テンプレはD列にコードを入力）
    if(code==null){console.warn('MF出力: 科目コード未登録のため行をスキップしました:',it.acctName,it);return;} // 引けない行は出さない（runBal更新前なので残高も汚さない）
    runBal=runBal+(it.inn||0)-(it.out||0);
-   if(it.date){ // 文字列ではなく本物の日付型で出力（MFインポートが日付列を認識できるようにする）
-     const dm=String(it.date).match(/(\d+)\/(\d+)\/(\d+)/);
-     if(dm)ws['B'+row]={t:'d',v:new Date(+dm[1],(+dm[2])-1,+dm[3]),z:'yyyy/m/d'};
-     else set('B'+row,it.date);
+   if(it.date){ // 公式テンプレは日付を B=月・C=日 の2列に分ける（年は出力しない：MFが会計年度で判断。B列は1〜12規則のため年を絶対に入れない）
+     const dm=String(it.date).match(/(\d+)\/(\d+)\/(\d+)/); // "yyyy/m/d"
+     if(dm){set('B'+row,+dm[2],'n');set('C'+row,+dm[3],'n');} // B=月(1〜12,数値), C=日(1〜31,数値)
    }
    set('D'+row,code,'n'); // D列＝相手勘定科目コード（数値, t:'n'）※公式テンプレに合わせコードを入力
    if(it.acctName)set('E'+row,it.acctName); // E列＝科目名称（公式ではVLOOKUP表示。ここでは名称を直接出力）
@@ -2739,7 +2738,7 @@ function cbExportMF(){
  // シート範囲
  const maxRow=Math.max(lastDataRow,mr,46);
  ws['!ref']=`A1:Z${maxRow}`;
- ws['!cols']=[{wch:2},{wch:11},{wch:2},{wch:15},{wch:6},{wch:12},{wch:14},{wch:12},{wch:16},{wch:6},{wch:30},{wch:11},{wch:11},{wch:11}];
+ ws['!cols']=[{wch:2},{wch:5},{wch:5},{wch:15},{wch:6},{wch:12},{wch:14},{wch:12},{wch:16},{wch:6},{wch:30},{wch:11},{wch:11},{wch:11}]; // B=月/C=日 に合わせ両列を狭く
  const wb=XLSX.utils.book_new();
  XLSX.utils.book_append_sheet(wb,ws,'現金出納帳');
  XLSX.writeFile(wb,`MF_現金出納帳_${yy}年${mm}月_${bumon}.xlsx`);
