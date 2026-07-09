@@ -202,7 +202,28 @@ tr.changed:hover td{background:color-mix(in srgb,var(--gold) 22%,transparent)!im
  body.printing-reissue #reissueDoc,body.printing-reissue #reissueDoc *{visibility:visible!important;}
  body.printing-reissue #reissueDoc{position:absolute;left:0;top:0;width:100%;margin:0!important;box-shadow:none!important;border:none!important;}
  body.printing-reissue .noprint{display:none!important;}
- @page{margin:12mm;}
+ /* 初回案内PDF：#pdfDoc だけを印刷（再振替と同じ隔離方式・専用bodyクラス printing-newcomer） */
+ body.printing-newcomer *{visibility:hidden!important;}
+ body.printing-newcomer #pdfDoc,body.printing-newcomer #pdfDoc *{visibility:visible!important;}
+ body.printing-newcomer #pdfDoc{position:absolute;left:0;top:0;width:100%;max-width:100%!important;margin:0!important;box-shadow:none!important;border:none!important;}
+ body.printing-newcomer .noprint{display:none!important;}
+ /* A4縦1ページに必ず収めるための圧縮（余白・フォント・行間を印刷時だけ縮める。画面/JPEGは不変） */
+ body.printing-newcomer #pdfDoc .topbar{padding:14px 44px 8px!important;}
+ body.printing-newcomer #pdfDoc .titlewrap{padding:16px 44px 10px!important;}
+ body.printing-newcomer #pdfDoc .titleJP{font-size:21px!important;}
+ body.printing-newcomer #pdfDoc .titleline{margin-top:10px!important;}
+ body.printing-newcomer #pdfDoc .body{padding:4px 44px 14px!important;}
+ body.printing-newcomer #pdfDoc .greet{font-size:12px!important;line-height:1.75!important;margin:10px 0 16px!important;}
+ body.printing-newcomer #pdfDoc .sec2{margin:14px 0 6px!important;}
+ body.printing-newcomer #pdfDoc .info{gap:8px 28px!important;font-size:12.5px!important;}
+ body.printing-newcomer #pdfDoc .billtable td{padding:7px 10px!important;font-size:12.5px!important;}
+ body.printing-newcomer #pdfDoc .billtotal{padding:10px 10px 4px!important;}
+ body.printing-newcomer #pdfDoc .billtotal .amt{font-size:23px!important;}
+ body.printing-newcomer #pdfDoc .bankcard{padding:14px 24px!important;gap:8px 22px!important;font-size:12.5px!important;}
+ body.printing-newcomer #pdfDoc .duebox{padding:12px 24px!important;margin-top:12px!important;}
+ body.printing-newcomer #pdfDoc .duebox .date{font-size:20px!important;}
+ body.printing-newcomer #pdfDoc .closing{font-size:12px!important;line-height:1.7!important;margin:14px 0 4px!important;}
+ @page{size:A4;margin:12mm;}
 }
 </style></head>
 <body data-theme="rose">
@@ -1794,10 +1815,14 @@ function renderPDF(){
   setCard('初回案内PDF出力','新規入園者の案内状','「新規入園」タブで入力した園児の初回振込案内を表示します。','none');
   return;
  }
- h+=`<div style="padding:14px 22px;border-bottom:1px solid var(--line);font-size:13px;color:var(--mut);display:flex;gap:24px;align-items:center;flex-wrap:wrap">`+
+ h+=`<div class="noprint" style="padding:14px 22px;border-bottom:1px solid var(--line);font-size:13px;color:var(--mut);display:flex;gap:24px;align-items:center;flex-wrap:wrap">`+
    `<div>案内対象（新規入園）：<select id="pdfPick" class="inp" style="width:auto;padding:4px 8px">${orderedCand.map((c,idx)=>`<option value="${idx}" ${window.__pdfPick===idx?'selected':''}>${c.cls||''} ${c.name}${c.nyuen?'（入園 '+c.nyuen+'）':''}</option>`).join('')}</select></div>`+
    `<div>発行日：<input id="issueDate" type="date" value="${issue}" class="inp" style="width:auto;padding:4px 8px"></div>`+
-   `<div>振込期限（発行日＋7日）：<b style="color:var(--berry)">${fmtJP(due)}</b></div></div>`;
+   `<div>振込期限（発行日＋7日）：<b style="color:var(--berry)">${fmtJP(due)}</b></div>`+
+   `<div style="flex:1"></div>`+
+   `<button id="pdfJpeg" class="btn btn-ghost" style="padding:7px 16px;font-size:13px">🖼 JPEG保存</button>`+
+   `<button id="pdfPrint" class="btn btn-primary" style="padding:7px 16px;font-size:13px">🖨 印刷</button>`+
+   `</div>`;
  if(p){const c=calc(p,true);
   h+=`<style>
    .pdfdoc{max-width:780px;margin:32px auto;background:#fdfaf6;color:#2a2018;padding:0;font-family:'Zen Old Mincho',serif;box-shadow:0 2px 24px rgba(120,80,60,.08);border:1px solid #e8dcc8;position:relative;overflow:hidden;}
@@ -1847,7 +1872,7 @@ function renderPDF(){
    .pdfdoc .footer{padding:24px 56px 36px;text-align:center;font-size:10px;color:#a89888;letter-spacing:.2em;border-top:1px solid #ebdfc8;}
    .pdfdoc .footer .seal{display:inline-block;font-family:'Spline Sans Mono',monospace;font-size:9px;letter-spacing:.3em;border:1px solid ${facColor};padding:6px 14px;color:${facColor};margin-bottom:10px;}
   </style>`+
-   `<div class="pdfdoc">`+
+   `<div class="pdfdoc" id="pdfDoc">`+
     `<div class="topbar" style="display:block;text-align:center">`+
      `<div class="brandJP" style="font-size:15px;letter-spacing:.1em;color:${facColor}">${footName}</div>`+
      `<div class="issuedate" style="text-align:center;margin-top:8px;font-size:13px;color:#5a4a3a">${fmtJP(issue)}</div>`+
@@ -1901,7 +1926,36 @@ function renderPDF(){
  document.getElementById('body').innerHTML=h;
  const isd=document.getElementById('issueDate');if(isd)isd.onchange=e=>{window.__issueDate=e.target.value;render();};
  const pdfPickEl=document.getElementById('pdfPick');if(pdfPickEl)pdfPickEl.onchange=e=>{window.__pdfPick=+e.target.value;render();};
- setCard('初回案内PDF出力','選択園の口座を自動反映','発行日を変えると振込期限(発行日+7日)も自動で再計算されます。施設色がアクセントに反映されます。','none');
+ // 🖼 JPEG保存 / 🖨 印刷（再振替タブの実装を流用。印刷は専用bodyクラス printing-newcomer で案内状カードのみ印刷）
+ const pdfSafeName=((p&&p.name)||'案内').replace(/[\\/:*?"<>|\s]/g,'_');
+ const pj=document.getElementById('pdfJpeg');
+ if(pj)pj.onclick=()=>{
+   const doc=document.getElementById('pdfDoc');if(!doc)return;
+   if(typeof html2canvas==='undefined'){alert('画像変換ライブラリの読み込みに失敗しました。通信環境をご確認のうえ、ページを再読み込みしてください。');return;}
+   const old=pj.textContent;pj.textContent='変換中…';pj.disabled=true;
+   html2canvas(doc,{scale:2,backgroundColor:'#fdfaf6',useCORS:true}).then(canvas=>{
+     const a=document.createElement('a');
+     a.href=canvas.toDataURL('image/jpeg',0.95);
+     a.download=`新規入園振込案内_${pdfSafeName}_${issue}.jpg`;
+     a.click();
+     pj.textContent=old;pj.disabled=false;
+   }).catch(err=>{alert('JPEG変換に失敗しました：'+err);pj.textContent=old;pj.disabled=false;});
+ };
+ const pp=document.getElementById('pdfPrint');if(pp)pp.onclick=()=>printDoc('printing-newcomer');
+ setCard('初回案内PDF出力','選択園の口座を自動反映','発行日を変えると振込期限(発行日+7日)も自動で再計算されます。施設色がアクセントに反映されます。「🖼 JPEG保存」で画像化、「🖨 印刷」でA4縦1ページに印刷できます。','none');
+}
+// 印刷の共通ヘルパー：クラス付与→即 print()、戻しは afterprint（無ければrAF）。
+// 旧実装の setTimeout(…,500) の固定待ちを廃止し、印刷ダイアログを速く出し・速く復帰する。
+function printDoc(cls){
+ document.body.classList.add(cls);
+ const restore=()=>{document.body.classList.remove(cls);window.removeEventListener('afterprint',restore);};
+ if('onafterprint' in window){ // モダンブラウザ：ダイアログを閉じた確実なタイミングで復帰（早すぎる解除で印刷が崩れない）
+   window.addEventListener('afterprint',restore);
+   window.print();
+ }else{ // 非対応環境のフォールバック：次フレームで復帰
+   window.print();
+   requestAnimationFrame(restore);
+ }
 }
 function renderReissue(){
  // 対象＝再請求チェックが入った在園児（当園で絞り込み）
@@ -2061,7 +2115,7 @@ function renderReissue(){
      jb.textContent=old;jb.disabled=false;
    }).catch(err=>{alert('JPEG変換に失敗しました：'+err);jb.textContent=old;jb.disabled=false;});
  };
- const pb=document.getElementById('rePrint');if(pb)pb.onclick=()=>{document.body.classList.add('printing-reissue');window.print();setTimeout(()=>document.body.classList.remove('printing-reissue'),500);};
+ const pb=document.getElementById('rePrint');if(pb)pb.onclick=()=>printDoc('printing-reissue');
  setCard('再振替・再振込案内',`${park} の再請求対象 ${targets.length}名`,'「🖼 JPEG保存」で案内を画像として保存し連絡帳に貼り付け。「🖨 印刷」で紙に印刷（PDF保存も可）。方式を「振込」にすると振込先口座入り、「再振替」にすると再引落日のみの案内になります。月謝＋事務手数料が請求額です。','none');
 }
 function bindReissueBar(){
