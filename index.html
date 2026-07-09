@@ -288,7 +288,10 @@ tr.changed:hover td{background:color-mix(in srgb,var(--gold) 22%,transparent)!im
   <div style="font-size:13px;color:#666;margin:2px 0 22px">月謝管理アプリ ｜ クラウド同期版</div>
   <div style="font-size:13px;color:#444;margin-bottom:16px;line-height:1.7">事務員共通のメールアドレスとパスワードでログインしてください。</div>
   <input id="loginEmail" type="email" autocomplete="username" placeholder="メールアドレス" style="width:100%;box-sizing:border-box;padding:11px 14px;margin-bottom:10px;border:1px solid #d8c4cc;border-radius:10px;font-size:14px;font-family:inherit">
-  <input id="loginPass" type="password" autocomplete="current-password" placeholder="パスワード" style="width:100%;box-sizing:border-box;padding:11px 14px;margin-bottom:6px;border:1px solid #d8c4cc;border-radius:10px;font-size:14px;font-family:inherit">
+  <div style="position:relative;margin-bottom:6px">
+   <input id="loginPass" type="password" autocomplete="current-password" placeholder="パスワード" style="width:100%;box-sizing:border-box;padding:11px 44px 11px 14px;border:1px solid #d8c4cc;border-radius:10px;font-size:14px;font-family:inherit">
+   <button id="loginPassToggle" type="button" aria-label="パスワードを表示" title="パスワードを表示" style="position:absolute;top:50%;right:6px;transform:translateY(-50%);border:none;background:none;cursor:pointer;font-size:17px;line-height:1;padding:6px;color:#8a7a80;font-family:inherit">👁</button>
+  </div>
   <div id="loginErr" style="color:#b3203f;font-size:12.5px;min-height:18px;margin-bottom:10px;text-align:left;line-height:1.5"></div>
   <button id="loginBtn" style="width:100%;padding:12px;border:none;border-radius:24px;background:#7a2540;color:#fff;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit">ログイン</button>
   <div style="font-size:11.5px;color:#999;margin-top:14px;line-height:1.6">ログインすると、入力データはこの端末と全端末でクラウド同期されます。</div>
@@ -3540,6 +3543,17 @@ function cloudInit(){
   cloudDB=firebase.firestore();
   const lb=document.getElementById('loginBtn'); if(lb)lb.onclick=doLogin;
   ['loginEmail','loginPass'].forEach(id=>{const e=document.getElementById(id);if(e)e.addEventListener('keydown',ev=>{if(ev.key==='Enter')doLogin();});});
+  // パスワード表示/非表示トグル（目のアイコン）。入力ミス（全角混入など）を目視確認するため。doLoginは変更しない
+  const pt=document.getElementById('loginPassToggle');
+  if(pt)pt.onclick=()=>{
+    const inp=document.getElementById('loginPass'); if(!inp) return;
+    const show=inp.type==='password';
+    inp.type=show?'text':'password';
+    pt.textContent=show?'🙈':'👁';
+    const lbl=show?'パスワードを隠す':'パスワードを表示';
+    pt.title=lbl; pt.setAttribute('aria-label',lbl);
+    inp.focus();
+  };
   firebase.auth().onAuthStateChanged(user=>{ if(user){ onSignedIn(); } else { showLogin(); } });
  }catch(e){ console.error('Firebase初期化失敗',e); cloudBarSet('error','初期化エラー'); hideLogin(); }
 }
