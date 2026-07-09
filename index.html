@@ -3417,13 +3417,25 @@ function openPwForm(user){
 function showLogin(){const ov=document.getElementById('loginOverlay');if(ov)ov.style.display='flex';}
 function hideLogin(){const ov=document.getElementById('loginOverlay');if(ov)ov.style.display='none';}
 function doLogin(){
- const email=document.getElementById('loginEmail').value.trim();
- const pass=document.getElementById('loginPass').value;
- const err=document.getElementById('loginErr'); err.textContent='';
- if(!email||!pass){err.textContent='メールアドレスとパスワードを入力してください。';return;}
- const btn=document.getElementById('loginBtn'); btn.disabled=true; btn.textContent='ログイン中…';
+ const err=document.getElementById('loginErr'); if(err)err.textContent='';
+ const email=(document.getElementById('loginEmail').value||'').trim();
+ const pass=document.getElementById('loginPass').value||'';
+ if(!email||!pass){if(err)err.textContent='メールアドレスとパスワードを入力してください。';return;}
+ if(typeof firebase==='undefined'||!firebase.auth){if(err)err.textContent='サーバーに接続できません（Firebase未読み込み）。ページを再読み込みしてから、もう一度お試しください。';return;}
+ const btn=document.getElementById('loginBtn'); if(btn){btn.disabled=true; btn.textContent='ログイン中…';}
  firebase.auth().signInWithEmailAndPassword(email,pass)
-  .catch(e=>{ err.textContent='ログインできませんでした（'+(e.code||e.message)+'）'; btn.disabled=false; btn.textContent='ログイン'; });
+  .catch(e=>{
+    const c=(e&&e.code)||'';
+    let m;
+    if(c==='auth/too-many-requests') m='ログイン失敗が続いたため、一時的にロックされています。パスワード自体は合っている可能性があります。しばらく（数十分）待ってから再度お試しいただくか、パスワードを再設定してください。';
+    else if(c==='auth/wrong-password'||c==='auth/invalid-credential') m='パスワードが違います。（全角スペースの混入や大文字・小文字にご注意ください。目のアイコンで入力内容を確認できます）';
+    else if(c==='auth/user-not-found') m='このメールアドレスは登録されていません。';
+    else if(c==='auth/invalid-email') m='メールアドレスの形式が正しくありません。';
+    else if(c==='auth/network-request-failed') m='通信エラーです。ネットワーク接続をご確認のうえ、もう一度お試しください。';
+    else m='ログインできませんでした（'+(c||e.message)+'）';
+    if(err)err.textContent=m;
+    if(btn){btn.disabled=false; btn.textContent='ログイン';}
+  });
 }
 function askOperator(then){
  const ov=document.getElementById('operOverlay');
@@ -3536,26 +3548,36 @@ function showConflict(data,payload){
  document.getElementById('cfTake').onclick=()=>{ window.__applyingRemote=true; if(payload){cloudApplyObject(payload);render();} window.__applyingRemote=false; __cloudDirty=false; __pendingUserSave=false; __pushedSeq=__editSeq; el.style.display='none'; cloudBarSet('synced'); };
  document.getElementById('cfKeep').onclick=()=>{ el.style.display='none'; cloudPushNow(); };
 }
+// ログイン画面のUI配線（ボタン・Enterキー・目のアイコン）。Firebaseの成否と無関係に必ず実行する。
+// ※以前はこの配線がFirebase初期化の成功後（typeof firebase チェックの内側）にあり、
+//   SDKが読めない環境ではボタンも目のアイコンも一切反応しない不具合になっていた。
+function wireLoginUI(){
+ const lb=document.getElementById('loginBtn'); if(lb)lb.onclick=doLogin;
+ ['loginEmail','loginPass'].forEach(id=>{const e=document.getElementById(id);if(e)e.addEventListener('keydown',ev=>{if(ev.key==='Enter')doLogin();});});
+ // パスワード表示/非表示トグル（目のアイコン）。入力ミス（全角混入など）を目視確認するため。
+ const pt=document.getElementById('loginPassToggle');
+ if(pt)pt.onclick=()=>{
+   const inp=document.getElementById('loginPass'); if(!inp) return;
+   const show=inp.type==='password';
+   inp.type=show?'text':'password';
+   pt.textContent=show?'🙈':'👁';
+   const lbl=show?'パスワードを隠す':'パスワードを表示';
+   pt.title=lbl; pt.setAttribute('aria-label',lbl);
+   inp.focus();
+ };
+}
 function cloudInit(){
- if(typeof firebase==='undefined'){ cloudBarSet('error','SDK読込失敗（オフライン？）'); return; }
+ wireLoginUI(); // ← Firebaseが読めなくてもボタン・目のアイコンは動くよう、先に必ず配線する
+ if(typeof firebase==='undefined'){
+   cloudBarSet('error','SDK読込失敗（オフライン？）');
+   const err=document.getElementById('loginErr'); if(err)err.textContent='サーバーに接続できません（Firebaseを読み込めませんでした）。通信環境をご確認のうえ、ページを再読み込みしてください。';
+   return;
+ }
  try{
   firebase.initializeApp(firebaseConfig);
   cloudDB=firebase.firestore();
-  const lb=document.getElementById('loginBtn'); if(lb)lb.onclick=doLogin;
-  ['loginEmail','loginPass'].forEach(id=>{const e=document.getElementById(id);if(e)e.addEventListener('keydown',ev=>{if(ev.key==='Enter')doLogin();});});
-  // パスワード表示/非表示トグル（目のアイコン）。入力ミス（全角混入など）を目視確認するため。doLoginは変更しない
-  const pt=document.getElementById('loginPassToggle');
-  if(pt)pt.onclick=()=>{
-    const inp=document.getElementById('loginPass'); if(!inp) return;
-    const show=inp.type==='password';
-    inp.type=show?'text':'password';
-    pt.textContent=show?'🙈':'👁';
-    const lbl=show?'パスワードを隠す':'パスワードを表示';
-    pt.title=lbl; pt.setAttribute('aria-label',lbl);
-    inp.focus();
-  };
   firebase.auth().onAuthStateChanged(user=>{ if(user){ onSignedIn(); } else { showLogin(); } });
- }catch(e){ console.error('Firebase初期化失敗',e); cloudBarSet('error','初期化エラー'); hideLogin(); }
+ }catch(e){ console.error('Firebase初期化失敗',e); cloudBarSet('error','初期化エラー'); const err=document.getElementById('loginErr'); if(err)err.textContent='初期化エラー：'+((e&&e.message)||e)+'（ページを再読み込みしてください）'; showLogin(); }
 }
 cloudInit();
 </script></body></html>
