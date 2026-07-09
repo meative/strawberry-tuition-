@@ -464,17 +464,29 @@ let timelyData={};
 // ===== 端末内保存（localStorage）：閉じても残る。Firebase移行時もこのデータ構造を流用 =====
 const STORE_KEY='sf_tuition_v1';
 let __saveTimer=null;
+// ユーザー編集の localStorage 書き込みがまだ済んでいない間 true。
+// リモート受信側が「この端末は編集直後だ」と判断するために使う（__cloudDirty が
+// 自分の書き込みエコーで消されても、こちらは残るので取りこぼさない）。
+let __pendingUserSave=false;
 function saveState(){ // 入力データをまとめて端末に保存（連打防止のため少し遅延）
  if(__saveTimer)clearTimeout(__saveTimer);
  const skipCloud = !!window.__applyingRemote; // リモート反映中の保存はクラウドへ送り返さない
+ // 編集中フラグはデバウンスの外で即座に立てる。
+ // タイマーの中で立てると、編集してから 300ms の間 __cloudDirty が false のままになり、
+ // その隙に他端末の更新を受けると showConflict を通らず静かに上書きされる。
+ if(!skipCloud){
+  __pendingUserSave=true;
+  if(typeof cloudMarkDirty==='function') cloudMarkDirty();
+ }
  __saveTimer=setTimeout(()=>{
+  __saveTimer=null;
   try{
    const data={v:1, savedAt:new Date().toISOString(),
     roster, changeLog, lookmeeCheck, rosterBase, bank, reissueFeeByPark, initSaleLog, cashbook, cashbookEvent, timelyData,
     addons, sched, schedMemo, meals};
    localStorage.setItem(STORE_KEY, JSON.stringify(data));
   }catch(e){console.warn('保存に失敗:',e);}
-  if(!skipCloud && typeof cloudMarkDirty==='function') cloudMarkDirty();
+  if(!skipCloud) __pendingUserSave=false;
  },300);
 }
 function loadState(){ // 起動時に端末から復元
@@ -1111,7 +1123,9 @@ function renderNew(){
  document.querySelectorAll('[data-newi]').forEach(el=>{el.onchange=e=>{const i=+e.target.dataset.newi,f=e.target.dataset.f;roster[i][f]=e.target.value;
    if(f==='birth'){const c=classByBirth(e.target.value,yy);if(c)roster[i].cls=c;}
    render();};
-  el.oninput=e=>{const i=+e.target.dataset.newi,f=e.target.dataset.f;roster[i][f]=e.target.value;};});
+  // 入力中も保存する（saveState は300msのデバウンス付き）。保存しないと、
+  // 入力中に他端末の更新を受けたとき「編集中でない」と見なされ静かに巻き戻る
+  el.oninput=e=>{const i=+e.target.dataset.newi,f=e.target.dataset.f;roster[i][f]=e.target.value;saveState();};});
  // オプションパネルの開閉
  document.querySelectorAll('[data-newopt]').forEach(el=>{el.onclick=e=>{const i=+e.currentTarget.dataset.newopt;
    window.__newOptOpen=(window.__newOptOpen===i)?undefined:i;render();};});
@@ -1133,8 +1147,8 @@ function renderNew(){
          if(g){o.price=g.price;const sz=(g.sizes&&g.sizes.length>0)?g.sizes[0]:'';o.size=sz;}
        }
        render();
-     }else if(of==='goods'){o.goods=e.target.value;}
-     else if(of==='size'){o.size=e.target.value;}
+     }else if(of==='goods'){o.goods=e.target.value;saveState();} // render() を通らないので明示的に保存
+     else if(of==='size'){o.size=e.target.value;saveState();}
      else if(of==='price'){o.price=+e.target.value;render();}
      else if(of==='qty'){o.qty=+e.target.value;render();}
    };
@@ -1230,7 +1244,7 @@ function renderAddon(){
    }
    if(f==='kind'){if(v==='返金'){addons[i].goods='';addons[i].size='';addons[i].custom=false;}}
    render();};el.onchange=handler;
-   if(el.dataset.f==='customgoods')el.oninput=e=>{addons[+e.target.dataset.add].goods=e.target.value;};});
+   if(el.dataset.f==='customgoods')el.oninput=e=>{addons[+e.target.dataset.add].goods=e.target.value;saveState();};});
  document.querySelectorAll('[data-adddel]').forEach(el=>{el.onclick=e=>{const i=+e.currentTarget.dataset.adddel;
    const a=addons[i];const nm=(a.name?a.name+'さんの':'')+(a.goods||'この項目')+(a.kind==='返金'?'（返金）':'');
    confirmDialog(`追加申込みから「${nm}」を削除します。\nこの操作は取り消せません。本当に削除しますか？`,()=>{addons.splice(i,1);render();});};});
@@ -1734,7 +1748,7 @@ function renderSched(){
  document.getElementById('body').innerHTML=h;
  // メモ欄の保存
  const memoEl=document.getElementById('schedMemo');
- if(memoEl)memoEl.oninput=e=>{schedMemo=e.target.value;};
+ if(memoEl)memoEl.oninput=e=>{schedMemo=e.target.value;saveState();};
  // 並び替えボタン：配列自体を年月順に並び替えて確定
  document.getElementById('schSort').onclick=()=>{const id2=new Map(sched.map((s,i)=>[s,i]));
    sched.sort((a,b)=>{const ka=(+a.year||0)*100+(+a.month||0),kb=(+b.year||0)*100+(+b.month||0);if(ka!==kb)return ka-kb;return id2.get(a)-id2.get(b);});render();};
@@ -3236,6 +3250,9 @@ const firebaseConfig = {
 };
 const CLOUD_COL='app', CLOUD_DOC_ID='state';
 let cloudDB=null, cloudReady=false, __cloudDirty=false, __pushTimer=null;
+// 編集の通し番号。push でクラウドへ送った時点の番号を控えておき、
+// 「送った後に増えていない」ときだけ __cloudDirty を落とす（送信後の編集を消さない）。
+let __editSeq=0, __pushedSeq=-1;
 let MY_DEVICE = localStorage.getItem('sf_device_id') || (()=>{const id='dev_'+Math.random().toString(36).slice(2)+Date.now().toString(36);localStorage.setItem('sf_device_id',id);return id;})();
 let currentOperator = localStorage.getItem('sf_operator') || '';
 let __lastRemote = null; // {by, at:Date}
@@ -3400,9 +3417,12 @@ function startCloudSync(){
   if(snap.metadata.hasPendingWrites){ cloudBarSet('saving'); return; } // 自分の未確定書き込み
   const data=snap.data();
   if(data.updatedAt) __lastRemote={by:data.updatedBy||'',at:data.updatedAt.toDate()};
-  if(data.deviceId===MY_DEVICE){ __cloudDirty=false; cloudBarSet('synced'); return; } // 自分の更新が確定
+  // 自分の更新が確定。ただし送信後に新しい編集が入っていれば dirty は落とさない
+  if(data.deviceId===MY_DEVICE){ if(__editSeq===__pushedSeq){__cloudDirty=false;} cloudBarSet('synced'); return; }
   const payload=parsePayload(data);
-  if(!__cloudDirty){ // 自分は編集中でない→そのまま反映
+  // __pendingUserSave も見る。自分の書き込みエコー（上の分岐）で __cloudDirty が
+  // 落ちた直後に他端末の更新が届くと、編集直後なのに「編集中でない」と誤判定されるため。
+  if(!__cloudDirty && !__pendingUserSave){ // 自分は編集中でない→そのまま反映
    window.__applyingRemote=true; if(payload){cloudApplyObject(payload);render();} window.__applyingRemote=false;
    cloudBarSet('synced');
   } else { // 編集中に他端末が更新→警告（最終保存優先＋警告）
@@ -3411,6 +3431,7 @@ function startCloudSync(){
  }, err=>{ console.error('onSnapshot error',err); cloudBarSet('error','接続エラー'); });
 }
 function cloudMarkDirty(){
+ __editSeq++; // cloudReady 前の編集も数える（起動直後の編集を取りこぼさない）
  if(!cloudReady)return;
  __cloudDirty=true; cloudBarSet('dirty');
  if(__pushTimer)clearTimeout(__pushTimer);
@@ -3419,11 +3440,14 @@ function cloudMarkDirty(){
 function cloudPushNow(){
  if(!cloudDB)return;
  cloudBarSet('saving');
+ const seq=__editSeq; // この番号の状態を送る
  const json=JSON.stringify(cloudStateObject());
  if(json.length>950000) console.warn('クラウド保存データが大きくなっています（'+json.length+'字）。1MB上限に注意。');
+ __pushedSeq=seq;
  cloudRef().set({ payload:json, updatedBy:currentOperator||'(不明)', deviceId:MY_DEVICE,
    updatedAt:firebase.firestore.FieldValue.serverTimestamp(), clientTime:new Date().toISOString() })
-  .then(()=>{ __cloudDirty=false; })
+  // 送信中に新しい編集が入っていたら dirty のままにする（次の push で送る）
+  .then(()=>{ if(__editSeq===seq) __cloudDirty=false; })
   .catch(e=>{ console.error('クラウド保存失敗',e); cloudBarSet('error','保存失敗'); });
 }
 function cloudManualRefresh(){
@@ -3434,7 +3458,8 @@ function cloudManualRefresh(){
   const data=snap.data(); const payload=parsePayload(data);
   if(data.updatedAt) __lastRemote={by:data.updatedBy||'',at:data.updatedAt.toDate()};
   window.__applyingRemote=true; if(payload){cloudApplyObject(payload);render();} window.__applyingRemote=false;
-  __cloudDirty=false; cloudBarSet('synced');
+  // 手動で最新を取得＝ローカルの編集は破棄。保存待ちフラグも畳む（残すと以降ずっと衝突扱いになる）
+  __cloudDirty=false; __pendingUserSave=false; __pushedSeq=__editSeq; cloudBarSet('synced');
  }).catch(e=>{ cloudBarSet('error','取得失敗'); });
 }
 function showConflict(data,payload){
@@ -3451,7 +3476,7 @@ function showConflict(data,payload){
    `<button id="cfKeep" style="padding:9px 16px;border:1px solid #fff;border-radius:20px;background:transparent;color:#fff;font-weight:700;cursor:pointer;font-family:inherit;font-size:13px">自分の変更を優先（上書き保存）</button>`+
   `</div>`;
  el.style.display='block';
- document.getElementById('cfTake').onclick=()=>{ window.__applyingRemote=true; if(payload){cloudApplyObject(payload);render();} window.__applyingRemote=false; __cloudDirty=false; el.style.display='none'; cloudBarSet('synced'); };
+ document.getElementById('cfTake').onclick=()=>{ window.__applyingRemote=true; if(payload){cloudApplyObject(payload);render();} window.__applyingRemote=false; __cloudDirty=false; __pendingUserSave=false; __pushedSeq=__editSeq; el.style.display='none'; cloudBarSet('synced'); };
  document.getElementById('cfKeep').onclick=()=>{ el.style.display='none'; cloudPushNow(); };
 }
 function cloudInit(){
