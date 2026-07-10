@@ -207,23 +207,36 @@ tr.changed:hover td{background:color-mix(in srgb,var(--gold) 22%,transparent)!im
  body.printing-newcomer #pdfDoc,body.printing-newcomer #pdfDoc *{visibility:visible!important;}
  body.printing-newcomer #pdfDoc{position:absolute;left:0;top:0;width:100%;max-width:100%!important;margin:0!important;box-shadow:none!important;border:none!important;}
  body.printing-newcomer .noprint{display:none!important;}
- /* A4縦1ページに必ず収めるための圧縮（余白・フォント・行間を印刷時だけ縮める。画面/JPEGは不変） */
- body.printing-newcomer #pdfDoc .topbar{padding:14px 44px 8px!important;}
- body.printing-newcomer #pdfDoc .titlewrap{padding:16px 44px 10px!important;}
- body.printing-newcomer #pdfDoc .titleJP{font-size:21px!important;}
- body.printing-newcomer #pdfDoc .titleline{margin-top:10px!important;}
- body.printing-newcomer #pdfDoc .body{padding:4px 44px 14px!important;}
- body.printing-newcomer #pdfDoc .greet{font-size:12px!important;line-height:1.75!important;margin:10px 0 16px!important;}
- body.printing-newcomer #pdfDoc .sec2{margin:14px 0 6px!important;}
- body.printing-newcomer #pdfDoc .info{gap:8px 28px!important;font-size:12.5px!important;}
- body.printing-newcomer #pdfDoc .billtable td{padding:7px 10px!important;font-size:12.5px!important;}
- body.printing-newcomer #pdfDoc .billtotal{padding:10px 10px 4px!important;}
- body.printing-newcomer #pdfDoc .billtotal .amt{font-size:23px!important;}
- body.printing-newcomer #pdfDoc .bankcard{padding:14px 24px!important;gap:8px 22px!important;font-size:12.5px!important;}
- body.printing-newcomer #pdfDoc .duebox{padding:12px 24px!important;margin-top:12px!important;}
- body.printing-newcomer #pdfDoc .duebox .date{font-size:20px!important;}
- body.printing-newcomer #pdfDoc .closing{font-size:12px!important;line-height:1.7!important;margin:14px 0 4px!important;}
- @page{size:A4;margin:12mm;}
+ /* A4縦1ページに必ず収めるための圧縮（余白・フォント・行間を印刷時だけ縮める。画面/JPEGは不変）。
+    オプション明細が数個増えても収まるよう、余白・行間を優先的に詰めつつ本文は11.5px以上を維持して可読性を保つ。 */
+ body.printing-newcomer #pdfDoc{font-size:12px!important;}
+ body.printing-newcomer #pdfDoc::after{display:none!important;} /* 下端の装飾バーは改ページ誘発を避けるため印刷時は消す */
+ body.printing-newcomer #pdfDoc .topbar{padding:10px 40px 6px!important;}
+ body.printing-newcomer #pdfDoc .brandJP{font-size:13px!important;}
+ body.printing-newcomer #pdfDoc .issuedate{margin-top:4px!important;font-size:11px!important;}
+ body.printing-newcomer #pdfDoc .titlewrap{padding:10px 40px 6px!important;}
+ body.printing-newcomer #pdfDoc .titleEN{margin-bottom:6px!important;font-size:9px!important;}
+ body.printing-newcomer #pdfDoc .titleJP{font-size:20px!important;letter-spacing:.4em!important;}
+ body.printing-newcomer #pdfDoc .titleline{margin-top:8px!important;}
+ body.printing-newcomer #pdfDoc .body{padding:2px 40px 10px!important;}
+ body.printing-newcomer #pdfDoc .addr{font-size:15px!important;margin:6px 0 2px!important;}
+ body.printing-newcomer #pdfDoc .greet{font-size:11.5px!important;line-height:1.65!important;margin:8px 0 12px!important;}
+ body.printing-newcomer #pdfDoc .sec2{margin:12px 0 5px!important;}
+ body.printing-newcomer #pdfDoc .sec2 .lbl{font-size:13px!important;}
+ body.printing-newcomer #pdfDoc .info{gap:5px 24px!important;font-size:12px!important;}
+ body.printing-newcomer #pdfDoc .info dd b{font-size:14px!important;}
+ body.printing-newcomer #pdfDoc .billtable td{padding:5px 10px!important;font-size:12px!important;line-height:1.35!important;}
+ body.printing-newcomer #pdfDoc .billtotal{padding:8px 10px 3px!important;margin-top:4px!important;}
+ body.printing-newcomer #pdfDoc .billtotal .lbl{font-size:13px!important;}
+ body.printing-newcomer #pdfDoc .billtotal .amt{font-size:22px!important;}
+ body.printing-newcomer #pdfDoc .bankcard{padding:12px 22px!important;gap:7px 20px!important;font-size:12px!important;margin-top:10px!important;break-inside:avoid;}
+ body.printing-newcomer #pdfDoc .bankcard dd{font-size:12px!important;}
+ body.printing-newcomer #pdfDoc .duebox{padding:10px 22px!important;margin-top:10px!important;break-inside:avoid;}
+ body.printing-newcomer #pdfDoc .duebox .date{font-size:19px!important;}
+ body.printing-newcomer #pdfDoc .duebox .sub{margin-top:4px!important;font-size:10.5px!important;}
+ body.printing-newcomer #pdfDoc .closing{font-size:11.5px!important;line-height:1.6!important;margin:12px 0 3px!important;break-inside:avoid;}
+ body.printing-newcomer #pdfDoc .keigu{margin-top:2px!important;font-size:12px!important;}
+ @page{size:A4;margin:10mm;}
 }
 </style></head>
 <body data-theme="rose">
