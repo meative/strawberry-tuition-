@@ -3305,6 +3305,16 @@ function exportXlsx(){const wb=XLSX.utils.book_new();const add=(n,a)=>XLSX.utils
 }
 
 // init
+// 対象年月（yy/mm）の初期化：この端末（iPad/ブラウザ）ごとに localStorage で個別保持。クラウド同期はしない＝他端末の表示月に影響させない。
+// 既定は「今月」。手動で今月以外を選んだらローカルに記憶し次回起動でも保持。今月を選び直すと記憶を消して“今月追従”に戻す。
+const TARGET_YM_KEY='sf_target_ym';
+(function initTargetYM(){
+  const now=new Date(); const cy=now.getFullYear(), cm=now.getMonth()+1;
+  let ty=cy, tm=cm;
+  try{ const raw=localStorage.getItem(TARGET_YM_KEY); if(raw){ const s=JSON.parse(raw); if(s&&s.y&&s.m){ ty=+s.y; tm=+s.m; } } }catch(e){}
+  yy=ty; mm=tm;
+  const ys=document.getElementById('yy'); if(ys)ys.value=String(yy); // 年セレクタに反映（対象optionが無ければ既定のまま）
+})();
 M.facilities.forEach(f=>{const o=document.createElement('option');o.textContent=f.name;if(f.name===park)o.selected=true;document.getElementById('park').appendChild(o);});
 const mmSel=document.getElementById('mm');for(let i=1;i<=12;i++){const o=document.createElement('option');o.value=i;o.textContent=i+'月';if(i===mm)o.selected=true;mmSel.appendChild(o);}
 const TABS=[['settings','設定'],['newcomer','新規入園',1],['sched','年間スケジュール'],['roster','園児台帳'],['addon','追加申込み',1],['meals','給食記録',1],['monthly','月次計算',1],['lookmee','ルクミー出力',1],['reissue','再振替・再振込案内',1],['cashbook','現金出納帳',1],['salesreport','月売上表',1],['hq','本部用集計'],['readme','README']];
@@ -3322,8 +3332,16 @@ const FAC_COLORS={'月寒園':'#3d7355','白石園':'#4a5a82','サッポロフ�
 function applyParkColor(){const sel=document.getElementById('park');const c=FAC_COLORS[park]||'var(--leaf)';
  sel.style.borderColor=c;sel.style.color=c;sel.style.borderLeftWidth='5px';}
 document.getElementById('park').onchange=e=>{park=e.target.value;wakuFilter='すべて';clsFilter='すべて';applyParkColor();syncTabs();render();};
-document.getElementById('yy').onchange=e=>{yy=+e.target.value;render();};
-document.getElementById('mm').onchange=e=>{mm=+e.target.value;render();};
+// 対象年月を手動変更したら、この端末のローカルに記憶（今月と一致するときは記憶を消して“今月追従”へ戻す）
+function saveTargetYM(){
+  try{
+    const now=new Date();
+    if(yy===now.getFullYear() && mm===now.getMonth()+1) localStorage.removeItem(TARGET_YM_KEY);
+    else localStorage.setItem(TARGET_YM_KEY, JSON.stringify({y:yy,m:mm}));
+  }catch(e){}
+}
+document.getElementById('yy').onchange=e=>{yy=+e.target.value;saveTargetYM();render();};
+document.getElementById('mm').onchange=e=>{mm=+e.target.value;saveTargetYM();render();};
 loadState();
 syncTabs();applyParkColor();render();
 
