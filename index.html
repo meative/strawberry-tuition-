@@ -1069,12 +1069,23 @@ function renderNewcomer(){
 }
 function renderNew(){
  // roster内の「新規入園」フラグの園児を登録順（regSeq）に表示。確定後も残る。
+ // 入園年月日 nyuen が「対象年月(yy/mm)」に該当するか。未設定/解釈不能は消えないよう true（安全側）。
+ const inTargetYM=(nyuen)=>{
+   if(!nyuen)return true;
+   const m=String(nyuen).match(/^(\d{4})-(\d{1,2})/);
+   if(!m)return true;
+   return (+m[1]===yy)&&(+m[2]===mm);
+ };
  const list=roster.map((r,i)=>({r,i})).filter(x=>x.r.isNew)
+   .filter(x=> park==='全施設' || x.r.park===park )        // 園フィルタ：特定園選択中はその所属園のみ表示
+   .filter(x=> !x.r.confirmed || inTargetYM(x.r.nyuen) )   // 月フィルタ：未確定は常時表示／確定は入園年月が対象月のときだけ表示
    .sort((a,b)=>(a.r.regSeq||0)-(b.r.regSeq||0));
  // 販売単価表（制服・その他）
  const goodsList=M.goods.filter(g=>g.facs.length===0||true); // 全商品を選択可
  let h='<div style="display:flex;flex-direction:column;gap:16px">';
- if(list.length===0)h+='<div style="text-align:center;color:var(--mut);padding:32px;border:1px dashed var(--line);border-radius:14px">「＋ 新規入園を追加」から途中入園者を入力してください。入力後「確定」を押すと月次計算・ルクミー出力・本部集計に反映されます。確定後も記録として一覧に残ります。</div>';
+ // 表示条件バナー（園フィルタ・月フィルタの状態を明示。データが消えたのではなく絞り込み中だと分かるように）
+ h+=`<div style="font-size:12px;color:var(--mut);background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:8px 12px">表示条件：<b style="color:var(--ink)">${park==='全施設'?'全施設':park}</b> ／ 対象 <b style="color:var(--ink)">${yy}年${mm}月</b>（未確定の子は対象月に関わらず常に表示）</div>`;
+ if(list.length===0)h+=`<div style="text-align:center;color:var(--mut);padding:32px;border:1px dashed var(--line);border-radius:14px">現在の表示条件（${park==='全施設'?'全施設':park}／${yy}年${mm}月）に該当する新規入園はありません。<br>「＋ 新規入園を追加」から入力するか、上部の対象年月・園を切り替えると過去の入園者も表示されます。<br><span style="font-size:12px">※ データは削除されていません（園児台帳・月次計算には従来どおり反映されています）。</span></div>`;
  list.forEach(({r,i})=>{const n=r;
   const c=n.name?calc(n,true):null;
   const optSum=initOptsSum(n);
@@ -1087,9 +1098,10 @@ function renderNew(){
   h+=`<div style="border:1px solid var(--line);border-radius:14px;overflow:hidden;background:${isConf?'color-mix(in srgb,var(--leaf) 5%,var(--panel))':'var(--panel)'}">`+
    // ヘッダー帯：状態＋初月合計
    `<div style="display:flex;justify-content:space-between;align-items:center;padding:12px 18px;border-bottom:1px solid var(--line);background:${isConf?'color-mix(in srgb,var(--leaf) 8%,transparent)':'var(--panel2)'}">`+
-     `<div style="display:flex;align-items:center;gap:10px">`+
+     `<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">`+
        `${isConf?'<span class="ptag pt-月寒園" style="font-size:11px">確定済</span>':'<span style="font-size:11px;color:var(--mut);border:1px solid var(--line);border-radius:10px;padding:3px 10px">未確定</span>'}`+
        `<span style="font-size:15px;font-weight:600;color:var(--ink)">${n.name||'（園児名を入力してください）'}</span>`+
+       `${park==='全施設'?`<span style="font-size:11px;color:var(--berry);border:1px solid var(--berry);border-radius:10px;padding:2px 9px;background:var(--berrysoft)">${n.park||'（所属園未設定）'}</span>`:''}`+
      `</div>`+
      `<div style="text-align:right"><div style="font-size:11px;color:var(--mut)">初月合計</div><div style="font-size:20px;font-weight:700;color:var(--berry)">${grand!=null?'¥'+grand.toLocaleString():'—'}</div>${optSum>0?`<div style="font-size:11px;color:var(--mut)">（含オプ ¥${optSum.toLocaleString()}）</div>`:''}</div>`+
    `</div>`+
