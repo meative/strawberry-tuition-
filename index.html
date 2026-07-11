@@ -2047,13 +2047,15 @@ function renderPDF(){
    `<div>案内対象（新規入園）：<select id="pdfPick" class="inp" style="width:auto;padding:4px 8px">${orderedCand.map((c,idx)=>`<option value="${idx}" ${window.__pdfPick===idx?'selected':''}>${c.cls||''} ${c.name}${c.nyuen?'（入園 '+c.nyuen+'）':''}</option>`).join('')}</select></div>`+
    `<div>発行日：<input id="issueDate" type="date" value="${issue}" class="inp" style="width:auto;padding:4px 8px"></div>`+
    `<div>振込期限（発行日＋7日）：<b style="color:var(--berry)">${fmtJP(due)}</b></div>`+
-   `<div style="flex:1"></div>`+
    // iPad/iPhone は Safari が自動印刷を禁止しているため、印刷ボタンは出さず JPEG保存に一本化する。
-   // Mac/PC は従来どおり「JPEG保存」＋「印刷」の2ボタン（挙動も現状のまま）。
+   // Mac/PC は「JPEG保存」＋「印刷」の2ボタン。2つを1つのまとまり(flex-wrap:nowrap)にして常に隣り合わせにし、
+   // 右寄せ(margin-left:auto)で置く。これで画面が狭くても「印刷」だけが次の行の左にはぐれない。
+   `<div style="margin-left:auto;display:flex;gap:10px;align-items:center;flex-wrap:nowrap">`+
    (IS_IOS
      ? `<button id="pdfJpeg" class="btn btn-primary" style="padding:7px 16px;font-size:13px">🖼 JPEGで保存（印刷用）</button>`
      : `<button id="pdfJpeg" class="btn btn-ghost" style="padding:7px 16px;font-size:13px">🖼 JPEG保存</button>`+
        `<button id="pdfPrint" class="btn btn-primary" style="padding:7px 16px;font-size:13px">🖨 印刷</button>`)+
+   `</div>`+
    `</div>`;
  if(p){const c=calc(p,true);
   h+=`<style>
@@ -2347,12 +2349,14 @@ function renderReissue(){
  h+=`<div class="noprint" style="padding:10px 22px;border-bottom:1px solid var(--line);font-size:13px;color:var(--mut);display:flex;gap:14px;align-items:center;flex-wrap:wrap">`+
    `<div>対象者（${tabTargets.length}名）：`+
    `<select id="rePick" class="inp" style="width:auto;padding:4px 8px">${tabTargets.map((t,idx)=>`<option value="${idx}" ${window.__rePick===idx?'selected':''}>${t.cls||''} ${t.name}</option>`).join('')}</select></div>`+
-   `<div style="flex:1"></div>`+
-   // iPad/iPhone は自動印刷が禁止されているため、JPEG保存に一本化（Mac/PCは2ボタンのまま）
+   // iPad/iPhone は自動印刷が禁止されているため、JPEG保存に一本化（Mac/PCは2ボタンのまま）。
+   // 2ボタンは1つのまとまり(nowrap)にして右寄せ。狭い画面で「印刷」だけが下段左にはぐれないようにする。
+   `<div style="margin-left:auto;display:flex;gap:10px;align-items:center;flex-wrap:nowrap">`+
    (IS_IOS
      ? `<button id="reJpeg" class="btn btn-primary" style="padding:7px 16px;font-size:13px">🖼 JPEGで保存（印刷用）</button>`
      : `<button id="reJpeg" class="btn btn-ghost" style="padding:7px 16px;font-size:13px">🖼 JPEG保存</button>`+
        `<button id="rePrint" class="btn btn-primary" style="padding:7px 16px;font-size:13px">🖨 印刷</button>`)+
+   `</div>`+
    `</div>`;
  // 金額：当月請求合計＝月謝、＋事務手数料＝振込額
  const c=calc(p);
