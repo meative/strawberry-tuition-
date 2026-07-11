@@ -406,7 +406,7 @@ let cloudDB=null, cloudReady=false, __cloudDirty=false, __pushTimer=null;
 let __editSeq=0, __pushedSeq=-1;
 // 直近に保存した内容（saveStateの重複保存＝無変更でのクラウド送信を防ぐ）。TDZ回避のためここで宣言。
 let __lastSavedJson=null;
-// 印刷の後片付けタイマー（afterprint が来ない環境の保険）。TDZ回避のためここで宣言。
+// 印刷フレームの後片付けタイマー（印刷が非同期な環境の保険）。TDZ回避のためここで宣言。
 let __printTimer=null;
 
 // ===== 重いライブラリの遅延読み込み =====
@@ -2217,51 +2217,80 @@ function saveDocAsJpeg(docId,fileName,btn){
   }).catch(err=>{alert('JPEG変換に失敗しました：'+err);done();});
  },btn);
 }
-// 印刷の共通ヘルパー（DOMは動かさない）。
-// 印刷したい書類（#pdfDoc / #reissueDoc）に .print-target、その祖先すべてに .print-anc を付け、
-// body に .printing-doc と専用クラスを付けるだけ。あとは @media print の CSS が
-// 「対象の祖先だけ表示・その兄弟は display:none」で隔離する（＝空白ページが出ない）。
-// これらのクラスは印刷時にしか効かないので、万一 afterprint が来ずクラスが残っても
-// 画面表示・JPEG保存には一切影響しない（旧実装のDOM移動方式はここで壊れていた）。
+// 印刷の共通ヘルパー（残置：現在は printDoc から呼ばない）。
+// かつては「アプリ本体を印刷しつつ CSS で案内状以外を隠す」方式で、隠すクラスの後始末に使っていた。
+// 現在は下の printDoc が「案内状だけを入れた別ページ(iframe)を印刷する」方式に変わったため未使用。
+// 画面表示・JPEG保存には無関係なので、安全のため関数だけ残しておく。
 function clearPrintMarks(){
  document.body.className=document.body.className.split(/\s+/).filter(c=>c&&c!=='printing-doc'&&!/^printing-/.test(c)).join(' ');
  document.querySelectorAll('.print-anc,.print-target').forEach(el=>el.classList.remove('print-anc','print-target'));
 }
+// 【印刷の設計（重要）】案内状は「アプリ本体」を印刷せず、案内状だけを入れた“別ページ”を印刷する。
+//  画面外の隠し iframe に案内状の複製だけを入れ、その iframe を印刷する。
+//  ＝印刷の土俵にヘッダー・絞り込み・タブが最初から存在しないので、
+//    「アプリ画面ごと印刷される」事故が“構造的に”起きない（Safariの印刷タイミングにも左右されない）。
+//  見た目は、アプリの <style>/<link> を丸ごと iframe に持ち込み、既存の @media print の
+//  圧縮ルール（body.printing-newcomer #pdfDoc ... 等）をそのまま流用するので、画面／JPEGと一致する。
 function printDoc(cls,docId){
- if(__printTimer){clearTimeout(__printTimer);__printTimer=null;} // 前回の後片付けが残っていれば取り消す
- clearPrintMarks(); // 前回の印刷マークが残っていても必ずリセットしてから始める（2回目以降も同じ状態から開始）
  const doc=docId?document.getElementById(docId):null;
  if(!doc){ alert('印刷する案内書が見つかりません。画面を切り替えてからもう一度お試しください。'); return; }
- doc.classList.add('print-target');
- for(let el=doc.parentElement; el && el!==document.body; el=el.parentElement) el.classList.add('print-anc');
- document.body.classList.add('printing-doc',cls);
 
- let done=false;
- const restore=()=>{
-  if(done)return; done=true;
+ // 前回の印刷フレーム・タイマーが残っていれば片付ける
+ if(__printTimer){clearTimeout(__printTimer);__printTimer=null;}
+ const stale=document.getElementById('__printFrame');
+ if(stale&&stale.parentNode)stale.parentNode.removeChild(stale);
+
+ // 画面外（左方向）に A4 サイズの隠し iframe を作る。display:none だと印刷されないため、
+ // 位置で画面外に逃がす（サイズは持たせてレイアウトを確定させる）。
+ const frame=document.createElement('iframe');
+ frame.id='__printFrame';
+ frame.setAttribute('aria-hidden','true');
+ frame.style.cssText='position:fixed;left:-10000px;top:0;width:794px;height:1123px;border:0;';
+ document.body.appendChild(frame);
+ const fdoc=frame.contentDocument||(frame.contentWindow&&frame.contentWindow.document);
+ if(!fdoc){ alert('印刷の準備に失敗しました。もう一度お試しください。'); if(frame.parentNode)frame.parentNode.removeChild(frame); return; }
+
+ // アプリの見た目とフォントを丸ごと iframe に持ち込む（<style> と Googleフォント等の <link>）。
+ // これで案内状の見た目・数字のフォントが画面／JPEGと完全に一致する。
+ let head='';
+ document.querySelectorAll('link[rel="stylesheet"],link[rel="preconnect"],style').forEach(n=>{ head+=n.outerHTML; });
+ // A4・余白・背景印刷だけ最小限で足す（圧縮や色調整は既存の @media print を流用）。
+ const pageCSS='<style>@page{size:A4;margin:9mm;}html,body{margin:0!important;padding:0!important;background:#fff!important;}</style>';
+
+ // 既存の印刷CSSが期待する入れ子（body.printing-doc > .print-anc > #doc.print-target）を
+ // iframe 内に最小構成で再現する。中身は案内状ひとつだけなので、隔離ルールが他を隠そうとしても
+ // “隠す相手がいない”＝案内状だけがそのまま A4 で出る。専用クラス cls で圧縮ルールも効く。
+ fdoc.open();
+ fdoc.write('<!DOCTYPE html><html lang="ja"><head><meta charset="utf-8">'+head+pageCSS+
+   '</head><body class="printing-doc '+cls+'"><div class="print-anc"></div></body></html>');
+ fdoc.close();
+ const anc=fdoc.querySelector('.print-anc');
+ const clone=doc.cloneNode(true);
+ clone.classList.add('print-target');
+ anc.appendChild(clone);
+
+ // 片付け（フレームは不可視なので、多少残っても無害）
+ const cleanup=()=>{
   if(__printTimer){clearTimeout(__printTimer);__printTimer=null;}
-  clearPrintMarks(); // 何があっても必ず元に戻す（次回の印刷・JPEG保存を妨げない）
-  window.removeEventListener('afterprint',restore);
+  const f=document.getElementById('__printFrame');
+  if(f&&f.parentNode)f.parentNode.removeChild(f);
  };
- window.addEventListener('afterprint',restore);
- // afterprint が来ない環境（iPad Safari）向けの保険。クラスが残っても画面・JPEGには影響しないため、
- // 印刷シートの生成を邪魔しないよう十分長く待ってから片付ける。
- __printTimer=setTimeout(restore,30000);
- // ※ focus イベントでの復帰は行わない。iPad では印刷シートが出る前に focus が飛ぶことがあり、
- //   隔離クラスが早すぎるタイミングで剥がれて「アプリ画面ごと印刷される」原因になる。
+ const doPrint=()=>{
+  try{
+   frame.contentWindow.focus();
+   frame.contentWindow.print();
+  }catch(e){
+   alert('印刷を開始できませんでした：'+((e&&e.message)||e)); cleanup(); return;
+  }
+  // 印刷終了の合図(afterprint)で片付ける。来ない環境向けに十分長い保険も置く。
+  try{ frame.contentWindow.addEventListener('afterprint',cleanup,{once:true}); }catch(e){}
+  __printTimer=setTimeout(cleanup,60000);
+ };
 
- // 【iPad Safari 対策・最重要】
- // iOS Safari は、クラスを付けた直後に同じ処理の中で print() を呼ぶと、
- // スタイル適用・レイアウト確定の“前”の状態を印刷用にスナップショットしてしまう。
- // （＝隔離が効かず、ヘッダー・タブ・ボタンを含むアプリ画面全体が数ページ印刷される）
- // 強制的にレイアウトを確定させ、さらに2フレーム待ってから print() を呼ぶ。
- void document.body.offsetHeight; // 強制リフロー：ここで隔離後のレイアウトが確定する
- requestAnimationFrame(()=>requestAnimationFrame(()=>{
-  setTimeout(()=>{
-   try{ window.print(); }
-   catch(e){ alert('印刷を開始できませんでした：'+((e&&e.message)||e)); restore(); }
-  },0);
- }));
+ // 見た目・フォントが整うのを待ってから印刷（数字フォントのズレや描画途中の印刷を防ぐ）。
+ const go=()=>requestAnimationFrame(()=>requestAnimationFrame(doPrint));
+ if(fdoc.fonts&&fdoc.fonts.ready){ fdoc.fonts.ready.then(go).catch(go); }
+ else{ go(); }
 }
 function renderReissue(){
  // 対象＝再請求チェックが入った在園児（当園で絞り込み）
