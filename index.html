@@ -213,14 +213,20 @@ tr.changed:hover td{background:color-mix(in srgb,var(--gold) 22%,transparent)!im
      クラスは @media print の中でしか意味を持たないため、万一クラスが残っても画面は無傷。 */
 @media print{
  @page{size:A4;margin:10mm;}
- body.printing-doc{background:#fff!important;}
+ /* 用紙の高さ計算を狂わせないよう、ルート要素の余白・スクロール枠を無効化（Safari対策） */
+ html,body{margin:0!important;padding:0!important;height:auto!important;min-height:0!important;overflow:visible!important;background:#fff!important;}
  /* ①body直下を全部消す → ②印刷対象の祖先だけ復活 → ③その祖先の他の子を消す → ④対象を表示 */
  body.printing-doc > *{display:none!important;}
  body.printing-doc .print-anc{display:block!important;}
  body.printing-doc .print-anc > *{display:none!important;}
  body.printing-doc .print-anc > .print-anc,
  body.printing-doc .print-anc > .print-target{display:block!important;}
- body.printing-doc .print-target{display:block!important;margin:0!important;width:100%!important;max-width:100%!important;box-shadow:none!important;border:none!important;}
+ /* 祖先（.app / .card / #body など）が持つ余白・枠・影・幅制限・スクロール枠を印刷時だけ無効化。
+    これをしないと Safari で案内書が用紙の途中から始まったり、余白ぶんで2ページ目が生まれる。 */
+ body.printing-doc .print-anc{margin:0!important;padding:0!important;border:none!important;background:none!important;box-shadow:none!important;
+   width:auto!important;max-width:none!important;min-height:0!important;height:auto!important;overflow:visible!important;position:static!important;float:none!important;}
+ body.printing-doc .print-target{display:block!important;margin:0!important;width:100%!important;max-width:100%!important;box-shadow:none!important;border:none!important;
+   position:static!important;overflow:visible!important;}
  .noprint{display:none!important;}
  /* Safari（iPad/Mac）は既定で背景色・背景グラデーションを印刷しない。
     施設カラーバー・口座欄の背景・振込期限の枠を紙に出すために明示指定する。 */
@@ -339,6 +345,8 @@ let cloudDB=null, cloudReady=false, __cloudDirty=false, __pushTimer=null;
 let __editSeq=0, __pushedSeq=-1;
 // 直近に保存した内容（saveStateの重複保存＝無変更でのクラウド送信を防ぐ）。TDZ回避のためここで宣言。
 let __lastSavedJson=null;
+// 印刷の後片付けタイマー（afterprint が来ない環境の保険）。TDZ回避のためここで宣言。
+let __printTimer=null;
 
 // ===== 重いライブラリの遅延読み込み =====
 // xlsx（Excel出力）と html2canvas（JPEG保存）は起動時には読み込まない。
@@ -2081,7 +2089,8 @@ function clearPrintMarks(){
  document.querySelectorAll('.print-anc,.print-target').forEach(el=>el.classList.remove('print-anc','print-target'));
 }
 function printDoc(cls,docId){
- clearPrintMarks(); // 前回の印刷マークが残っていても必ずリセットしてから始める
+ if(__printTimer){clearTimeout(__printTimer);__printTimer=null;} // 前回の後片付けが残っていれば取り消す
+ clearPrintMarks(); // 前回の印刷マークが残っていても必ずリセットしてから始める（2回目以降も同じ状態から開始）
  const doc=docId?document.getElementById(docId):null;
  if(!doc){ alert('印刷する案内書が見つかりません。画面を切り替えてからもう一度お試しください。'); return; }
  doc.classList.add('print-target');
@@ -2091,14 +2100,29 @@ function printDoc(cls,docId){
  let done=false;
  const restore=()=>{
   if(done)return; done=true;
-  clearPrintMarks();
+  if(__printTimer){clearTimeout(__printTimer);__printTimer=null;}
+  clearPrintMarks(); // 何があっても必ず元に戻す（次回の印刷・JPEG保存を妨げない）
   window.removeEventListener('afterprint',restore);
-  window.removeEventListener('focus',restore);
  };
  window.addEventListener('afterprint',restore);
- window.addEventListener('focus',restore); // iPad Safari は afterprint が発火しないことがある
- setTimeout(restore,10000);                // 最後の保険（クラスが残っても実害はないが念のため）
- window.print();
+ // afterprint が来ない環境（iPad Safari）向けの保険。クラスが残っても画面・JPEGには影響しないため、
+ // 印刷シートの生成を邪魔しないよう十分長く待ってから片付ける。
+ __printTimer=setTimeout(restore,30000);
+ // ※ focus イベントでの復帰は行わない。iPad では印刷シートが出る前に focus が飛ぶことがあり、
+ //   隔離クラスが早すぎるタイミングで剥がれて「アプリ画面ごと印刷される」原因になる。
+
+ // 【iPad Safari 対策・最重要】
+ // iOS Safari は、クラスを付けた直後に同じ処理の中で print() を呼ぶと、
+ // スタイル適用・レイアウト確定の“前”の状態を印刷用にスナップショットしてしまう。
+ // （＝隔離が効かず、ヘッダー・タブ・ボタンを含むアプリ画面全体が数ページ印刷される）
+ // 強制的にレイアウトを確定させ、さらに2フレーム待ってから print() を呼ぶ。
+ void document.body.offsetHeight; // 強制リフロー：ここで隔離後のレイアウトが確定する
+ requestAnimationFrame(()=>requestAnimationFrame(()=>{
+  setTimeout(()=>{
+   try{ window.print(); }
+   catch(e){ alert('印刷を開始できませんでした：'+((e&&e.message)||e)); restore(); }
+  },0);
+ }));
 }
 function renderReissue(){
  // 対象＝再請求チェックが入った在園児（当園で絞り込み）
