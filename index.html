@@ -203,6 +203,43 @@ tr.changed:hover td{background:color-mix(in srgb,var(--gold) 22%,transparent)!im
 .readme{padding:22px 26px;font-size:13.5px;line-height:1.95;white-space:pre-wrap;}
 .readme b{color:var(--leaf);}
 .foot{text-align:center;font-size:11px;color:var(--mut);letter-spacing:.05em;margin-top:34px;}
+/* ===== JPEG保存（印刷用）のA4化 =====
+   JPEG保存は「A4の紙をそのまま画像にしたもの」を出力する。
+   画面用の案内書（幅780px・縦長）をそのまま画像化すると、A4より縦長の比率になり、
+   写真アプリから印刷したときにA4の中央へ小さく配置され、余白だらけになっていた。
+   そこで、画面外に用意した「A4サイズの台紙」（794×1123px＝A4 96dpi換算、内側余白9mm）に
+   案内書の“複製”を貼り、その台紙ごと画像化する（原本のDOMは一切動かさない）。
+   .a4-fit は、印刷時と同じ圧縮（余白・行間を詰めてA4 1枚に収める）を画像化のときにも効かせるためのクラス。
+   画面表示・印刷CSSには一切影響しない（この class が付くのは画面外の複製だけ）。 */
+.a4-fit{margin:0!important;width:100%!important;max-width:100%!important;box-shadow:none!important;border:none!important;font-size:12px!important;}
+.a4-fit::after{display:none!important;}
+.a4-fit .topbar{padding:6px 40px 5px!important;}
+.a4-fit .brandJP{font-size:13px!important;}
+.a4-fit .issuedate{margin-top:4px!important;font-size:11px!important;}
+.a4-fit .titlewrap{padding:6px 40px 4px!important;}
+.a4-fit .titleEN{margin-bottom:6px!important;font-size:9px!important;}
+.a4-fit .titleJP{font-size:19px!important;letter-spacing:.36em!important;}
+.a4-fit .titleline{margin-top:6px!important;}
+.a4-fit .body{padding:0 40px 6px!important;}
+.a4-fit .addr{font-size:15px!important;margin:6px 0 2px!important;}
+.a4-fit .greet{font-size:11.5px!important;line-height:1.6!important;margin:6px 0 10px!important;}
+.a4-fit .sec2{margin:9px 0 4px!important;}
+.a4-fit .sec2 .lbl{font-size:13px!important;}
+.a4-fit .info{gap:4px 24px!important;font-size:12px!important;}
+.a4-fit .info dd b{font-size:14px!important;}
+.a4-fit .billtable td{padding:4px 10px!important;font-size:12px!important;line-height:1.3!important;}
+.a4-fit .billtotal{padding:6px 10px 2px!important;margin-top:3px!important;}
+.a4-fit .billtotal .lbl{font-size:13px!important;}
+.a4-fit .billtotal .amt{font-size:22px!important;}
+.a4-fit .bankcard{padding:9px 20px!important;gap:5px 20px!important;font-size:12px!important;margin-top:8px!important;}
+.a4-fit .bankcard dd{font-size:12px!important;}
+.a4-fit .duebox{padding:8px 20px!important;margin-top:8px!important;}
+.a4-fit .duebox .date{font-size:19px!important;}
+.a4-fit .duebox .sub{margin-top:4px!important;font-size:10.5px!important;}
+.a4-fit .closing{font-size:11px!important;line-height:1.5!important;margin:8px 0 2px!important;}
+.a4-fit .keigu{margin-top:1px!important;font-size:11.5px!important;}
+.a4-fit .footer{padding:10px 40px 12px!important;}
+
 /* 印刷の隔離方式（重要）
    ・旧々方式：アプリ全体を visibility:hidden → 高さが残るので空白ページが出る。
    ・旧方式（不具合）：書類ノードを非表示コンテナへ「移動」→ iPad Safari は afterprint を
@@ -2140,8 +2177,36 @@ function saveDocAsJpeg(docId,fileName,btn){
   const doc=document.getElementById(docId);if(!doc)return;
   if(!canCapture(doc)){alert('案内書が画面に表示されていないため画像化できません。画面を再表示してからもう一度お試しください。');return;}
   const old=btn.textContent;btn.textContent='変換中…';btn.disabled=true;
-  const done=()=>{btn.textContent=old;btn.disabled=false;}; // 成功・失敗どちらでも必ず元に戻す
-  html2canvas(doc,{scale:2,backgroundColor:'#fdfaf6',useCORS:true}).then(canvas=>{
+
+  // A4縦の「紙」を画面外につくり、そこに案内書の複製を貼ってから、紙ごと画像化する。
+  // これで画像そのものがA4の比率（210:297＝1:1.414）になり、写真アプリからそのまま印刷しても
+  // 用紙いっぱいに広がる（＝Mac Chromeの直接印刷と同じ見え方）。
+  // A4 96dpi換算＝794×1123px、内側余白は印刷と同じ 9mm（≒34px）。
+  const A4_W=794, A4_H=1123, PAD=34, INNER_H=A4_H-PAD*2;
+  const stage=document.createElement('div');
+  stage.className='noprint';
+  stage.style.cssText='position:fixed;left:-10000px;top:0;z-index:-1;width:'+A4_W+'px;height:'+A4_H+'px;'+
+    'padding:'+PAD+'px;box-sizing:border-box;background:#fdfaf6;overflow:hidden;';
+  const clone=doc.cloneNode(true); // ★複製。画面に出ている原本は一切動かさない
+  clone.removeAttribute('id');     // id重複を避ける
+  clone.classList.add('a4-fit');   // 印刷と同じ圧縮レイアウトを適用（A4 1枚に収まる形）
+  stage.appendChild(clone);
+  document.body.appendChild(stage);
+
+  const done=()=>{ // 成功・失敗どちらでも必ず後片付けする
+   if(stage.parentNode)stage.parentNode.removeChild(stage);
+   btn.textContent=old;btn.disabled=false;
+  };
+  // 内容がA4の印刷可能領域より高いときだけ、はみ出さないよう全体を均等に縮小する
+  const ch=clone.getBoundingClientRect().height;
+  if(ch>INNER_H){
+   const k=INNER_H/ch;
+   clone.style.transformOrigin='top left';
+   clone.style.transform='scale('+k+')';
+   clone.style.width=(100/k)+'%'; // 縮小したぶん横幅を広げ、紙の幅いっぱいを保つ
+  }
+  // scale:2 → 1588×2246px（A4を約190dpi相当）。印刷しても十分きれいな解像度。
+  html2canvas(stage,{scale:2,backgroundColor:'#fdfaf6',useCORS:true,width:A4_W,height:A4_H}).then(canvas=>{
     const a=document.createElement('a');
     a.href=canvas.toDataURL('image/jpeg',0.95);
     a.download=fileName;
