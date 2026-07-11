@@ -409,6 +409,40 @@ function withLib(name,fn,btn){
   alert('必要なライブラリを読み込めませんでした。通信環境をご確認のうえ、もう一度お試しください。\n（'+((e&&e.message)||e)+'）');
  });
 }
+// ===== 端末判定：iOS / iPadOS か =====
+// iPad・iPhone の Safari は「Webサイトからの自動印刷」をブロックし、window.print() を呼ぶと
+// 「このWebサイトから自動的に印刷することは禁止されています」と出て実用的に印刷できない。
+// そのため iOS では印刷ボタンを出さず、JPEG保存に一本化する（画像を保存 → 写真アプリから印刷）。
+// ・iPhone / iPod / 旧iPad：userAgent に iPhone / iPad / iPod が入る。
+// ・iPadOS 13以降：Safariが「Mac」を名乗るため userAgent では判別できない。
+//   platform==='MacIntel' かつ タッチ対応（maxTouchPoints>1）で iPad と判定する。
+//   Mac のデスクトップ（Chrome/Safari）は maxTouchPoints が 0 なので「非iOS」となる。
+const IS_IOS = (function(){
+ try{
+  const ua=navigator.userAgent||'';
+  if(/iPad|iPhone|iPod/.test(ua))return true;
+  const plat=navigator.platform||'';
+  const touch=Number(navigator.maxTouchPoints||0);
+  return (plat==='MacIntel'||plat==='iPad'||plat==='iPhone') && touch>1; // iPadOS 13+ の「Macを名乗るSafari」
+ }catch(e){ return false; }
+})();
+// 画面下に数秒だけ出る控えめな案内（保存後の「次にどうするか」を伝える）
+function toast(msg,ms){
+ let el=document.getElementById('sfToast');
+ if(!el){
+  el=document.createElement('div');
+  el.id='sfToast'; el.className='noprint';
+  el.style.cssText='position:fixed;left:50%;bottom:26px;transform:translateX(-50%);z-index:10050;'+
+   'background:rgba(30,20,26,.92);color:#fff;padding:12px 20px;border-radius:22px;font-size:13.5px;'+
+   'line-height:1.6;max-width:88%;text-align:center;box-shadow:0 8px 30px rgba(0,0,0,.25);'+
+   'opacity:0;transition:opacity .25s;pointer-events:none;font-family:inherit;';
+  document.body.appendChild(el);
+ }
+ el.textContent=msg;
+ requestAnimationFrame(()=>{el.style.opacity='1';});
+ if(window.__toastTimer)clearTimeout(window.__toastTimer);
+ window.__toastTimer=setTimeout(()=>{el.style.opacity='0';}, ms||4500);
+}
 // 画像化できる状態か（幅・高さが有限で0より大きいか）を確認する。
 // html2canvas は 0サイズ／非表示の要素を渡されると「The provided value is non-finite」で落ちるため、
 // 呼ぶ前に必ずここで弾く。
@@ -1977,8 +2011,12 @@ function renderPDF(){
    `<div>発行日：<input id="issueDate" type="date" value="${issue}" class="inp" style="width:auto;padding:4px 8px"></div>`+
    `<div>振込期限（発行日＋7日）：<b style="color:var(--berry)">${fmtJP(due)}</b></div>`+
    `<div style="flex:1"></div>`+
-   `<button id="pdfJpeg" class="btn btn-ghost" style="padding:7px 16px;font-size:13px">🖼 JPEG保存</button>`+
-   `<button id="pdfPrint" class="btn btn-primary" style="padding:7px 16px;font-size:13px">🖨 印刷</button>`+
+   // iPad/iPhone は Safari が自動印刷を禁止しているため、印刷ボタンは出さず JPEG保存に一本化する。
+   // Mac/PC は従来どおり「JPEG保存」＋「印刷」の2ボタン（挙動も現状のまま）。
+   (IS_IOS
+     ? `<button id="pdfJpeg" class="btn btn-primary" style="padding:7px 16px;font-size:13px">🖼 JPEGで保存（印刷用）</button>`
+     : `<button id="pdfJpeg" class="btn btn-ghost" style="padding:7px 16px;font-size:13px">🖼 JPEG保存</button>`+
+       `<button id="pdfPrint" class="btn btn-primary" style="padding:7px 16px;font-size:13px">🖨 印刷</button>`)+
    `</div>`;
  if(p){const c=calc(p,true);
   h+=`<style>
@@ -2087,20 +2125,32 @@ function renderPDF(){
  const pdfSafeName=((p&&p.name)||'案内').replace(/[\\/:*?"<>|\s]/g,'_');
  const pj=document.getElementById('pdfJpeg');
  // JPEG保存を押したときに初めて html2canvas を読み込む（表示・印刷では読み込まない）
- if(pj)pj.onclick=()=>withLib('html2canvas',()=>{
-   const doc=document.getElementById('pdfDoc');if(!doc)return;
-   if(!canCapture(doc)){alert('案内書が画面に表示されていないため画像化できません。画面を再表示してからもう一度お試しください。');return;}
-   const old=pj.textContent;pj.textContent='変換中…';pj.disabled=true;
-   html2canvas(doc,{scale:2,backgroundColor:'#fdfaf6',useCORS:true}).then(canvas=>{
-     const a=document.createElement('a');
-     a.href=canvas.toDataURL('image/jpeg',0.95);
-     a.download=`新規入園振込案内_${pdfSafeName}_${issue}.jpg`;
-     a.click();
-     pj.textContent=old;pj.disabled=false;
-   }).catch(err=>{alert('JPEG変換に失敗しました：'+err);pj.textContent=old;pj.disabled=false;});
- },pj);
+ if(pj)pj.onclick=()=>saveDocAsJpeg('pdfDoc',`新規入園振込案内_${pdfSafeName}_${issue}.jpg`,pj);
  const pp=document.getElementById('pdfPrint');if(pp)pp.onclick=()=>printDoc('printing-newcomer','pdfDoc');
- setCard('初回案内PDF出力','選択園の口座を自動反映','発行日を変えると振込期限(発行日+7日)も自動で再計算されます。施設色がアクセントに反映されます。「🖼 JPEG保存」で画像化、「🖨 印刷」でA4縦1ページに印刷できます。','none');
+ setCard('初回案内PDF出力','選択園の口座を自動反映',
+   IS_IOS
+    ? '発行日を変えると振込期限(発行日+7日)も自動で再計算されます。施設色がアクセントに反映されます。「🖼 JPEGで保存（印刷用）」を押すと案内書が画像として保存されるので、写真アプリ（またはダウンロード）から印刷してください。'
+    : '発行日を変えると振込期限(発行日+7日)も自動で再計算されます。施設色がアクセントに反映されます。「🖼 JPEG保存」で画像化、「🖨 印刷」でA4縦1ページに印刷できます。','none');
+}
+// 案内書をJPEGとして保存する共通処理（初回案内PDF・再振替案内の両方で使用）。
+// 画像化の設定（scale:2 / 背景色 / 明朝）は従来のまま＝出力品質は不変。
+// 押されたときに初めて html2canvas を読み込む（表示・印刷では読み込まない）。
+function saveDocAsJpeg(docId,fileName,btn){
+ withLib('html2canvas',()=>{
+  const doc=document.getElementById(docId);if(!doc)return;
+  if(!canCapture(doc)){alert('案内書が画面に表示されていないため画像化できません。画面を再表示してからもう一度お試しください。');return;}
+  const old=btn.textContent;btn.textContent='変換中…';btn.disabled=true;
+  const done=()=>{btn.textContent=old;btn.disabled=false;}; // 成功・失敗どちらでも必ず元に戻す
+  html2canvas(doc,{scale:2,backgroundColor:'#fdfaf6',useCORS:true}).then(canvas=>{
+    const a=document.createElement('a');
+    a.href=canvas.toDataURL('image/jpeg',0.95);
+    a.download=fileName;
+    a.click();
+    done();
+    // iOSは印刷ボタンが無いぶん、保存後に次の操作を短く案内する
+    if(IS_IOS)toast('画像を保存しました。写真アプリ（またはダウンロード）から印刷してください。');
+  }).catch(err=>{alert('JPEG変換に失敗しました：'+err);done();});
+ },btn);
 }
 // 印刷の共通ヘルパー（DOMは動かさない）。
 // 印刷したい書類（#pdfDoc / #reissueDoc）に .print-target、その祖先すべてに .print-anc を付け、
@@ -2204,8 +2254,11 @@ function renderReissue(){
    `<div>対象者（${tabTargets.length}名）：`+
    `<select id="rePick" class="inp" style="width:auto;padding:4px 8px">${tabTargets.map((t,idx)=>`<option value="${idx}" ${window.__rePick===idx?'selected':''}>${t.cls||''} ${t.name}</option>`).join('')}</select></div>`+
    `<div style="flex:1"></div>`+
-   `<button id="reJpeg" class="btn btn-ghost" style="padding:7px 16px;font-size:13px">🖼 JPEG保存</button>`+
-   `<button id="rePrint" class="btn btn-primary" style="padding:7px 16px;font-size:13px">🖨 印刷</button>`+
+   // iPad/iPhone は自動印刷が禁止されているため、JPEG保存に一本化（Mac/PCは2ボタンのまま）
+   (IS_IOS
+     ? `<button id="reJpeg" class="btn btn-primary" style="padding:7px 16px;font-size:13px">🖼 JPEGで保存（印刷用）</button>`
+     : `<button id="reJpeg" class="btn btn-ghost" style="padding:7px 16px;font-size:13px">🖼 JPEG保存</button>`+
+       `<button id="rePrint" class="btn btn-primary" style="padding:7px 16px;font-size:13px">🖨 印刷</button>`)+
    `</div>`;
  // 金額：当月請求合計＝月謝、＋事務手数料＝振込額
  const c=calc(p);
@@ -2294,21 +2347,12 @@ function renderReissue(){
  const rp=document.getElementById('rePick');if(rp)rp.onchange=e=>{window.__rePick=+e.target.value;render();};
  const safeName=(p.name||'案内').replace(/[\\/:*?"<>|\s]/g,'_');
  const jb=document.getElementById('reJpeg');
- // JPEG保存を押したときに初めて html2canvas を読み込む
- if(jb)jb.onclick=()=>withLib('html2canvas',()=>{
-   const doc=document.getElementById('reissueDoc');if(!doc)return;
-   if(!canCapture(doc)){alert('案内書が画面に表示されていないため画像化できません。画面を再表示してからもう一度お試しください。');return;}
-   const old=jb.textContent;jb.textContent='変換中…';jb.disabled=true;
-   html2canvas(doc,{scale:2,backgroundColor:'#fdfaf6',useCORS:true}).then(canvas=>{
-     const a=document.createElement('a');
-     a.href=canvas.toDataURL('image/jpeg',0.95);
-     a.download=`月謝納入のお願い_${safeName}_${issue}.jpg`;
-     a.click();
-     jb.textContent=old;jb.disabled=false;
-   }).catch(err=>{alert('JPEG変換に失敗しました：'+err);jb.textContent=old;jb.disabled=false;});
- },jb);
+ if(jb)jb.onclick=()=>saveDocAsJpeg('reissueDoc',`月謝納入のお願い_${safeName}_${issue}.jpg`,jb);
  const pb=document.getElementById('rePrint');if(pb)pb.onclick=()=>printDoc('printing-reissue','reissueDoc');
- setCard('再振替・再振込案内',`${park} の再請求対象 ${targets.length}名`,'「🖼 JPEG保存」で案内を画像として保存し連絡帳に貼り付け。「🖨 印刷」で紙に印刷（PDF保存も可）。方式を「振込」にすると振込先口座入り、「再振替」にすると再引落日のみの案内になります。月謝＋事務手数料が請求額です。','none');
+ setCard('再振替・再振込案内',`${park} の再請求対象 ${targets.length}名`,
+   IS_IOS
+    ? '「🖼 JPEGで保存（印刷用）」を押すと案内が画像として保存されます。連絡帳への貼り付けにも、写真アプリ（またはダウンロード）からの印刷にも使えます。方式を「振込」にすると振込先口座入り、「再振替」にすると再引落日のみの案内になります。月謝＋事務手数料が請求額です。'
+    : '「🖼 JPEG保存」で案内を画像として保存し連絡帳に貼り付け。「🖨 印刷」で紙に印刷（PDF保存も可）。方式を「振込」にすると振込先口座入り、「再振替」にすると再引落日のみの案内になります。月謝＋事務手数料が請求額です。','none');
 }
 function bindReissueBar(){
  document.querySelectorAll('[data-retab]').forEach(el=>{el.onclick=e=>{window.__reissueTab=e.currentTarget.dataset.retab;window.__rePick=0;render();};});
