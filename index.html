@@ -2,9 +2,14 @@
 <html lang="ja"><head><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>STRAWBERRY FIELD ｜ 月謝管理</title>
-<link href="https://fonts.googleapis.com/css2?family=Zen+Old+Mincho:wght@600;700;900&family=Zen+Kaku+Gothic+New:wght@400;500;700&family=Spline+Sans+Mono:wght@500;600;700&display=swap" rel="stylesheet">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<!-- Webフォントは「案内書の見出し用の明朝1ウェイト」＋「数字用の等幅1ウェイト」だけに絞る。
+     以前は日本語フォント3ファミリー×3ウェイトを読み込んでおり、iPad Safari で
+     フォント断片ファイルを約100個も取得していた（=表示が重い最大の原因）。
+     本文用ゴシック(Zen Kaku Gothic New)は端末標準の日本語ゴシック（iPad/Mac ならヒラギノ）に置き換えた。 -->
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Zen+Old+Mincho:wght@600&family=Spline+Sans+Mono:wght@500&display=swap" rel="stylesheet">
+<!-- xlsx / html2canvas は「Excel出力」「JPEG保存」を押したときに初めて読み込む（loadLib）。
+     初回案内PDFの表示・印刷では一切使わないため、起動時には読み込まない。 -->
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
@@ -95,7 +100,8 @@
  --chip:#1f2738; --headbg:#0a0e18; --headtxt:#e4e9f2; --yellow:#3a3410;
 }
 *{box-sizing:border-box;margin:0;padding:0;}
-body{font-family:"Zen Kaku Gothic New",sans-serif;background:var(--bg);color:var(--ink);
+/* 本文ゴシックは端末標準（iPad/Mac＝ヒラギノ角ゴ、Win＝メイリオ/游ゴシック）。Webフォント取得ゼロ。 */
+body{font-family:-apple-system,"Hiragino Kaku Gothic ProN","Hiragino Sans","Yu Gothic Medium","Meiryo",sans-serif;background:var(--bg);color:var(--ink);
  transition:background .4s,color .4s;min-height:100vh;
  background-image:radial-gradient(circle at 12% 8%,color-mix(in srgb,var(--leaf2) 8%,transparent),transparent 42%),
   radial-gradient(circle at 88% 92%,color-mix(in srgb,var(--berry) 6%,transparent),transparent 46%);}
@@ -192,21 +198,27 @@ tr.changed:hover td{background:color-mix(in srgb,var(--gold) 22%,transparent)!im
 [data-theme="dark"] .pdfpaper{color:#1a1a1a;}
 .pdfpaper h3{text-align:center;font-size:20px;letter-spacing:.3em;margin:18px 0;border-bottom:2px solid #2f6b46;padding-bottom:10px;}
 .pdfpaper .sec{font-weight:700;color:#2f6b46;border-left:4px solid #2f6b46;padding-left:8px;margin:18px 0 8px;}
-.pdfpaper table{font-family:"Zen Kaku Gothic New";font-size:13px;}
+.pdfpaper table{font-family:inherit;font-size:13px;}
 .pdfpaper td{border:none;padding:5px 8px;color:#333;background:none!important;}
 .readme{padding:22px 26px;font-size:13.5px;line-height:1.95;white-space:pre-wrap;}
 .readme b{color:var(--leaf);}
 .foot{text-align:center;font-size:11px;color:var(--mut);letter-spacing:.05em;margin-top:34px;}
+/* 印刷用の隔離コンテナ。画面では非表示。印刷時だけ、印刷したい書類（#pdfDoc / #reissueDoc）を
+   ここへ一時的に移動して印刷する（printDoc）。旧方式の visibility:hidden は
+   「見えないがレイアウトは残る」ため、隠したアプリ画面の高さぶん空白ページが出て
+   印刷プレビューの生成も遅くなっていた。display:none で完全に取り除く方式に変更。 */
+#printHost{display:none;}
 @media print{
- body.printing-reissue *{visibility:hidden!important;}
- body.printing-reissue #reissueDoc,body.printing-reissue #reissueDoc *{visibility:visible!important;}
- body.printing-reissue #reissueDoc{position:absolute;left:0;top:0;width:100%;margin:0!important;box-shadow:none!important;border:none!important;}
- body.printing-reissue .noprint{display:none!important;}
- /* 初回案内PDF：#pdfDoc だけを印刷（再振替と同じ隔離方式・専用bodyクラス printing-newcomer） */
- body.printing-newcomer *{visibility:hidden!important;}
- body.printing-newcomer #pdfDoc,body.printing-newcomer #pdfDoc *{visibility:visible!important;}
- body.printing-newcomer #pdfDoc{position:absolute;left:0;top:0;width:100%;max-width:100%!important;margin:0!important;box-shadow:none!important;border:none!important;}
- body.printing-newcomer .noprint{display:none!important;}
+ @page{size:A4;margin:10mm;}
+ /* 印刷対象の書類だけを残し、アプリ画面（.app・ログイン画面など body直下の要素）は完全に消す */
+ body.printing-doc > *{display:none!important;}
+ body.printing-doc > #printHost{display:block!important;}
+ body.printing-doc{background:#fff!important;}
+ #printHost > *{margin:0!important;width:100%!important;max-width:100%!important;box-shadow:none!important;border:none!important;}
+ .noprint{display:none!important;}
+ /* Safari（iPad/Mac）は既定で背景色・背景グラデーションを印刷しない。
+    施設カラーバー・口座欄の背景・振込期限の枠を紙に出すために明示指定する。 */
+ #printHost,#printHost *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;}
  /* A4縦1ページに必ず収めるための圧縮（余白・フォント・行間を印刷時だけ縮める。画面/JPEGは不変）。
     オプション明細が数個増えても収まるよう、余白・行間を優先的に詰めつつ本文は11.5px以上を維持して可読性を保つ。 */
  body.printing-newcomer #pdfDoc{font-size:12px!important;}
@@ -229,14 +241,13 @@ tr.changed:hover td{background:color-mix(in srgb,var(--gold) 22%,transparent)!im
  body.printing-newcomer #pdfDoc .billtotal{padding:8px 10px 3px!important;margin-top:4px!important;}
  body.printing-newcomer #pdfDoc .billtotal .lbl{font-size:13px!important;}
  body.printing-newcomer #pdfDoc .billtotal .amt{font-size:22px!important;}
- body.printing-newcomer #pdfDoc .bankcard{padding:12px 22px!important;gap:7px 20px!important;font-size:12px!important;margin-top:10px!important;break-inside:avoid;}
+ body.printing-newcomer #pdfDoc .bankcard{padding:12px 22px!important;gap:7px 20px!important;font-size:12px!important;margin-top:10px!important;page-break-inside:avoid;break-inside:avoid;}
  body.printing-newcomer #pdfDoc .bankcard dd{font-size:12px!important;}
- body.printing-newcomer #pdfDoc .duebox{padding:10px 22px!important;margin-top:10px!important;break-inside:avoid;}
+ body.printing-newcomer #pdfDoc .duebox{padding:10px 22px!important;margin-top:10px!important;page-break-inside:avoid;break-inside:avoid;}
  body.printing-newcomer #pdfDoc .duebox .date{font-size:19px!important;}
  body.printing-newcomer #pdfDoc .duebox .sub{margin-top:4px!important;font-size:10.5px!important;}
- body.printing-newcomer #pdfDoc .closing{font-size:11.5px!important;line-height:1.6!important;margin:12px 0 3px!important;break-inside:avoid;}
+ body.printing-newcomer #pdfDoc .closing{font-size:11.5px!important;line-height:1.6!important;margin:12px 0 3px!important;page-break-inside:avoid;break-inside:avoid;}
  body.printing-newcomer #pdfDoc .keigu{margin-top:2px!important;font-size:12px!important;}
- @page{size:A4;margin:10mm;}
 }
 </style></head>
 <body data-theme="rose">
@@ -296,7 +307,7 @@ tr.changed:hover td{background:color-mix(in srgb,var(--gold) 22%,transparent)!im
 <div class="foot">STRAWBERRY FIELD Children's Garden ／ ハイアイランド株式会社　—　月謝管理アプリ（方式B連動版）</div>
 </div>
 <div id="loginOverlay" style="display:flex;position:fixed;inset:0;z-index:10040;background:linear-gradient(135deg,#7a2540,#3d2030);align-items:center;justify-content:center;padding:20px">
- <div style="background:#fff;border-radius:20px;max-width:380px;width:100%;padding:34px 30px 28px;box-shadow:0 20px 60px rgba(0,0,0,.4);text-align:center;font-family:'Zen Kaku Gothic New',sans-serif">
+ <div style="background:#fff;border-radius:20px;max-width:380px;width:100%;padding:34px 30px 28px;box-shadow:0 20px 60px rgba(0,0,0,.4);text-align:center;font-family:inherit">
   <div style="font-family:'Zen Old Mincho',serif;font-size:19px;font-weight:700;color:#7a2540">STRAWBERRY FIELD</div>
   <div style="font-size:13px;color:#666;margin:2px 0 22px">月謝管理アプリ ｜ クラウド同期版</div>
   <div style="font-size:13px;color:#444;margin-bottom:16px;line-height:1.7">事務員共通のメールアドレスとパスワードでログインしてください。</div>
@@ -310,6 +321,8 @@ tr.changed:hover td{background:color-mix(in srgb,var(--gold) 22%,transparent)!im
   <div style="font-size:11.5px;color:#999;margin-top:14px;line-height:1.6">ログインすると、入力データはこの端末と全端末でクラウド同期されます。</div>
  </div>
 </div>
+<!-- 印刷専用の受け皿（画面では非表示）。印刷時だけ案内書をここへ移し、他は display:none で消す。 -->
+<div id="printHost"></div>
 <script>
 const M = {"prices": {"地域枠": {"getsu": 35000, "kyozai": 10000, "mat": 2000, "tesu": 110}, "旧地域枠": {"getsu": 25000, "kyozai": 10000, "mat": 2000, "tesu": 110}, "企業提携枠": {"getsu": 25000, "kyozai": 10000, "mat": 2000, "tesu": 110}, "旧企業提携枠": {"getsu": 15000, "kyozai": 10000, "mat": 2000, "tesu": 110}, "従業員(Number9)": {"getsu": 0, "kyozai": 10000, "mat": 0, "tesu": 110}, "従業員(ハイアイランド)": {"getsu": 0, "kyozai": 10000, "mat": 0, "tesu": 110}, "従業員(アドバイザー)": {"getsu": 0, "kyozai": 10000, "mat": 0, "tesu": 110}, "従業員(保育士)": {"getsu": 0, "kyozai": 5000, "mat": 0, "tesu": 110}}, "sibling": -8000, "half_day": 15, "year": 2026, "parks": ["全園", "月寒園", "白石園", "サッポロファクトリー園"], "bank": [{"label": "園名（正式名称）", "月寒園": "STRAWBERRY FIELD Children's garden（月寒園）", "白石園": "STRAWBERRY FIELD Children's garden（白石園）", "サッポロファクトリー園": "STRAWBERRY FIELD Children's garden（サッポロファクトリー園）", "幼稚舎": "STRAWBERRY FIELD 幼稚舎", "資生館保育園": "Children's Garden 資生館保育園"}, {"label": "園住所", "月寒園": null, "白石園": null, "サッポロファクトリー園": "〒000-0000 ○○県○○市○○町1-2-3", "幼稚舎": "", "資生館保育園": ""}, {"label": "園電話番号", "月寒園": null, "白石園": null, "サッポロファクトリー園": "000-0000-0000", "幼稚舎": "", "資生館保育園": "011-552-0015"}, {"label": "園代表者", "月寒園": "代表取締役 髙嶋 英憲", "白石園": "代表取締役 髙嶋 英憲", "サッポロファクトリー園": "代表取締役 髙嶋 英憲", "幼稚舎": "代表取締役 髙嶋 英憲", "資生館保育園": "代表取締役 髙嶋 英憲"}, {"label": "振込先銀行名", "月寒園": "北海道銀行", "白石園": "北海道銀行", "サッポロファクトリー園": "北海道銀行", "幼稚舎": "北海道銀行", "資生館保育園": "北海道銀行"}, {"label": "振込先支店名", "月寒園": "月寒支店（支店コード：108）", "白石園": "月寒支店（支店コード：108）", "サッポロファクトリー園": "月寒支店（支店コード：108）", "幼稚舎": "月寒支店（支店コード：108）", "資生館保育園": "月寒支店（支店コード：108）"}, {"label": "口座種別", "月寒園": "普通", "白石園": "普通", "サッポロファクトリー園": "普通", "幼稚舎": "普通", "資生館保育園": "普通"}, {"label": "口座番号", "月寒園": "1170558", "白石園": "1170567", "サッポロファクトリー園": "1170576", "幼稚舎": "1206768", "資生館保育園": "1243654"}, {"label": "口座名義(カナ)", "月寒園": "ハイアイランド(カ)ストロベリーフイールドツキサムエン", "白石園": "ハイアイランド(カ)ストロベリーフイールドシロイシエン", "サッポロファクトリー園": "ハイアイランド(カ)ストロベリーフイールドサツポロファクトリーエン", "幼稚舎": "ハイアイランド(カ", "資生館保育園": "カ)ナンバーナイン"}, {"label": "振込期限(毎月)", "月寒園": "毎月27日", "白石園": "毎月27日", "サッポロファクトリー園": "毎月27日", "幼稚舎": "毎月27日", "資生館保育園": "毎月27日"}], "goods": [{"id": "U-01", "cat": "制服", "name": "ニット帽", "size": "フリー", "price": 3850, "sizes": ["フリー"], "facs": ["幼稚舎", "月寒園", "白石園", "サッポロファクトリー園", "資生館保育園"]}, {"id": "U-02", "cat": "制服", "name": "パーカー", "size": "90/100/110/120/130cm", "price": 4400, "sizes": ["110", "130"], "facs": ["幼稚舎", "月寒園", "白石園", "サッポロファクトリー園", "資生館保育園"]}, {"id": "U-03", "cat": "制服", "name": "キャップ", "size": "フリー", "price": 3850, "sizes": ["フリー"], "facs": ["幼稚舎", "月寒園", "白石園", "サッポロファクトリー園", "資生館保育園"]}, {"id": "U-04", "cat": "制服", "name": "デニムジャケット", "size": "90/100/110/120/130cm", "price": 22000, "sizes": ["110", "120"], "facs": ["幼稚舎"]}, {"id": "O-01", "cat": "その他", "name": "マットレス交換", "size": "-", "price": 2000, "sizes": [], "facs": []}, {"id": "O-02", "cat": "その他", "name": "おむつまとめ買い", "size": "S/M/L", "price": 1900, "sizes": ["S", "M", "L"], "facs": []}, {"id": "O-03", "cat": "その他", "name": "おしりふき(10個パック)", "size": "-", "price": 1500, "sizes": [], "facs": []}, {"id": "O-05", "cat": "その他", "name": "その他", "size": "-", "price": 0, "sizes": [], "facs": ["幼稚舎", "月寒園", "白石園", "サッポロファクトリー園", "資生館保育園"]}], "irreg": [{"name": "新入園準備金不足分", "type": "個別調整"}, {"name": "月謝不足分", "type": "個別調整"}, {"name": "バス遠足代", "type": "イベント費"}, {"name": "プール用品代", "type": "用品費"}, {"name": "夏祭り参加費", "type": "イベント費"}, {"name": "発表会衣装代", "type": "用品費"}, {"name": "クリスマス会費", "type": "イベント費"}, {"name": "節分行事費", "type": "イベント費"}, {"name": "卒園記念品代", "type": "用品費"}], "roster": [{"id": 68, "status": "在園中", "waku": "一般", "cls": "LEAF", "name": "遠藤 瑚青", "sib": "なし", "koza": "得地 景子", "lid": "", "park": "幼稚舎", "nyuen": "", "bus": "", "birth": "2023-03-16", "jugyoOverride": 45000}, {"id": 69, "status": "在園中", "waku": "一般", "cls": "LEAF", "name": "岡本 翔空", "sib": "なし", "koza": "伊賀 美弓", "lid": "", "park": "幼稚舎", "nyuen": "", "bus": "", "jugyoOverride": 45000}, {"id": 70, "status": "在園中", "waku": "一般", "cls": "LEAF", "name": "喜田 匠真", "sib": "あり", "koza": "喜田 武昭", "lid": "", "park": "幼稚舎", "nyuen": "", "bus": "", "birth": "2022-08-05", "jugyoOverride": 45000}, {"id": 71, "status": "在園中", "waku": "一般", "cls": "LEAF", "name": "木戸 悠吏", "sib": "なし", "koza": "西陰 敏晴", "lid": "", "park": "幼稚舎", "nyuen": "", "bus": "", "jugyoOverride": 45000}, {"id": 72, "status": "在園中", "waku": "一般", "cls": "LEAF", "name": "小島 空河", "sib": "あり", "koza": "小島 恭平", "lid": "", "park": "幼稚舎", "nyuen": "", "bus": "", "birth": "2023-02-01", "jugyoOverride": 45000}, {"id": 73, "status": "在園中", "waku": "一般", "cls": "LEAF", "name": "佐藤 杏", "sib": "あり", "koza": "佐藤 夏絵", "lid": "", "park": "幼稚舎", "nyuen": "", "bus": "", "birth": "2022-10-22", "jugyoOverride": 45000}, {"id": 74, "status": "在園中", "waku": "一般", "cls": "LEAF", "name": "縄手 優橙", "sib": "あり", "koza": "縄手 陵湖", "lid": "", "park": "幼稚舎", "nyuen": "", "bus": "", "birth": "2022-06-15", "jugyoOverride": 45000}, {"id": 75, "status": "在園中", "waku": "一般", "cls": "LEAF", "name": "西陰 緋那", "sib": "あり", "koza": "西陰 敏晴", "lid": "", "park": "幼稚舎", "nyuen": "", "bus": "", "birth": "2022-11-15", "jugyoOverride": 45000}, {"id": 76, "status": "在園中", "waku": "一般", "cls": "LEAF", "name": "新田 美來", "sib": "なし", "koza": "橋本 優希", "lid": "", "park": "幼稚舎", "nyuen": "", "bus": "", "jugyoOverride": 45000}, {"id": 77, "status": "在園中", "waku": "一般", "cls": "LEAF", "name": "早崎 麦", "sib": "あり", "koza": "早崎 友一朗", "lid": "", "park": "幼稚舎", "nyuen": "", "bus": "", "birth": "2023-01-09", "jugyoOverride": 45000}, {"id": 78, "status": "在園中", "waku": "一般", "cls": "LEAF", "name": "平野 蒼晴", "sib": "あり", "koza": "名村 麗奈", "lid": "", "park": "幼稚舎", "nyuen": "2025-04-01", "bus": "", "birth": "2023-01-26"}, {"id": 79, "status": "在園中", "waku": "一般", "cls": "LEAF", "name": "町田 陽彩", "sib": "なし", "koza": "中村 麻衣", "lid": "", "park": "幼稚舎", "nyuen": "", "bus": "", "birth": "2023-03-14", "jugyoOverride": 45000}, {"id": 80, "status": "在園中", "waku": "一般", "cls": "LEAF", "name": "村山 青嶺", "sib": "なし", "koza": "喜田 武昭", "lid": "", "park": "幼稚舎", "nyuen": "", "bus": "", "jugyoOverride": 45000}, {"id": 81, "status": "在園中", "waku": "一般", "cls": "LEAF", "name": "吉田 怜華", "sib": "あり", "koza": "縄手 陵湖", "lid": "", "park": "幼稚舎", "nyuen": "", "bus": "", "birth": "2022-09-06", "jugyoOverride": 45000}, {"id": 82, "status": "在園中", "waku": "一般", "cls": "LEAF", "name": "渡部 瑛介", "sib": "あり", "koza": "小島 恭平", "lid": "", "park": "幼稚舎", "nyuen": "", "bus": "", "birth": "2023-03-08", "jugyoOverride": 45000}, {"id": 83, "status": "在園中", "waku": "一般", "cls": "BLOSSOM", "name": "岡野 智穂", "sib": "あり", "koza": "吉田 貴子", "lid": "", "park": "幼稚舎", "nyuen": "", "bus": "", "birth": "2022-02-26", "jugyoOverride": 45000}, {"id": 84, "status": "在園中", "waku": "一般", "cls": "BLOSSOM", "name": "鈴木 葵莉乃", "sib": "あり", "koza": "早崎 友一朗", "lid": "", "park": "幼稚舎", "nyuen": "", "bus": "", "birth": "2021-04-30", "jugyoOverride": 45000}, {"id": 85, "status": "在園中", "waku": "一般", "cls": "BLOSSOM", "name": "常軒 芽亜梨", "sib": "あり", "koza": "平野 淑恵", "lid": "", "park": "幼稚舎", "nyuen": "", "bus": "", "birth": "2021-06-23", "jugyoOverride": 45000}, {"id": 86, "status": "在園中", "waku": "一般", "cls": "BLOSSOM", "name": "中井 麻里江", "sib": "なし", "koza": "大槌 眞鈴", "lid": "", "park": "幼稚舎", "nyuen": "", "bus": "", "birth": "2022-02-01", "jugyoOverride": 45000}, {"id": 87, "status": "在園中", "waku": "一般", "cls": "BLOSSOM", "name": "中村 望花", "sib": "あり", "koza": "佐藤 夏絵", "lid": "", "park": "幼稚舎", "nyuen": "", "bus": "", "birth": "2021-09-25", "jugyoOverride": 45000}, {"id": 88, "status": "在園中", "waku": "一般", "cls": "BLOSSOM", "name": "名村 幸人", "sib": "あり", "koza": "佐藤 夏絵", "lid": "", "park": "幼稚舎", "nyuen": "", "bus": "", "birth": "2022-03-12", "jugyoOverride": 45000}, {"id": 89, "status": "在園中", "waku": "一般", "cls": "BLOSSOM", "name": "新沼 楓花", "sib": "なし", "koza": "河原 直樹", "lid": "", "park": "幼稚舎", "nyuen": "", "bus": "", "jugyoOverride": 45000}, {"id": 90, "status": "在園中", "waku": "一般", "cls": "BLOSSOM", "name": "橋本 恵", "sib": "あり", "koza": "常軒 健太", "lid": "", "park": "幼稚舎", "nyuen": "", "bus": "", "birth": "2021-07-05", "jugyoOverride": 45000}, {"id": 91, "status": "在園中", "waku": "一般", "cls": "BLOSSOM", "name": "吉野 結惺", "sib": "あり", "koza": "", "lid": "", "park": "幼稚舎", "nyuen": "", "bus": "", "birth": "2021-11-28", "jugyoOverride": 45000}, {"id": 92, "status": "在園中", "waku": "一般", "cls": "HARVEST", "name": "伊賀 正宗", "sib": "あり", "koza": "", "lid": "", "park": "幼稚舎", "nyuen": "", "bus": "", "birth": "2020-06-07", "jugyoOverride": 45000}, {"id": 93, "status": "在園中", "waku": "一般", "cls": "HARVEST", "name": "大槌 凌右", "sib": "あり", "koza": "", "lid": "", "park": "幼稚舎", "nyuen": "", "bus": "", "birth": "2020-10-21", "jugyoOverride": 45000}, {"id": 94, "status": "在園中", "waku": "一般", "cls": "HARVEST", "name": "尾崎 玄悟", "sib": "あり", "koza": "", "lid": "", "park": "幼稚舎", "nyuen": "", "bus": "", "birth": "2020-12-23", "jugyoOverride": 45000}, {"id": 95, "status": "在園中", "waku": "一般", "cls": "HARVEST", "name": "金澤 果鈴", "sib": "なし", "koza": "", "lid": "", "park": "幼稚舎", "nyuen": "", "bus": "", "jugyoOverride": 45000}, {"id": 96, "status": "在園中", "waku": "一般", "cls": "HARVEST", "name": "河原 フミナ", "sib": "あり", "koza": "", "lid": "", "park": "幼稚舎", "nyuen": "", "bus": "", "birth": "2021-03-01", "jugyoOverride": 45000}, {"id": 97, "status": "在園中", "waku": "一般", "cls": "HARVEST", "name": "佐藤 花", "sib": "あり", "koza": "", "lid": "", "park": "幼稚舎", "nyuen": "", "bus": "", "birth": "2020-07-22", "jugyoOverride": 45000}, {"id": 98, "status": "在園中", "waku": "一般", "cls": "HARVEST", "name": "得地 梨花", "sib": "あり", "koza": "", "lid": "", "park": "幼稚舎", "nyuen": "", "bus": "", "birth": "2020-06-26", "jugyoOverride": 45000}, {"id": 99, "status": "在園中", "waku": "一般", "cls": "HARVEST", "name": "西陰 晴翔", "sib": "あり", "koza": "", "lid": "", "park": "幼稚舎", "nyuen": "", "bus": "", "birth": "2020-06-03", "jugyoOverride": 45000}, {"id": 100, "status": "在園中", "waku": "一般", "cls": "HARVEST", "name": "服部 心芭", "sib": "なし", "koza": "", "lid": "", "park": "幼稚舎", "nyuen": "", "bus": "", "jugyoOverride": 45000}, {"id": 101, "status": "在園中", "waku": "一般", "cls": "HARVEST", "name": "村山 冬芽", "sib": "なし", "koza": "", "lid": "", "park": "幼稚舎", "nyuen": "", "bus": "", "jugyoOverride": 45000}, {"id": 102, "status": "在園中", "waku": "一般", "cls": "HARVEST", "name": "渡部 衣織", "sib": "あり", "koza": "", "lid": "", "park": "幼稚舎", "nyuen": "", "bus": "", "birth": "2020-11-07", "jugyoOverride": 45000}, {"id": 131, "status": "在園中", "waku": "企業提携枠", "cls": "SEED-0", "name": "砂子田 梨月", "sib": "なし", "koza": "斉藤 さやか", "lid": "", "park": "月寒園", "nyuen": "", "birth": "2025-05-11"}, {"id": 132, "status": "在園中", "waku": "企業提携枠", "cls": "SEED-0", "name": "三浦 叶愛", "sib": "なし", "koza": "三浦 梢", "lid": "", "park": "月寒園", "nyuen": "", "birth": "2025-08-05"}, {"id": 133, "status": "在園中", "waku": "従業員(Number9)", "cls": "SEED-0", "name": "岡本 望空", "sib": "あり", "koza": "岡本 理賀", "lid": "", "park": "月寒園", "nyuen": "", "birth": "2025-08-07"}, {"id": 134, "status": "在園中", "waku": "地域枠", "cls": "SEED-1", "name": "森田 海音", "sib": "なし", "koza": "森田 惟", "lid": "", "park": "月寒園", "nyuen": "", "birth": "2024-09-17"}, {"id": 135, "status": "在園中", "waku": "地域枠", "cls": "SEED-1", "name": "平岡 礼都", "sib": "なし", "koza": "平岡 那実", "lid": "", "park": "月寒園", "nyuen": "", "birth": "2024-04-21"}, {"id": 136, "status": "在園中", "waku": "地域枠", "cls": "SEED-1", "name": "澤岡 寿々永", "sib": "なし", "koza": "澤岡 仁", "lid": "", "park": "月寒園", "nyuen": "", "birth": "2024-08-11"}, {"id": 137, "status": "在園中", "waku": "地域枠", "cls": "SEED-1", "name": "鴨田 愛佳", "sib": "なし", "koza": "鴨田 知未", "lid": "", "park": "月寒園", "nyuen": "", "birth": "2025-03-25"}, {"id": 138, "status": "在園中", "waku": "従業員(Number9)", "cls": "SEED-1", "name": "服部 環大", "sib": "あり", "koza": "服部 昌那", "lid": "", "park": "月寒園", "nyuen": "", "birth": "2024-12-23"}, {"id": 139, "status": "在園中", "waku": "地域枠", "cls": "SPROUT", "name": "吉野 碧桜", "sib": "あり", "koza": "吉野 幹悠", "lid": "", "park": "月寒園", "nyuen": "", "birth": "2023-04-14"}, {"id": 140, "status": "在園中", "waku": "地域枠", "cls": "SPROUT", "name": "山﨑 怜", "sib": "なし", "koza": "山﨑 賢", "lid": "", "park": "月寒園", "nyuen": "", "birth": "2023-04-16"}, {"id": 141, "status": "在園中", "waku": "地域枠", "cls": "SPROUT", "name": "小池 陽梛", "sib": "なし", "koza": "小池 夏海", "lid": "", "park": "月寒園", "nyuen": "", "birth": "2024-01-08"}, {"id": 142, "status": "在園中", "waku": "地域枠", "cls": "SPROUT", "name": "大崎 那菜", "sib": "なし", "koza": "大崎 晃", "lid": "", "park": "月寒園", "nyuen": "", "birth": "2023-09-07"}, {"id": 143, "status": "在園中", "waku": "地域枠", "cls": "SPROUT", "name": "坂下 千隼", "sib": "なし", "koza": "坂下 もも", "lid": "", "park": "月寒園", "nyuen": "", "birth": "2023-10-31"}, {"id": 144, "status": "在園中", "waku": "地域枠", "cls": "SPROUT", "name": "小島 凪礼", "sib": "なし", "koza": "小島 礼士", "lid": "", "park": "月寒園", "nyuen": "", "birth": "2024-01-02"}, {"id": 145, "status": "在園中", "waku": "地域枠", "cls": "SPROUT", "name": "小林 叶和", "sib": "なし", "koza": "小林 巧明", "lid": "", "park": "月寒園", "nyuen": "", "birth": "2023-08-14"}, {"id": 146, "status": "在園中", "waku": "企業提携枠", "cls": "SPROUT", "name": "竿崎 柊花", "sib": "なし", "koza": "竿崎 栞", "lid": "", "park": "月寒園", "nyuen": "", "birth": "2023-11-27"}, {"id": 147, "status": "在園中", "waku": "従業員(Number9)", "cls": "SPROUT", "name": "魚津 蒼舞", "sib": "なし", "koza": "魚津 彩香", "lid": "", "park": "月寒園", "nyuen": "", "birth": "2023-04-12"}, {"id": 148, "status": "在園中", "waku": "地域枠", "cls": "SEED-1", "name": "原谷 清華", "sib": "なし", "koza": "原谷", "lid": "", "park": "月寒園", "nyuen": "", "birth": "2024-12-26"}, {"id": 149, "status": "在園中", "waku": "地域枠", "cls": "SPROUT", "name": "中西 咲良", "sib": "なし", "koza": "中西 夕貴", "lid": "", "park": "白石園", "nyuen": "", "birth": "2024-03-15"}, {"id": 150, "status": "在園中", "waku": "地域枠", "cls": "SPROUT", "name": "西野 想七", "sib": "なし", "koza": "西野 翔", "lid": "", "park": "白石園", "nyuen": "", "birth": "2023-10-28"}, {"id": 151, "status": "在園中", "waku": "地域枠", "cls": "SPROUT", "name": "藤本 一千翔", "sib": "なし", "koza": "藤本 隆寛", "lid": "", "park": "白石園", "nyuen": "", "birth": "2023-07-01"}, {"id": 152, "status": "在園中", "waku": "地域枠", "cls": "SPROUT", "name": "坂口 華羽", "sib": "なし", "koza": "坂口 圭一", "lid": "", "park": "白石園", "nyuen": "", "birth": "2023-07-07"}, {"id": 153, "status": "在園中", "waku": "地域枠", "cls": "SEED-1", "name": "本間 心紬", "sib": "なし", "koza": "本間 由佳", "lid": "", "park": "白石園", "nyuen": "", "birth": "2024-07-05"}, {"id": 154, "status": "在園中", "waku": "企業提携枠", "cls": "SPROUT", "name": "池田 禮", "sib": "なし", "koza": "池田 ひとみ", "lid": "", "park": "白石園", "nyuen": "", "birth": "2023-11-27"}, {"id": 155, "status": "在園中", "waku": "従業員(アドバイザー)", "cls": "SEED-1", "name": "松谷 咲茉", "sib": "なし", "koza": "松谷 結香", "lid": "", "park": "白石園", "nyuen": "", "birth": "2024-05-15"}, {"id": 156, "status": "在園中", "waku": "地域枠", "cls": "SPROUT", "name": "南 恒成", "sib": "なし", "koza": "南 ひかり", "lid": "", "park": "サッポロファクトリー園", "nyuen": "", "birth": "2023-04-25"}, {"id": 157, "status": "在園中", "waku": "地域枠", "cls": "SPROUT", "name": "盧 世潤", "sib": "なし", "koza": "盧 哲成", "lid": "", "park": "サッポロファクトリー園", "nyuen": "", "birth": "2023-08-23"}, {"id": 158, "status": "在園中", "waku": "地域枠", "cls": "SEED-1", "name": "鈴木 楓真", "sib": "なし", "koza": "鈴木 伸也", "lid": "", "park": "サッポロファクトリー園", "nyuen": "", "birth": "2024-05-30"}, {"id": 159, "status": "在園中", "waku": "地域枠", "cls": "SEED-1", "name": "秋川 瑛翔", "sib": "なし", "koza": "秋川 まどか", "lid": "", "park": "サッポロファクトリー園", "nyuen": "", "birth": "2024-04-11"}, {"id": 160, "status": "在園中", "waku": "地域枠", "cls": "SEED-1", "name": "廣澤 紗叶", "sib": "なし", "koza": "廣澤 紗叶", "lid": "", "park": "サッポロファクトリー園", "nyuen": "", "birth": "2024-09-11"}, {"id": 161, "status": "在園中", "waku": "地域枠", "cls": "SEED-1", "name": "佐藤 帆夏", "sib": "なし", "koza": "佐藤 信之介", "lid": "", "park": "サッポロファクトリー園", "nyuen": "", "birth": "2024-12-04"}, {"id": 162, "status": "在園中", "waku": "地域枠", "cls": "SEED-1", "name": "早川 紫乃", "sib": "なし", "koza": "早川 郁美", "lid": "", "park": "サッポロファクトリー園", "nyuen": "", "birth": "2025-03-31"}, {"id": 163, "status": "在園中", "waku": "旧企業枠", "cls": "SPROUT", "name": "敦谷 みな美", "sib": "なし", "koza": "敦谷 ひかる", "lid": "", "park": "サッポロファクトリー園", "nyuen": "", "birth": "2024-03-08"}, {"id": 164, "status": "在園中", "waku": "企業提携枠", "cls": "SPROUT", "name": "川人 真宙", "sib": "あり", "koza": "川人 絵里香", "lid": "", "park": "サッポロファクトリー園", "nyuen": "", "birth": "2023-11-28"}, {"id": 165, "status": "在園中", "waku": "企業提携枠", "cls": "SEED-0", "name": "川人 晴流", "sib": "あり", "koza": "川人 絵里香", "lid": "", "park": "サッポロファクトリー園", "nyuen": "", "birth": "2025-05-15"}, {"id": 166, "status": "在園中", "waku": "企業提携枠", "cls": "SEED-1", "name": "縄手 暖橙", "sib": "あり", "koza": "縄手 陵湖", "lid": "", "park": "サッポロファクトリー園", "nyuen": "", "birth": "2024-06-26"}, {"id": 167, "status": "在園中", "waku": "企業提携枠", "cls": "SEED-1", "name": "中村 風李", "sib": "あり", "koza": "中村 麻衣", "lid": "", "park": "サッポロファクトリー園", "nyuen": "", "birth": "2024-05-23"}, {"id": 168, "status": "在園中", "waku": "企業提携枠", "cls": "SEED-1", "name": "横山 瑳一", "sib": "なし", "koza": "横山 舜", "lid": "", "park": "サッポロファクトリー園", "nyuen": "", "birth": "2025-01-08"}, {"id": 169, "status": "在園中", "waku": "企業提携枠", "cls": "SEED-1", "name": "鈴木 志", "sib": "なし", "koza": "鈴木 汐里", "lid": "", "park": "サッポロファクトリー園", "nyuen": "", "birth": "2025-01-13"}, {"id": 170, "status": "在園中", "waku": "企業提携枠", "cls": "SEED-0", "name": "西陰 湊翔", "sib": "あり", "koza": "西陰 敏晴", "lid": "", "park": "サッポロファクトリー園", "nyuen": "", "birth": "2025-06-09"}, {"id": 171, "status": "在園中", "waku": "企業提携枠", "cls": "SEED-0", "name": "橋本 怜", "sib": "あり", "koza": "橋本 優希", "lid": "", "park": "サッポロファクトリー園", "nyuen": "", "birth": "2025-04-24"}, {"id": 172, "status": "在園中", "waku": "地域無償化", "cls": "HARVEST", "name": "田代 柚乃", "sib": "なし", "koza": "田代 徹志", "lid": "", "park": "資生館保育園", "nyuen": "", "birth": "2020-12-18"}, {"id": 173, "status": "在園中", "waku": "旧企業提携枠", "cls": "HARVEST", "name": "田村 茉那", "sib": "なし", "koza": "田村 恵", "lid": "", "park": "資生館保育園", "nyuen": "", "birth": "2021-03-11"}, {"id": 174, "status": "在園中", "waku": "地域無償化", "cls": "HARVEST", "name": "松葉 大透", "sib": "なし", "koza": "松葉 朱莉", "lid": "", "park": "資生館保育園", "nyuen": "", "birth": "2020-10-31"}, {"id": 175, "status": "在園中", "waku": "旧企業提携枠", "cls": "BLOSSOM", "name": "飯田 美桜", "sib": "なし", "koza": "飯田 航平", "lid": "", "park": "資生館保育園", "nyuen": "", "birth": "2021-05-11"}, {"id": 176, "status": "在園中", "waku": "旧企業提携枠", "cls": "BLOSSOM", "name": "大谷 環奈", "sib": "なし", "koza": "大谷 香織", "lid": "", "park": "資生館保育園", "nyuen": "", "birth": "2021-08-05"}, {"id": 177, "status": "在園中", "waku": "旧企業提携枠", "cls": "BLOSSOM", "name": "小原 将人", "sib": "なし", "koza": "小原 一馬", "lid": "", "park": "資生館保育園", "nyuen": "", "birth": "2021-06-30"}, {"id": 178, "status": "在園中", "waku": "旧企業提携枠", "cls": "BLOSSOM", "name": "佐々木 蒼空", "sib": "あり", "koza": "佐々木 明徳", "lid": "", "park": "資生館保育園", "nyuen": "", "birth": "2021-06-24"}, {"id": 179, "status": "在園中", "waku": "旧企業提携枠", "cls": "BLOSSOM", "name": "篠原 結衣", "sib": "なし", "koza": "篠原 実香", "lid": "", "park": "資生館保育園", "nyuen": "", "birth": "2021-08-04"}, {"id": 180, "status": "在園中", "waku": "地域無償化", "cls": "BLOSSOM", "name": "原 唯夏", "sib": "なし", "koza": "原 幸弘", "lid": "", "park": "資生館保育園", "nyuen": "", "birth": "2021-07-07"}, {"id": 181, "status": "在園中", "waku": "旧企業提携枠", "cls": "BLOSSOM", "name": "藤田 楓禾", "sib": "なし", "koza": "藤田 洸介", "lid": "", "park": "資生館保育園", "nyuen": "", "birth": "2021-09-19"}, {"id": 182, "status": "在園中", "waku": "地域無償化", "cls": "BLOSSOM", "name": "水井 詩乃", "sib": "なし", "koza": "水井 寛", "lid": "", "park": "資生館保育園", "nyuen": "", "birth": "2021-11-05"}, {"id": 183, "status": "在園中", "waku": "地域無償化", "cls": "LEAF", "name": "青木 優志郎", "sib": "なし", "koza": "青木 仁美", "lid": "", "park": "資生館保育園", "nyuen": "", "birth": "2022-07-19"}, {"id": 184, "status": "在園中", "waku": "地域無償化", "cls": "LEAF", "name": "市丸 楓理", "sib": "なし", "koza": "市丸 諒", "lid": "", "park": "資生館保育園", "nyuen": "", "birth": "2022-07-15"}, {"id": 185, "status": "在園中", "waku": "従業員(アドバイザー)", "cls": "LEAF", "name": "小川 衣杜", "sib": "なし", "koza": "小川 真侑", "lid": "", "park": "資生館保育園", "nyuen": "", "birth": "2022-06-18"}, {"id": 186, "status": "在園中", "waku": "地域無償化", "cls": "LEAF", "name": "木村 玲生", "sib": "なし", "koza": "澤田 優香", "lid": "", "park": "資生館保育園", "nyuen": "", "birth": "2023-03-04"}, {"id": 187, "status": "在園中", "waku": "旧企業提携枠", "cls": "LEAF", "name": "佐藤 仁", "sib": "なし", "koza": "佐藤 祐基", "lid": "", "park": "資生館保育園", "nyuen": "", "birth": "2023-01-27"}, {"id": 188, "status": "在園中", "waku": "旧企業提携枠", "cls": "LEAF", "name": "髙田 怜", "sib": "なし", "koza": "髙田 天音", "lid": "", "park": "資生館保育園", "nyuen": "", "birth": "2023-03-07"}, {"id": 189, "status": "在園中", "waku": "地域無償化", "cls": "LEAF", "name": "辻岡 伶珠", "sib": "なし", "koza": "辻岡 暁郎", "lid": "", "park": "資生館保育園", "nyuen": "", "birth": "2022-04-18"}, {"id": 190, "status": "在園中", "waku": "旧企業提携枠", "cls": "LEAF", "name": "林田 連理", "sib": "なし", "koza": "林田 愛梨", "lid": "", "park": "資生館保育園", "nyuen": "", "birth": "2022-06-10"}, {"id": 191, "status": "在園中", "waku": "地域枠", "cls": "SPROUT", "name": "菅野 想", "sib": "なし", "koza": "菅野 桃花", "lid": "", "park": "資生館保育園", "nyuen": "", "birth": "2023-07-22"}, {"id": 192, "status": "在園中", "waku": "地域枠", "cls": "SPROUT", "name": "佐々木 乃愛", "sib": "あり", "koza": "佐々木 明徳", "lid": "", "park": "資生館保育園", "nyuen": "", "birth": "2023-05-17"}, {"id": 193, "status": "在園中", "waku": "企業提携枠", "cls": "SPROUT", "name": "山本 和", "sib": "なし", "koza": "山本 聡", "lid": "", "park": "資生館保育園", "nyuen": "", "birth": "2023-05-18"}, {"id": 194, "status": "在園中", "waku": "旧企業提携枠", "cls": "SPROUT", "name": "吉田 凪", "sib": "なし", "koza": "吉田 めぐみ", "lid": "", "park": "資生館保育園", "nyuen": "", "birth": "2023-11-24"}, {"id": 195, "status": "在園中", "waku": "地域枠", "cls": "SEED-1", "name": "鎌田 琴葉", "sib": "なし", "koza": "鎌田 剛史", "lid": "", "park": "資生館保育園", "nyuen": "", "birth": "2025-03-06"}, {"id": 196, "status": "在園中", "waku": "地域枠", "cls": "SEED-0", "name": "石原 翠", "sib": "なし", "koza": "石原 丞", "lid": "", "park": "資生館保育園", "nyuen": "", "birth": "2026-01-05"}, {"id": 197, "status": "在園中", "waku": "地域枠", "cls": "SEED-0", "name": "植木 琴", "sib": "なし", "koza": "植木 悠介", "lid": "", "park": "資生館保育園", "nyuen": "", "birth": "2025-10-02"}, {"id": 198, "status": "在園中", "waku": "地域枠", "cls": "SEED-0", "name": "浦田 珠翠", "sib": "なし", "koza": "浦田 淳貴", "lid": "", "park": "資生館保育園", "nyuen": "", "birth": "2025-08-21"}, {"id": 199, "status": "在園中", "waku": "地域枠", "cls": "SEED-0", "name": "村山 愛茉", "sib": "なし", "koza": "村山 広典", "lid": "", "park": "資生館保育園", "nyuen": "", "birth": "2025-10-16"}], "sched": [{"year": 2026, "month": 4, "item": "進級費（幼稚舎）", "cls": "幼稚舎", "pupil": "", "plan": 20000, "fix": 20000, "state": "予定"}, {"year": 2026, "month": 6, "item": "バス遠足", "cls": "全員", "pupil": "", "plan": 0, "fix": 0, "state": "予定"}, {"year": 2026, "month": 7, "item": "お泊まり会", "cls": "BLOSSOM", "pupil": "", "plan": 0, "fix": 0, "state": "予定"}, {"year": 2026, "month": 7, "item": "お泊まり会", "cls": "HARVEST", "pupil": "", "plan": 0, "fix": 0, "state": "予定"}, {"year": 2026, "month": 9, "item": "運動会", "cls": "全員", "pupil": "", "plan": 0, "fix": 0, "state": "予定"}, {"year": 2027, "month": 2, "item": "STRAWBERRY FIELD COLLECTION", "cls": "全員", "pupil": "", "plan": 0, "fix": 0, "state": "予定"}], "classes": ["SEED-0", "SEED-1", "SPROUT", "LEAF", "BLOSSOM", "HARVEST"], "facilities": [{"name": "全施設", "type": "all", "capacity": null}, {"name": "月寒園", "type": "A", "capacity": 30}, {"name": "白石園", "type": "A", "capacity": 19}, {"name": "サッポロファクトリー園", "type": "A", "capacity": 19}, {"name": "幼稚舎", "type": "B", "capacity": null}, {"name": "資生館保育園", "type": "C", "capacity": 60}], "youchisha": {"nyugaku": 50000, "jugyo": 65000, "futai": 10000, "lesson": 14000, "monthly_total": 89000, "kyushoku": 6000, "reidanbo": 4000, "bus": 4300, "shinkyu": 20000, "soso": 5000, "choshoku_m": 5000, "hojokin": 37000, "early_discount": {"0": 20000, "1": 15000, "2": 10000}, "early_cutoff": "2026-04-01", "futai_breakdown": {"教材費": 2000, "おやつ代": 2000, "設備費": 2000, "普通傷害保険": 2000, "賠償責任保険": 2000}, "tesu": 110}, "shiseikan": {"age02": {"地域枠": 30000, "企業提携枠": 20000, "旧企業提携枠": 12500, "旧地域枠": 25000, "従業員(Number9)": 10000, "従業員(ハイアイランド)": 10000, "従業員(他園)": 10000, "従業員(アドバイザー)": 10000, "地域無償化": 30000, "従業員(保育士)": 5000}, "sib02": 15000, "fukushoku": 4500, "class_age": {"LEAF": 3, "BLOSSOM": 4, "HARVEST": 5}, "age02_classes": ["SEED-0", "SEED-1", "SPROUT"], "temp_hour": 1000}, "sibling_scope": "group", "mealfee": {"lunch": 500, "bread": 100}, "options": {"mattress": 2000, "bus": 4300, "diaper": 2000, "uniform": {"knit": 250, "cap": 160, "parka": 290}}};
 let park='全施設', yy=2026, mm=5, tab='settings';
@@ -320,6 +333,56 @@ let cloudDB=null, cloudReady=false, __cloudDirty=false, __pushTimer=null;
 // 編集の通し番号。push でクラウドへ送った時点の番号を控えておき、
 // 「送った後に増えていない」ときだけ __cloudDirty を落とす（送信後の編集を消さない）。
 let __editSeq=0, __pushedSeq=-1;
+// 直近に保存した内容（saveStateの重複保存＝無変更でのクラウド送信を防ぐ）。TDZ回避のためここで宣言。
+let __lastSavedJson=null;
+
+// ===== 重いライブラリの遅延読み込み =====
+// xlsx（Excel出力）と html2canvas（JPEG保存）は起動時には読み込まない。
+// 初回案内PDFの「表示」「印刷」では一切使わないため、これらを <head> から外し、
+// 実際に使うボタンが押されたときだけ読み込む。iPad Safari の起動負荷を大きく減らす。
+const __LIB_URL={
+ xlsx:'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js',
+ html2canvas:'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js'
+};
+const __libPromise={};
+function libReady(name){ // 既に読み込み済みか（同期判定）
+ return name==='xlsx' ? (typeof XLSX!=='undefined') : (typeof html2canvas!=='undefined');
+}
+function loadLib(name){ // 読み込み済みなら即解決。未読み込みなら <script> を挿して待つ。
+ if(libReady(name))return Promise.resolve();
+ if(__libPromise[name])return __libPromise[name];
+ __libPromise[name]=new Promise((resolve,reject)=>{
+  const s=document.createElement('script');
+  s.src=__LIB_URL[name]; s.async=true;
+  s.onload=()=>resolve();
+  s.onerror=()=>{__libPromise[name]=null;reject(new Error(name+' の読み込みに失敗しました'));};
+  document.head.appendChild(s);
+ });
+ return __libPromise[name];
+}
+// ライブラリを読み込んでから fn を実行する共通ヘルパー（ボタンに「準備中…」を出す）
+function withLib(name,fn,btn){
+ if(libReady(name)){fn();return;}
+ let old=null;
+ if(btn){old=btn.textContent;btn.textContent='準備中…';btn.disabled=true;}
+ loadLib(name).then(()=>{
+  if(btn){btn.textContent=old;btn.disabled=false;}
+  fn();
+ }).catch(e=>{
+  if(btn){btn.textContent=old;btn.disabled=false;}
+  alert('必要なライブラリを読み込めませんでした。通信環境をご確認のうえ、もう一度お試しください。\n（'+((e&&e.message)||e)+'）');
+ });
+}
+// ===== 日付ヘルパー（ローカル日付基準）=====
+// new Date().toISOString() は UTC基準のため、日本時間の 0:00〜9:00 に開くと「前日」の日付になる。
+// 発行日・振込期限・給食記録の既定日はすべてローカル日付から組み立てる。
+function ymdLocal(d){ return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
+function todayYMD(){ return ymdLocal(new Date()); }
+function parseYMD(s){ // 'YYYY-MM-DD' をローカル日付として解釈（Safariでも安全）
+ const m=String(s||'').match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+ return m ? new Date(+m[1],+m[2]-1,+m[3]) : new Date(s);
+}
+function addDaysYMD(s,n){ const d=parseYMD(s); d.setDate(d.getDate()+n); return ymdLocal(d); }
 let roster=JSON.parse(JSON.stringify(M.roster));
 let newcomers=[]; // 新規入園
 let addons=[];    // 追加申込み
@@ -512,7 +575,22 @@ let __saveTimer=null;
 // リモート受信側が「この端末は編集直後だ」と判断するために使う（__cloudDirty が
 // 自分の書き込みエコーで消されても、こちらは残るので取りこぼさない）。
 let __pendingUserSave=false;
+// 保存対象データ（savedAt を含まない＝内容の同一判定に使える形）を1か所で組み立てる
+function stateForSave(){
+ return {v:1,
+  roster, changeLog, lookmeeCheck, rosterBase, bank, reissueFeeByPark, initSaleLog, cashbook, cashbookEvent, timelyData,
+  addons, sched, schedMemo, meals};
+}
 function saveState(){ // 入力データをまとめて端末に保存（連打防止のため少し遅延）
+ // 【変更】render() は画面を描き直すたびに saveState() を呼ぶため、
+ //   「タブを切り替えただけ」「初回案内PDFを表示しただけ」でも
+ //   毎回クラウドへ全データ（最大1MB）を送信していた。
+ //   内容が前回保存時とまったく同じなら、保存もクラウド送信も行わない。
+ //   ＝データが1文字でも変われば JSON が変わるので、保存漏れは起きない。
+ const json=JSON.stringify(stateForSave());
+ if(json===__lastSavedJson) return; // 無変更：端末保存もクラウド送信もしない
+ __lastSavedJson=json;
+
  if(__saveTimer)clearTimeout(__saveTimer);
  const skipCloud = !!window.__applyingRemote; // リモート反映中の保存はクラウドへ送り返さない
  // 編集中フラグはデバウンスの外で即座に立てる。
@@ -525,9 +603,8 @@ function saveState(){ // 入力データをまとめて端末に保存（連打�
  __saveTimer=setTimeout(()=>{
   __saveTimer=null;
   try{
-   const data={v:1, savedAt:new Date().toISOString(),
-    roster, changeLog, lookmeeCheck, rosterBase, bank, reissueFeeByPark, initSaleLog, cashbook, cashbookEvent, timelyData,
-    addons, sched, schedMemo, meals};
+   const data=stateForSave();
+   data.savedAt=new Date().toISOString();
    localStorage.setItem(STORE_KEY, JSON.stringify(data));
   }catch(e){console.warn('保存に失敗:',e);}
   if(!skipCloud) __pendingUserSave=false;
@@ -1838,11 +1915,12 @@ function renderPDF(){
  // 園名表示は再振替案内と統一（資生館→チルドレンズガーデン資生館保育園／その他→STRAWBERRY FIELD ○○）
  const FAC_JP_NAME={'月寒園':'STRAWBERRY FIELD 月寒園','白石園':'STRAWBERRY FIELD 白石園','サッポロファクトリー園':'STRAWBERRY FIELD サッポロファクトリー園','幼稚舎':'STRAWBERRY FIELD 幼稚舎','資生館保育園':'チルドレンズガーデン資生館保育園'};
  const footName=FAC_JP_NAME[park]||(bk['園名（正式名称）']||'');
- if(!window.__issueDate){const d=new Date();window.__issueDate=d.toISOString().slice(0,10);}
+ // 発行日の既定＝端末のローカル日付（旧: toISOString はUTC基準のため、日本時間の朝は前日になっていた）
+ if(!window.__issueDate){window.__issueDate=todayYMD();}
  const issue=window.__issueDate;
- const due=(()=>{const d=new Date(issue);d.setDate(d.getDate()+7);return d.toISOString().slice(0,10);})();
- const fmtJP=s=>{const d=new Date(s);return `${d.getFullYear()}年 ${d.getMonth()+1}月 ${d.getDate()}日`;};
- const fmtJPshort=s=>{const d=new Date(s);return `${d.getFullYear()}.${String(d.getMonth()+1).padStart(2,'0')}.${String(d.getDate()).padStart(2,'0')}`;};
+ const due=addDaysYMD(issue,7); // 振込期限＝発行日+7日（ローカル日付で計算するのでズレない）
+ const fmtJP=s=>{const d=parseYMD(s);return `${d.getFullYear()}年 ${d.getMonth()+1}月 ${d.getDate()}日`;};
+ const fmtJPshort=s=>{const d=parseYMD(s);return `${d.getFullYear()}.${String(d.getMonth()+1).padStart(2,'0')}.${String(d.getDate()).padStart(2,'0')}`;};
  const facColor=FAC_COLORS[park]||'#a8466a';
  let h='';
  if(orderedCand.length===0){
@@ -1964,9 +2042,9 @@ function renderPDF(){
  // 🖼 JPEG保存 / 🖨 印刷（再振替タブの実装を流用。印刷は専用bodyクラス printing-newcomer で案内状カードのみ印刷）
  const pdfSafeName=((p&&p.name)||'案内').replace(/[\\/:*?"<>|\s]/g,'_');
  const pj=document.getElementById('pdfJpeg');
- if(pj)pj.onclick=()=>{
+ // JPEG保存を押したときに初めて html2canvas を読み込む（表示・印刷では読み込まない）
+ if(pj)pj.onclick=()=>withLib('html2canvas',()=>{
    const doc=document.getElementById('pdfDoc');if(!doc)return;
-   if(typeof html2canvas==='undefined'){alert('画像変換ライブラリの読み込みに失敗しました。通信環境をご確認のうえ、ページを再読み込みしてください。');return;}
    const old=pj.textContent;pj.textContent='変換中…';pj.disabled=true;
    html2canvas(doc,{scale:2,backgroundColor:'#fdfaf6',useCORS:true}).then(canvas=>{
      const a=document.createElement('a');
@@ -1975,16 +2053,38 @@ function renderPDF(){
      a.click();
      pj.textContent=old;pj.disabled=false;
    }).catch(err=>{alert('JPEG変換に失敗しました：'+err);pj.textContent=old;pj.disabled=false;});
- };
- const pp=document.getElementById('pdfPrint');if(pp)pp.onclick=()=>printDoc('printing-newcomer');
+ },pj);
+ const pp=document.getElementById('pdfPrint');if(pp)pp.onclick=()=>printDoc('printing-newcomer','pdfDoc');
  setCard('初回案内PDF出力','選択園の口座を自動反映','発行日を変えると振込期限(発行日+7日)も自動で再計算されます。施設色がアクセントに反映されます。「🖼 JPEG保存」で画像化、「🖨 印刷」でA4縦1ページに印刷できます。','none');
 }
-// 印刷の共通ヘルパー：クラス付与→即 print()、戻しは afterprint（無ければrAF）。
-// 旧実装の setTimeout(…,500) の固定待ちを廃止し、印刷ダイアログを速く出し・速く復帰する。
-function printDoc(cls){
- document.body.classList.add(cls);
- const restore=()=>{document.body.classList.remove(cls);window.removeEventListener('afterprint',restore);};
- if('onafterprint' in window){ // モダンブラウザ：ダイアログを閉じた確実なタイミングで復帰（早すぎる解除で印刷が崩れない）
+// 印刷の共通ヘルパー。
+// 【変更】旧実装は「アプリ全体を visibility:hidden にして目的の書類だけ visible」にしていたが、
+//   visibility:hidden は要素のレイアウト（高さ）を残すため、隠したアプリ画面の分だけ
+//   空白ページが生まれ、印刷プレビューの生成も重くなっていた。
+//   新実装は、印刷したい書類のノードを印刷専用コンテナ #printHost へ一時的に移し、
+//   body直下の他の要素を display:none で完全に取り除く。＝紙に出るのは案内書1枚だけ。
+//   印刷後（afterprint）に元の位置へ必ず戻すので、画面表示は変わらない。
+function printDoc(cls,docId){
+ const doc=docId?document.getElementById(docId):null;
+ const host=document.getElementById('printHost');
+ let placeholder=null;
+ if(doc&&host&&doc.parentNode){ // 元の位置に目印を置いてから、書類を印刷用コンテナへ移動
+  placeholder=document.createComment('printed-doc');
+  doc.parentNode.insertBefore(placeholder,doc);
+  host.appendChild(doc);
+ }
+ document.body.classList.add('printing-doc',cls);
+ let done=false;
+ const restore=()=>{
+  if(done)return; done=true;
+  document.body.classList.remove('printing-doc',cls);
+  if(placeholder&&placeholder.parentNode){ // 書類を元の位置へ戻す
+   placeholder.parentNode.insertBefore(doc,placeholder);
+   placeholder.parentNode.removeChild(placeholder);
+  }
+  window.removeEventListener('afterprint',restore);
+ };
+ if('onafterprint' in window){ // モダンブラウザ：ダイアログを閉じた確実なタイミングで復帰
    window.addEventListener('afterprint',restore);
    window.print();
  }else{ // 非対応環境のフォールバック：次フレームで復帰
@@ -2000,13 +2100,13 @@ function renderReissue(){
  // フッター用の園名（前置きの全園共通文言なし・各園の正式名称）
  const FAC_JP_NAME={'月寒園':'STRAWBERRY FIELD 月寒園','白石園':'STRAWBERRY FIELD 白石園','サッポロファクトリー園':'STRAWBERRY FIELD サッポロファクトリー園','幼稚舎':'STRAWBERRY FIELD 幼稚舎','資生館保育園':'チルドレンズガーデン資生館保育園'};
  const footName=FAC_JP_NAME[park]||(bk['園名（正式名称）']||'');
- const fmtJP=s=>{const d=new Date(s);return `${d.getFullYear()}年 ${d.getMonth()+1}月 ${d.getDate()}日`;};
- const fmtJPshort=s=>{const d=new Date(s);return `${d.getFullYear()}.${String(d.getMonth()+1).padStart(2,'0')}.${String(d.getDate()).padStart(2,'0')}`;};
- if(!window.__reissueDate){const d=new Date();window.__reissueDate=d.toISOString().slice(0,10);}
+ const fmtJP=s=>{const d=parseYMD(s);return `${d.getFullYear()}年 ${d.getMonth()+1}月 ${d.getDate()}日`;};
+ const fmtJPshort=s=>{const d=parseYMD(s);return `${d.getFullYear()}.${String(d.getMonth()+1).padStart(2,'0')}.${String(d.getDate()).padStart(2,'0')}`;};
+ if(!window.__reissueDate){window.__reissueDate=todayYMD();}
  const issue=window.__reissueDate;
  // 振込期限と再振替日は別々に保持
- if(!window.__reissueDueFuri){const d=new Date(issue);d.setDate(d.getDate()+7);window.__reissueDueFuri=d.toISOString().slice(0,10);}
- if(!window.__reissueDueSai){const d=new Date(issue);d.setDate(d.getDate()+7);window.__reissueDueSai=d.toISOString().slice(0,10);}
+ if(!window.__reissueDueFuri){window.__reissueDueFuri=addDaysYMD(issue,7);}
+ if(!window.__reissueDueSai){window.__reissueDueSai=addDaysYMD(issue,7);}
  // タブ＝納入方法で自動振り分け（furi＝振込の人／hiki＝引落の人）
  if(!window.__reissueTab)window.__reissueTab='furi';
  const isFuriMode=window.__reissueTab==='furi';
@@ -2138,9 +2238,9 @@ function renderReissue(){
  const rp=document.getElementById('rePick');if(rp)rp.onchange=e=>{window.__rePick=+e.target.value;render();};
  const safeName=(p.name||'案内').replace(/[\\/:*?"<>|\s]/g,'_');
  const jb=document.getElementById('reJpeg');
- if(jb)jb.onclick=()=>{
+ // JPEG保存を押したときに初めて html2canvas を読み込む
+ if(jb)jb.onclick=()=>withLib('html2canvas',()=>{
    const doc=document.getElementById('reissueDoc');if(!doc)return;
-   if(typeof html2canvas==='undefined'){alert('画像変換ライブラリの読み込みに失敗しました。通信環境をご確認のうえ、ページを再読み込みしてください。');return;}
    const old=jb.textContent;jb.textContent='変換中…';jb.disabled=true;
    html2canvas(doc,{scale:2,backgroundColor:'#fdfaf6',useCORS:true}).then(canvas=>{
      const a=document.createElement('a');
@@ -2149,13 +2249,13 @@ function renderReissue(){
      a.click();
      jb.textContent=old;jb.disabled=false;
    }).catch(err=>{alert('JPEG変換に失敗しました：'+err);jb.textContent=old;jb.disabled=false;});
- };
- const pb=document.getElementById('rePrint');if(pb)pb.onclick=()=>printDoc('printing-reissue');
+ },jb);
+ const pb=document.getElementById('rePrint');if(pb)pb.onclick=()=>printDoc('printing-reissue','reissueDoc');
  setCard('再振替・再振込案内',`${park} の再請求対象 ${targets.length}名`,'「🖼 JPEG保存」で案内を画像として保存し連絡帳に貼り付け。「🖨 印刷」で紙に印刷（PDF保存も可）。方式を「振込」にすると振込先口座入り、「再振替」にすると再引落日のみの案内になります。月謝＋事務手数料が請求額です。','none');
 }
 function bindReissueBar(){
  document.querySelectorAll('[data-retab]').forEach(el=>{el.onclick=e=>{window.__reissueTab=e.currentTarget.dataset.retab;window.__rePick=0;render();};});
- const i=document.getElementById('reIssue');if(i)i.onchange=e=>{window.__reissueDate=e.target.value;const d=new Date(e.target.value);d.setDate(d.getDate()+7);const nd=d.toISOString().slice(0,10);window.__reissueDueFuri=nd;window.__reissueDueSai=nd;render();};
+ const i=document.getElementById('reIssue');if(i)i.onchange=e=>{window.__reissueDate=e.target.value;const nd=addDaysYMD(e.target.value,7);window.__reissueDueFuri=nd;window.__reissueDueSai=nd;render();};
  const du=document.getElementById('reDue');if(du)du.onchange=e=>{if(e.target.dataset.duemode==='sai')window.__reissueDueSai=e.target.value;else window.__reissueDueFuri=e.target.value;render();};
  const f=document.getElementById('reFee');if(f)f.onchange=e=>{const pk=e.target.dataset.feepark;reissueFeeByPark[pk]=Number(e.target.value)||0;render();};
 }
@@ -2192,11 +2292,11 @@ function renderReadme(){
  document.getElementById('body').innerHTML='<div class="readme">'+t+'</div>';
  setCard('README','使い方','','none');
 }
-let mealDate=new Date().toISOString().slice(0,10); // 既定の対象日（初期＝今日）
+let mealDate=todayYMD(); // 既定の対象日（初期＝今日／ローカル日付）
 function renderMeals(){
  // 幼稚舎の在園児（プルダウン候補：クラス＋名前）
  const pupils=allPupils().filter(r=>r.park==='幼稚舎'&&(r.status==='在園中'||calc(r).isNew));
- const today=new Date().toISOString().slice(0,10);
+ const today=todayYMD();
  const todayCount=meals.filter(r=>r.date===today&&(r.lunch||r.bread)).length;
  let h='';
  // 記入漏れ警告
@@ -2249,7 +2349,7 @@ function renderInitSale(){
  // 対象＝新規入園（isNew）の園児。選択中の施設で絞り込み、登録順。確定後も残る
  const cand=roster.filter(r=>r.isNew&&r.name).filter(r=>park==='全施設'||r.park===park)
    .sort((a,b)=>(a.regSeq||0)-(b.regSeq||0));
- const today=new Date().toISOString().slice(0,10);
+ const today=todayYMD();
  // 集計
  const paidList=cand.filter(p=>initSaleLog[p.name]&&initSaleLog[p.name].paid);
  const paidSum=paidList.reduce((s,p)=>s+initSaleAmount(p),0);
@@ -2776,6 +2876,8 @@ function shokaiAutoRowsFor(){
 // マネーフォワード様式のExcel（現金出納帳インポート用）を出力
 // 本物テンプレートのレイアウトに準拠：B列開始・Ver表記・E列に勘定科目コードのVLOOKUP・右側にマスター表
 function cbExportMF(){
+ // xlsx は起動時に読み込まない。この関数が呼ばれた時点で未読み込みなら、読み込んでからやり直す。
+ if(!libReady('xlsx')){ withLib('xlsx',()=>cbExportMF()); return; }
  const cb=cbGet();const bumon=CB_BUMON[park]||park;
  // MF勘定科目マスター（コード・名称・カテゴリ）— テンプレートの右側マスターと同一
  const MF_ACCTS=[[99,'当期商品仕入高','その他'],[100,'役員報酬',''],[101,'給与手当','仕入関係'],[102,'賞与',''],
@@ -2887,6 +2989,8 @@ function cbMfRows(cb){
 }
 // 売上だけのExcel（見やすい一覧表）
 function cbExportSalesXlsx(){
+ // xlsx は起動時に読み込まない。この関数が呼ばれた時点で未読み込みなら、読み込んでからやり直す。
+ if(!libReady('xlsx')){ withLib('xlsx',()=>cbExportSalesXlsx()); return; }
  const cb=cbGet();const {sales,bumon}=cbSplitData(cb);
  const aoa=[[`${bumon}　${yy}年${mm}月　売上一覧`],[],['日付','区分','内容','担当','金額']];
  let sum=0;sales.forEach(s=>{sum+=s.amt;aoa.push([s.date,s.kubun,s.item,s.by,s.amt]);});
@@ -2898,6 +3002,8 @@ function cbExportSalesXlsx(){
 }
 // 支出だけのExcel（見やすい一覧表）
 function cbExportExpenseXlsx(){
+ // xlsx は起動時に読み込まない。この関数が呼ばれた時点で未読み込みなら、読み込んでからやり直す。
+ if(!libReady('xlsx')){ withLib('xlsx',()=>cbExportExpenseXlsx()); return; }
  const cb=cbGet();const {expenses,bumon}=cbSplitData(cb);
  const aoa=[[`${bumon}　${yy}年${mm}月　支出（経費）一覧`],[],['日付','勘定科目','税区分','店舗名','内容','担当','イベント','金額']];
  let sum=0;expenses.forEach(e=>{sum+=e.amt;aoa.push([e.date,e.acct,e.tax,e.shop,e.item,e.by,e.event?'○':'',e.amt]);});
@@ -2909,6 +3015,8 @@ function cbExportExpenseXlsx(){
 }
 // 費用（イベント費のみ）のExcel
 function cbExportEventXlsx(){
+ // xlsx は起動時に読み込まない。この関数が呼ばれた時点で未読み込みなら、読み込んでからやり直す。
+ if(!libReady('xlsx')){ withLib('xlsx',()=>cbExportEventXlsx()); return; }
  const cb=cbGet();const {expenses,bumon}=cbSplitData(cb);
  const evs=expenses.filter(e=>e.event);
  const aoa=[[`${bumon}　${yy}年${mm}月　行事イベント費一覧`],[],['日付','勘定科目','店舗名','内容','担当','金額']];
@@ -3280,13 +3388,15 @@ function addAction(){if(tab==='roster')roster.push({id:roster.length+1,status:'�
  else if(tab==='newcomer'){if(window.__newSub&&window.__newSub!=='entry')return;const newId=Math.max(0,...roster.map(r=>r.id||0))+1;
    roster.push({id:newId,status:'在園中',park:(park==='全施設'||!park)?'月寒園':park,name:'',kana:'',waku:'地域枠',cls:'LEAF',koza:'',nyuen:'',sib:'なし',lid:'',birth:'',isNew:true,confirmed:false,regSeq:Date.now()});}
  else if(tab==='addon')addons.push({kind:'申込',name:'',goods:'',size:'',qty:1,price:0,ry:yy,rm:mm});
- else if(tab==='meals')meals.push({date:new Date().toISOString().slice(0,10),name:'',lunch:false,bread:false});
+ else if(tab==='meals')meals.push({date:todayYMD(),name:'',lunch:false,bread:false});
  else if(tab==='sched')sched.push({year:yy,month:mm,item:'新規項目',cls:'全員',pupil:'',plan:0,fix:0,state:'予定'});
  render();}
 function render(){renderStats();RENDER[tab]();if(tab==='roster')bindEdit();saveState();}
 
 // xlsx出力（全シート）
-function exportXlsx(){const wb=XLSX.utils.book_new();const add=(n,a)=>XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(a),n);
+function exportXlsx(){
+ if(!libReady('xlsx')){ withLib('xlsx',()=>exportXlsx()); return; }
+ const wb=XLSX.utils.book_new();const add=(n,a)=>XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(a),n);
  const ros=[['ID','ステータス','枠区分','クラス','園児名','兄弟有(下子)','口座名義','ルクミー園児ID','入園年月日','所属園','マットレス','バス','おむつサブスク','制服ﾚﾝﾀﾙ:ニット','制服ﾚﾝﾀﾙ:キャップ','制服ﾚﾝﾀﾙ:パーカー']];
  const yn=v=>v?'あり':'';
  allPupils().forEach((r,i)=>ros.push([i+1,r.status,r.waku,r.cls,r.name,r.sib,r.koza,r.lid,r.nyuen,r.park,yn(r.optMattress),yn(r.optBus),yn(r.optDiaper),yn(r.optKnit),yn(r.optCap),yn(r.optParka)]));add('園児台帳',ros);
@@ -3358,15 +3468,26 @@ const firebaseConfig = {
 const CLOUD_COL='app', CLOUD_DOC_ID='state';
 // クラウド同期ステート（cloudDB/cloudReady/__cloudDirty/__pushTimer/__editSeq/__pushedSeq）は
 // TDZ回避のためスクリプト最上部（let park の直後）へ移動して先に初期化済み。
-let MY_DEVICE =localStorage.getItem('sf_device_id') || (()=>{const id='dev_'+Math.random().toString(36).slice(2)+Date.now().toString(36);localStorage.setItem('sf_device_id',id);return id;})();
-let currentOperator = localStorage.getItem('sf_operator') || '';
+// localStorage はプライベートブラウズや容量超過で例外を投げることがある。
+// 素のまま呼ぶと例外でスクリプト全体が止まり、画面が真っ白になるため必ず try/catch で包む。
+let MY_DEVICE = (()=>{
+ const gen=()=>'dev_'+Math.random().toString(36).slice(2)+Date.now().toString(36);
+ try{
+  const saved=localStorage.getItem('sf_device_id');
+  if(saved)return saved;
+  const id=gen();
+  localStorage.setItem('sf_device_id',id);
+  return id;
+ }catch(e){ return gen(); } // 保存できない環境でも、このセッション限りのIDで動かす
+})();
+let currentOperator = (()=>{ try{ return localStorage.getItem('sf_operator')||''; }catch(e){ return ''; } })();
 let __lastRemote = null; // {by, at:Date}
 
 function cloudRef(){ return cloudDB.collection(CLOUD_COL).doc(CLOUD_DOC_ID); }
-function cloudStateObject(){
- return {v:1, savedAt:new Date().toISOString(),
-   roster, changeLog, lookmeeCheck, rosterBase, bank, reissueFeeByPark, initSaleLog, cashbook, cashbookEvent, timelyData,
-   addons, sched, schedMemo, meals};
+function cloudStateObject(){ // 端末保存と同じ内容＋送信時刻（保存対象キーの二重管理を避けるため stateForSave を使う）
+ const d=stateForSave();
+ d.savedAt=new Date().toISOString();
+ return d;
 }
 function cloudApplyObject(d){ // クラウド/他端末のデータをこの端末へ反映（ローカルにも保存）
  if(!d)return;
@@ -3383,6 +3504,9 @@ function cloudApplyObject(d){ // クラウド/他端末のデータをこの端�
  if(typeof d.schedMemo==='string')schedMemo=d.schedMemo;
  if(d.meals)meals=d.meals;
  try{localStorage.setItem(STORE_KEY, JSON.stringify(cloudStateObject()));}catch(e){}
+ // 受信した内容＝いま保存済みの内容。これを基準にしておくことで、この直後の render→saveState が
+ // 「無変更」と判定され、受け取ったデータをそのままクラウドへ送り返さない。
+ try{__lastSavedJson=JSON.stringify(stateForSave());}catch(e){__lastSavedJson=null;}
 }
 function parsePayload(data){ try{ return data&&data.payload?JSON.parse(data.payload):null; }catch(e){ return null; } }
 
