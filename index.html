@@ -3590,7 +3590,7 @@ function addAction(){if(tab==='roster')roster.push({id:roster.length+1,status:'�
  else if(tab==='meals')meals.push({date:todayYMD(),name:'',lunch:false,bread:false});
  else if(tab==='sched')sched.push({year:yy,month:mm,item:'新規項目',cls:'全員',pupil:'',plan:0,fix:0,state:'予定'});
  render();}
-function render(){renderStats();RENDER[tab]();if(tab==='roster')bindEdit();saveState();}
+function render(){renderStats();RENDER[tab]();if(tab==='roster')bindEdit();saveState();/* SF-KINDER-PUBLISH-20260723 : クラウド受信後の再描画も含め、全経路の受け皿。差分方式なので変化が無ければ書かない。 */if(typeof kinderPublish==='function')kinderPublish();}
 
 // xlsx出力（全シート）
 function exportXlsx(){
@@ -3877,8 +3877,35 @@ function cloudMarkDirty(){
  if(__pushTimer)clearTimeout(__pushTimer);
  __pushTimer=setTimeout(cloudPushNow,1200);
 }
+/* ===== SF-KINDER-PUBLISH-20260723 : 幼稚舎名簿の公開ミラーを書き出す =====
+   予約管理ボード(strawberry-field / board.html)は
+   kindergarten_public/roster の { pupils: [{name, linkPark}] } を購読し、
+   早朝・延長のチップを出している。ボード側の受け口は実装済みで、
+   こちらの書き出しだけが無かった。
+   氏名と連携園だけを載せる（月謝額・納入方法などは載せない）。 */
+var __kinderLastSig = null;   /* let にすると起動直後の render() から触れて TDZ になる。このファイルは同じ罠で一度壊れている */
+function kinderPublish(){
+  // クラウド受信前は書かない（起動直後のローカル既定値で名簿を消さないため）
+  if(!cloudDB || !cloudReady) return;
+  try{
+    const pupils = (roster || [])
+      .filter(r => r && r.name && r.linkPark)
+      .map(r => ({ name: String(r.name), linkPark: String(r.linkPark) }));
+    const sig = JSON.stringify(pupils);
+    if(sig === __kinderLastSig) return;   // 変化が無ければ書かない
+    __kinderLastSig = sig;
+    cloudDB.collection('kindergarten_public').doc('roster')
+      .set({ pupils: pupils, count: pupils.length, updatedAt: new Date().toISOString() })
+      .then(function(){ console.log('[kinder] 名簿を発行: ' + pupils.length + '名'); })
+      .catch(function(e){ console.error('[kinder] 名簿の発行に失敗', e); });
+  }catch(e){ console.error('[kinderPublish]', e); }
+}
+/* ===== SF-KINDER-PUBLISH-20260723 ここまで ===== */
+
 function cloudPushNow(){
  if(!cloudDB)return;
+ /* SF-KINDER-PUBLISH-20260723 : 編集が保存されるたびに公開ミラーも更新する */
+ kinderPublish();
  cloudBarSet('saving');
  const seq=__editSeq; // この番号の状態を送る
  const json=JSON.stringify(cloudStateObject());
