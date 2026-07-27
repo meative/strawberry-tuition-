@@ -3557,7 +3557,25 @@ function addAction(){if(tab==='roster')roster.push({id:roster.length+1,status:'�
  else if(tab==='meals')meals.push({date:todayYMD(),name:'',lunch:false,bread:false});
  else if(tab==='sched')sched.push({year:yy,month:mm,item:'新規項目',cls:'全員',pupil:'',plan:0,fix:0,state:'予定'});
  render();}
-function render(){renderStats();RENDER[tab]();if(tab==='roster')bindEdit();saveState();}
+function render(){
+ // 案A：再描画（body.innerHTML の作り直し）でスクロール位置が最上部へ飛ぶのを防ぐ。
+ //  作り直しの「前」に現在位置を控え、「後」に新しい要素へ復元する。render() を呼ぶ
+ //  全箇所（入力ハンドラ・タブ切替・onSnapshot によるクラウド受信など）に一括で効く。
+ const __scEl=document.scrollingElement||document.documentElement;
+ const __winTop=(__scEl&&__scEl.scrollTop)||window.scrollY||0; // ウィンドウ全体のスクロール量
+ const __twTops=Array.prototype.map.call(document.querySelectorAll('.tablewrap'),el=>el.scrollTop); // 各表枠のスクロール量
+ renderStats();RENDER[tab]();if(tab==='roster')bindEdit();
+ // 復元：innerHTML 差し替えで .tablewrap は新要素に置き換わっているので、index 対応で書き戻す。
+ const __restoreScroll=()=>{
+  const __tws=document.querySelectorAll('.tablewrap');
+  for(let __k=0;__k<__tws.length&&__k<__twTops.length;__k++) __tws[__k].scrollTop=__twTops[__k];
+  if(__scEl) __scEl.scrollTop=__winTop;
+  if(window.scrollY!==__winTop) window.scrollTo(0,__winTop);
+ };
+ __restoreScroll(); // まず即時に復元（innerHTML 代入でレイアウトは確定済み）
+ requestAnimationFrame(__restoreScroll); // 描画直前にもう一度当てて確実に反映
+ saveState();
+}
 
 // xlsx出力（全シート）
 function exportXlsx(){
