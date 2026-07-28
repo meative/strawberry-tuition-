@@ -2848,7 +2848,7 @@ function renderCashbook(){
   const noLabel=r.src==='timely'?'現金':(r.src==='shokai'?'振込':(i+1)); // タイムリー現金売上=現金／新規入園=振込／出金=連番
   h+=`<tr${locked?' style="opacity:.85"':''}${timely?' style="background:var(--leafsoft)"':''}>`+
     `<td style="text-align:center;font-weight:700;color:${r.src?'var(--leaf)':'var(--berry)'};font-size:${r.src?'11px':'inherit'}">${noLabel}</td>`+
-    `<td><div style="display:flex;align-items:center;gap:1px"><input type="text" inputmode="numeric" data-cb="${i}" data-f="mon" value="${r.mon!=null&&r.mon!==''?r.mon:mm}" ${dis} class="inp" style="width:34px;padding:3px 3px" title="月"><span style="font-size:10px;color:var(--mut)">月</span><input type="text" inputmode="numeric" data-cb="${i}" data-f="day" value="${r.day||''}" ${dis} class="inp" style="width:34px;padding:3px 3px" placeholder="日" title="日"><span style="font-size:10px;color:var(--mut)">日</span></div></td>`+
+    `<td><div style="display:flex;align-items:center;gap:1px"><input type="text" inputmode="numeric" data-cb="${i}" data-f="mon" value="${r.mon!=null&&r.mon!==''?r.mon:mm}" ${dis} class="inp" style="width:44px;padding:3px 3px;flex-shrink:0;text-align:center" title="月"><span style="font-size:10px;color:var(--mut)">月</span><input type="text" inputmode="numeric" data-cb="${i}" data-f="day" value="${r.day||''}" ${dis} class="inp" style="width:44px;padding:3px 3px;flex-shrink:0;text-align:center" placeholder="日" title="日"><span style="font-size:10px;color:var(--mut)">日</span></div></td>`+
     (fixed
       ? `<td style="color:var(--mut)">1 現金</td>`
       : timely
