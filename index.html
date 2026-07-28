@@ -179,6 +179,9 @@ tr.changed:hover td{background:color-mix(in srgb,var(--gold) 22%,transparent)!im
 [contenteditable]:focus{outline:2px solid var(--leaf);outline-offset:1px;background:color-mix(in srgb,var(--leaf) 10%,transparent);}
 .inp{font-family:inherit;background:var(--panel);border:1px solid var(--line2);color:var(--ink);padding:7px 9px;border-radius:8px;font-size:13px;width:100%;}
 .inp:focus{outline:none;border-color:var(--leaf);}
+/* 年間スケジュールの「年」入力欄（.nospin）だけ number スピナーを消す。4桁の西暦を切らずに表示するため。他の数字入力欄には影響しない */
+.nospin{-moz-appearance:textfield;appearance:textfield;}
+.nospin::-webkit-inner-spin-button,.nospin::-webkit-outer-spin-button{-webkit-appearance:none;appearance:none;margin:0;}
 .actions{display:flex;gap:12px;margin-top:20px;flex-wrap:wrap;align-items:center;}
 .btn{font-family:inherit;font-weight:700;font-size:14px;border:none;padding:13px 26px;border-radius:12px;
  cursor:pointer;letter-spacing:.03em;transition:transform .15s,box-shadow .15s;display:inline-flex;align-items:center;gap:8px;}
@@ -1945,9 +1948,15 @@ function hqFyExportCsv(){
 // 制服判定（販売単価マスターの制服カテゴリ）
 function isUniform(item){if(item&&item.indexOf('制服ﾚﾝﾀﾙ')===0)return true;const g=M.goods.find(x=>x.name===item);return g && g.cat==='制服';}
 function renderSched(){
- // 年月順・同月内は入力順（元の配列順）でソート（安定ソート）
+ // 表示ソート：既存項目（justAdded無し）は年月順・同月内は入力順（安定ソート）。
+ //  新規追加項目（justAdded有り）は年月に関係なく末尾へ、新規どうしは追加順（元index順）。
+ //  ※並べ替えるのは表示用コピーのみ。各行→実配列の紐付けは 1959行の sched.indexOf(s) が
+ //    表示順と独立に実indexを引くため、並び順を変えても別行編集の事故は起きない。
  const idx=new Map(sched.map((s,i)=>[s,i]));
  const sorted=sched.slice().sort((a,b)=>{
+  const na=!!a.justAdded, nb=!!b.justAdded;
+  if(na!==nb)return na?1:-1;                 // 新規は末尾へ
+  if(na)return idx.get(a)-idx.get(b);        // 新規どうし：追加順
   const ka=(+a.year||0)*100+(+a.month||0), kb=(+b.year||0)*100+(+b.month||0);
   if(ka!==kb)return ka-kb; return idx.get(a)-idx.get(b);});
  const clsList=['全員','幼稚舎','資生館保育園','月寒園','白石園','サッポロファクトリー園','LEAF','BLOSSOM','HARVEST','SEED-0','SEED-1','SPROUT','個別'];
@@ -1971,7 +1980,7 @@ function renderSched(){
   }).sort((a,b)=>(a.cls+a.name).localeCompare(b.cls+b.name,'ja'));
   const exCount=(s.exclude||[]).length;
   h+=`<tr>`+
-   `<td style="white-space:nowrap"><input class="inp" type="number" data-sch="${i}" data-f="year" value="${s.year||yy}" style="width:64px;display:inline">/<input class="inp" type="number" data-sch="${i}" data-f="month" value="${s.month||1}" style="width:48px;display:inline"></td>`+
+   `<td style="white-space:nowrap"><input class="inp nospin" type="number" data-sch="${i}" data-f="year" value="${s.year||yy}" style="width:100px;display:inline-block;text-align:center">/<input class="inp" type="number" data-sch="${i}" data-f="month" value="${s.month||1}" style="width:48px;display:inline"></td>`+
    `<td><input class="inp" data-sch="${i}" data-f="item" value="${(s.item||'').replace(/"/g,'&quot;')}" placeholder="項目名"></td>`+
    `<td><select class="inp" data-sch="${i}" data-f="cls" style="width:auto">${clsList.map(c=>`<option ${(s.cls===c||(c==='全員'&&s.cls==='全園'))?'selected':''}>${c}</option>`).join('')}</select>`+
      (s.cls==='個別'?` <select class="inp" data-sch="${i}" data-f="pupil" style="width:auto"><option value="">園児を選択</option>${pupilPool.map(p=>`<option value="${p.name}" ${s.pupil===p.name?'selected':''}>${(park==='全施設'?p.park+' ':'')}${p.cls}　${p.name}</option>`).join('')}</select>`:'')+`</td>`+
@@ -1997,8 +2006,11 @@ function renderSched(){
  // メモ欄の保存
  const memoEl=document.getElementById('schedMemo');
  if(memoEl)memoEl.oninput=e=>{schedMemo=e.target.value;saveState();};
- // 並び替えボタン：配列自体を年月順に並び替えて確定
- document.getElementById('schSort').onclick=()=>{const id2=new Map(sched.map((s,i)=>[s,i]));
+ // 並び替えボタン：全項目の justAdded を解除（＝新規の末尾固定を外す）してから、
+ //  配列自体を年月順に並び替えて確定。解除後は全員「既存」扱いなので従来の年月ソートでよい。
+ document.getElementById('schSort').onclick=()=>{
+   sched.forEach(s=>{if(s.justAdded)delete s.justAdded;});
+   const id2=new Map(sched.map((s,i)=>[s,i]));
    sched.sort((a,b)=>{const ka=(+a.year||0)*100+(+a.month||0),kb=(+b.year||0)*100+(+b.month||0);if(ka!==kb)return ka-kb;return id2.get(a)-id2.get(b);});render();};
  document.querySelectorAll('[data-sch]').forEach(el=>{const handler=e=>{const i=+e.target.dataset.sch,f=e.target.dataset.f;
    let v=e.target.value;if(f==='year'||f==='month'||f==='fix')v=+v;sched[i][f]=v;
@@ -3555,8 +3567,19 @@ function addAction(){if(tab==='roster')roster.push({id:roster.length+1,status:'�
    roster.push({id:newId,status:'在園中',park:(park==='全施設'||!park)?'月寒園':park,name:'',kana:'',waku:'地域枠',cls:'LEAF',koza:'',nyuen:'',sib:'なし',lid:'',birth:'',isNew:true,confirmed:false,regSeq:Date.now()});}
  else if(tab==='addon')addons.push({kind:'申込',name:'',goods:'',size:'',qty:1,price:0,ry:yy,rm:mm});
  else if(tab==='meals')meals.push({date:todayYMD(),name:'',lunch:false,bread:false});
- else if(tab==='sched')sched.push({year:yy,month:mm,item:'新規項目',cls:'全員',pupil:'',plan:0,fix:0,state:'予定'});
- render();}
+ else if(tab==='sched')sched.push({year:yy,month:mm,item:'新規項目',cls:'全員',pupil:'',plan:0,fix:0,state:'予定',justAdded:true}); // justAdded:新規追加は「年月順に並び替え」まで末尾に表示
+ const __schedAdded=(tab==='sched'); // 今回の追加が年間スケジュールか（追加後に新規行へスクロールする対象）
+ render();
+ // 年間スケジュールの「項目を追加」時のみ、再描画後に新規行（表の一番下）を画面内へスクロール。
+ //  render() 内の __restoreScroll（位置保持）より後に rAF を登録するため、こちらが後勝ちになり、
+ //  「追加時＝新規行へ移動／それ以外＝現在位置を保持」の使い分けが成立する（既存修正とは非競合）。
+ //  scrollIntoView は .tablewrap（表内スクロール）とウィンドウ両方の祖先スクロールを動かして行を見せる。
+ if(__schedAdded)requestAnimationFrame(()=>{
+   const __rows=document.querySelectorAll('.tablewrap table tbody tr');
+   const __last=__rows[__rows.length-1];
+   if(__last&&__last.scrollIntoView)__last.scrollIntoView({block:'nearest'});
+ });
+}
 function render(){
  // 案A：再描画（body.innerHTML の作り直し）でスクロール位置が最上部へ飛ぶのを防ぐ。
  //  作り直しの「前」に現在位置を控え、「後」に新しい要素へ復元する。render() を呼ぶ
