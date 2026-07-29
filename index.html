@@ -2867,7 +2867,7 @@ function renderCashbook(){
     `<td>${r.kind==='out'?`<input type="text" inputmode="numeric" data-cb="${i}" data-f="amt" value="${r.amt||''}" ${dis} class="inp" style="width:74px;padding:3px 5px;text-align:right">`:(locked||timely?'':`<span style="color:var(--mut);font-size:11px;cursor:pointer" data-cbkind="${i}" data-k="out">出金に</span>`)}</td>`+
     `<td class="num">¥${r.bal.toLocaleString()}</td>`+
     `<td><select data-cb="${i}" data-f="by" ${dis} class="inp" style="width:100%;padding:3px 4px;font-size:11px">${byOpts}</select></td>`+
-    `<td>${locked?'':`<span style="color:var(--berry);cursor:pointer;font-weight:700" data-cbdel="${i}" title="削除">✕</span>`}</td>`+
+    `<td style="white-space:nowrap">${locked?'':`<span style="color:var(--leaf);cursor:pointer;font-weight:700;margin-right:10px" data-cbins="${i}" title="この行の下に空行を挿入">＋</span><span style="color:var(--berry);cursor:pointer;font-weight:700" data-cbdel="${i}" title="削除">✕</span>`}</td>`+
     `</tr>`;
   });
  }
@@ -2969,6 +2969,18 @@ function renderCashbook(){
  document.querySelectorAll('[data-cbdel]').forEach(el=>{el.onclick=e=>{
    const i=+e.target.dataset.cbdel,cur=cbGet();
    confirmDialog('この行を削除します。よろしいですか？',()=>{cur.rows.splice(i,1);render();});
+ };});
+ // 行挿入：この行の「下」に空行を splice（既存の「行を追加」と同じ初期値）。No.・残高は配列順から毎回再計算されるため自動で正しく振り直される。
+ document.querySelectorAll('[data-cbins]').forEach(el=>{el.onclick=e=>{
+   const i=+e.target.dataset.cbins,cur=cbGet();
+   cur.rows.splice(i+1,0,{mon:mm,day:'',acct:'',tax:'課税仕入 10%',shop:'',item:'',kind:'out',amt:'',by:''});render();
+   // 挿入した新規行（配列 i+1）を画面内へスクロール。data-cb属性で特定（tbody先頭に繰越金・本部振替の行があるため位置計算より確実）。
+   //  render()内の __restoreScroll（位置保持）より後に rAF を登録するので後勝ちになり、「挿入時＝新規行へ移動／それ以外＝位置保持」の使い分けが成立（既存修正とは非競合）。
+   requestAnimationFrame(()=>{
+     const __cell=document.querySelector('[data-cb="'+(i+1)+'"]');
+     const __row=(__cell&&__cell.closest)?__cell.closest('tr'):__cell;
+     if(__row&&__row.scrollIntoView)__row.scrollIntoView({block:'nearest'});
+   });
  };});
  if(isEv){
    setCard('イベント出納帳',`${park}（${bumon}）のイベント費管理`,'運動会・ファッションショー等の行事ごとの現金を、通常の経費とは分けて管理します。まず「イベント予算（入金）」の金額と担当を入れます（本部から振り替えたイベント用の現金）。担当を選ぶと明細を入力できます。イベントの支出（経費）を入力していきます。日付は月・日に分けて入力。No.は領収書番号と照合できる連番です。足りなくなったら「＋現金入金」で補充できます。月末は「預金振替で締める」で残金を口座へ戻します。締めると「👁 出力プレビュー」が出て、イベント経費の一覧とExcel出力ができます。通常の経費は「現金出納帳」で管理してください。','none');
