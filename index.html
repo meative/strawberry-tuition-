@@ -507,6 +507,8 @@ let addons=[];    // 追加申込み
 let meals=[];     // 給食記録（幼稚舎）: {date:'YYYY-MM-DD', name, lunch:bool, bread:bool}
 let sched=JSON.parse(JSON.stringify(M.sched)); // 年間スケジュール（編集可能）
 let schedMemo=M.schedMemo||''; // 年間スケジュールのメモ欄
+let schedShared=[]; // 全社共通カレンダー（shared/global から読込。この園の own sched とは別に保持）
+let schedAmounts={}; // 全社行事の「園ごとの金額」 { 園名:{ 行事キー:金額 } }（園別ドキュメントに保存）
 // 共通の確認ダイアログ（削除・確定など）
 function confirmDialog(msg,onOK,title,okLabel){
  const ov=document.getElementById('confirmOverlay');
@@ -686,6 +688,7 @@ let cashbookEvent={};
 let cbMode='normal';
 // タイムリー売上（プレビュー内で読み込む）：timelyData[施設][yy-mm] = [{mon,day,item,amt,by}]
 let timelyData={};
+let shops=null; // 現金出納帳の店舗名リスト（園ごと・同期対象。null=未設定→既定リストで自動初期化）
 // ===== 端末内保存（localStorage）：閉じても残る。Firebase移行時もこのデータ構造を流用 =====
 const STORE_KEY='sf_tuition_v1';
 let __saveTimer=null;
@@ -697,7 +700,7 @@ let __pendingUserSave=false;
 function stateForSave(){
  return {v:1,
   roster, changeLog, lookmeeCheck, rosterBase, bank, reissueFeeByPark, initSaleLog, cashbook, cashbookEvent, timelyData,
-  addons, sched, schedMemo, meals};
+  addons, sched, schedMemo, meals, shops, schedAmounts};
 }
 function saveState(){ // 入力データをまとめて端末に保存（連打防止のため少し遅延）
  // 【変更】render() は画面を描き直すたびに saveState() を呼ぶため、
@@ -744,13 +747,15 @@ function loadState(){ // 起動時に端末から復元
   if(d.sched)sched=d.sched;
   if(typeof d.schedMemo==='string')schedMemo=d.schedMemo;
   if(d.meals)meals=d.meals;
+  if(d.shops!==undefined)shops=d.shops;
+  if(d.schedAmounts)schedAmounts=d.schedAmounts;
   return true;
  }catch(e){console.warn('復元に失敗:',e);return false;}
 }
 function exportBackup(){ // データをファイルに書き出し（バックアップ・受け渡し用）
  const data={v:1, savedAt:new Date().toISOString(), app:'STRAWBERRY_FIELD月謝管理',
   roster, changeLog, lookmeeCheck, rosterBase, bank, reissueFeeByPark, initSaleLog, cashbook, cashbookEvent, timelyData,
-  addons, sched, schedMemo, meals};
+  addons, sched, schedMemo, meals, shops, schedAmounts};
  const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
  const url=URL.createObjectURL(blob);const a=document.createElement('a');
  const d=new Date();const stamp=`${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}_${String(d.getHours()).padStart(2,'0')}${String(d.getMinutes()).padStart(2,'0')}`;
@@ -776,6 +781,8 @@ function importBackup(file){ // 書き出したファイルを読み込み（受
    if(d.sched)sched=d.sched;
    if(typeof d.schedMemo==='string')schedMemo=d.schedMemo;
    if(d.meals)meals=d.meals;
+   if(d.shops!==undefined)shops=d.shops;
+   if(d.schedAmounts)schedAmounts=d.schedAmounts;
    saveState();render();
    infoDialog('読み込みました。'+(d.savedAt?'\n（書き出し日時：'+new Date(d.savedAt).toLocaleString()+'）':''),'復元完了');
   };
@@ -800,8 +807,16 @@ function setTheme(t){curTheme=t;document.body.dataset.theme=t;buildThemeTog();}
 // ===== 計算ロジック（3体系対応：A保育園 / B幼稚舎 / C資生館）=====
 function facType(name){const f=M.facilities.find(x=>x.name===name);return f?f.type:'A';}
 function hasSibling(p){return p.sib==='あり';} // グループ全体判定（兄弟ありフラグで表現）
-function eventsFor(p){let out=[];sched.forEach(s=>{
- if(s.state!=='確定'||s.year!=yy||s.month!=mm)return;const amt=s.fix||0;if(!amt)return;
+function schedKey(s){ return [s.year,s.month,s.item,s.cls,s.pupil||''].join('|'); } // 行事の識別（金額は含めない）
+function gardenAmt(pk,s){ const m=schedAmounts[pk]; const v=m?m[schedKey(s)]:undefined; return (v!=null&&v!=='')?(Number(v)||0):(Number(s.fix)||0); } // 全社行事の「この園の金額」（未設定なら本部の既定）
+function allSched(){ // 全社カレンダー(schedShared:行事は本部管理・金額は園別)＋この園の予定(sched) を重複排除で合成
+ const seen=new Set(), out=[];
+ (schedShared||[]).forEach(s=>{const k=schedKey(s);if(!seen.has(k)){seen.add(k);out.push(Object.assign({},s,{_shared:true}));}});
+ (sched||[]).forEach(s=>{const k=schedKey(s);if(!seen.has(k)){seen.add(k);out.push(s);}});
+ return out;
+}
+function eventsFor(p){let out=[];allSched().forEach(s=>{
+ if(s.state!=='確定'||s.year!=yy||s.month!=mm)return;const amt=s._shared?gardenAmt(p.park,s):(Number(s.fix)||0);if(!amt)return;
  // 除外園児に含まれていればスキップ
  if(s.exclude&&s.exclude.includes(p.name))return;
  let hit=false;
@@ -1953,7 +1968,9 @@ function renderSched(){
  //  ※並べ替えるのは表示用コピーのみ。各行→実配列の紐付けは 1959行の sched.indexOf(s) が
  //    表示順と独立に実indexを引くため、並び順を変えても別行編集の事故は起きない。
  const idx=new Map(sched.map((s,i)=>[s,i]));
- const sorted=sched.slice().sort((a,b)=>{
+ const _shKey=schedKey; // 行事の識別（金額を含めない＝金額が園ごとに違っても重複判定は変わらない）
+ const _shSet=new Set((schedShared||[]).map(_shKey));
+ const sorted=sched.slice().filter(s=>!_shSet.has(_shKey(s))).sort((a,b)=>{
   const na=!!a.justAdded, nb=!!b.justAdded;
   if(na!==nb)return na?1:-1;                 // 新規は末尾へ
   if(na)return idx.get(a)-idx.get(b);        // 新規どうし：追加順
@@ -1964,6 +1981,16 @@ function renderSched(){
  let h='<div style="padding:12px 22px;border-bottom:1px solid var(--line);display:flex;gap:10px;align-items:center;flex-wrap:wrap">'+
   '<button id="schSort" class="btn btn-ghost" style="padding:8px 18px;font-size:13px">↕ 年月順に並び替え</button>'+
   '<span style="font-size:12px;color:var(--mut)">年月を変えてこのボタンを押すと、表の順序が年月順に確定します。</span></div>';
+ if(schedShared&&schedShared.length){
+  h+='<div style="padding:10px 22px 0"><div style="font-size:13px;color:var(--leaf);font-weight:700;margin-bottom:6px">🏛 全社カレンダー（行事は本部が管理・金額は各園で入力）</div>';
+  h+='<div class="tablewrap"><table><thead><tr><th>年月</th><th>項目</th><th>対象</th><th class="r">金額（この園）</th><th>状態</th></tr></thead><tbody>';
+  schedShared.slice().sort((a,b)=>((+a.year||0)*100+(+a.month||0))-((+b.year||0)*100+(+b.month||0))).forEach(s=>{
+    const amtCell=(park==='全施設')?`<td class="num">¥${(Number(s.fix)||0).toLocaleString()}<div style="font-size:10px;color:var(--mut)">※園ごと</div></td>`:`<td><input class="inp num" type="number" data-shamt="${String(schedKey(s)).replace(/"/g,'&quot;')}" value="${gardenAmt(park,s)}" placeholder="0" style="text-align:right;width:100px"></td>`;
+    h+=`<tr><td style="white-space:nowrap">${s.year}/${s.month}</td><td>${(s.item||'').replace(/</g,'&lt;')}</td><td>${s.cls||''}${(s.cls==='個別'&&s.pupil)?'：'+String(s.pupil).replace(/</g,'&lt;'):''}</td>${amtCell}<td>${s.state||''}</td></tr>`;
+  });
+  h+='</tbody></table></div><div style="font-size:11px;color:var(--mut);padding:6px 0 2px">※行事（項目・対象）は本部が管理します。金額はこの園の分を入力してください（同じ行事でも園ごとに違う金額にできます）。入れた金額は月次計算に反映されます。下の表には「この園だけの予定」も追加できます。</div></div>';
+ }
+ h+='<div style="padding:10px 22px 2px;font-size:13px;color:var(--berry);font-weight:700">📅 この園の予定</div>';
  h+='<div class="tablewrap"><table><thead><tr><th>年月</th><th>項目</th><th>対象</th><th class="r">金額</th><th>状態</th><th>除外</th><th></th></tr></thead><tbody>';
  sorted.forEach(s=>{const i=sched.indexOf(s);
   const isFixed=s.state==='確定';
@@ -2006,6 +2033,8 @@ function renderSched(){
  // メモ欄の保存
  const memoEl=document.getElementById('schedMemo');
  if(memoEl)memoEl.oninput=e=>{schedMemo=e.target.value;saveState();};
+ // 全社カレンダーの「この園の金額」入力
+ document.querySelectorAll('[data-shamt]').forEach(el=>{ el.onchange=e=>{ if(park==='全施設')return; const k=e.target.dataset.shamt; if(!schedAmounts[park])schedAmounts[park]={}; schedAmounts[park][k]=(e.target.value===''?0:(+e.target.value||0)); saveState(); }; });
  // 並び替えボタン：全項目の justAdded を解除（＝新規の末尾固定を外す）してから、
  //  配列自体を年月順に並び替えて確定。解除後は全員「既存」扱いなので従来の年月ソートでよい。
  document.getElementById('schSort').onclick=()=>{
@@ -2654,6 +2683,34 @@ function cbSortShops(list){
  return ja.concat(en).map(s=>s.n);
 }
 const CB_SHOPS=cbSortShops(CB_SHOPS_RAW);
+// 店舗名（園ごと）：shops が未設定なら既定リストで初期化。以後は園ごとに追加・削除できる。
+function cbShops(){ if(shops===null||!Array.isArray(shops)){ shops=CB_SHOPS.slice(); } return shops; }
+function cbManageShops(){ // この園の店舗名を追加・削除（園ごとに保存）
+ if(AGG_READONLY){ infoDialog('「全施設」は閲覧のみです。店舗名の編集は園を選んでから行ってください。','店舗名の管理'); return; }
+ const ov=document.getElementById('confirmOverlay');
+ document.getElementById('confirmTitle').textContent='店舗名の管理（この園）';
+ document.getElementById('confirmMsg').textContent='現金出納帳の店舗名を、この園ごとに追加・削除できます。削除しても既存の記帳内容は消えません。';
+ const extra=document.getElementById('confirmExtra');
+ const okBtn=document.getElementById('confirmOK'), cnBtn=document.getElementById('confirmCancel');
+ okBtn.style.display='none'; cnBtn.style.display=''; cnBtn.textContent='閉じる';
+ ov.style.display='flex';
+ const close=()=>{ ov.style.display='none'; okBtn.onclick=null; cnBtn.onclick=null; ov.onclick=null; extra.innerHTML=''; okBtn.style.display=''; cnBtn.textContent='キャンセル'; render(); };
+ const draw=()=>{
+  const arr=cbShops();
+  extra.innerHTML=
+   `<div style="display:flex;flex-direction:column;gap:5px;text-align:left;max-height:42vh;overflow:auto">`+
+   (arr.length?arr.map((s,i)=>`<div style="display:flex;align-items:center;gap:8px"><span style="flex:1;font-size:14px">${String(s).replace(/</g,'&lt;')}</span><button class="shopDel" data-i="${i}" title="削除" style="border:1px solid var(--line);background:var(--panel2);color:var(--berry);border-radius:50%;width:26px;height:26px;line-height:1;cursor:pointer;font-family:inherit">×</button></div>`).join(''):'<div style="color:var(--mut);font-size:13px">まだ店舗名がありません。</div>')+
+   `</div>`+
+   `<div style="display:flex;gap:6px;margin-top:12px"><input id="shopNew" class="inp" placeholder="新しい店舗名" style="flex:1;padding:8px 10px;font-size:14px"><button id="shopAdd" style="padding:8px 14px;border:1px solid var(--leaf);background:var(--panel2);color:var(--leaf);border-radius:10px;font-weight:700;cursor:pointer;font-family:inherit">＋追加</button></div>`;
+  extra.querySelectorAll('.shopDel').forEach(b=>{ b.onclick=()=>{ const i=+b.dataset.i; const a=cbShops(); a.splice(i,1); shops=a; saveState(); draw(); }; });
+  const inp=extra.querySelector('#shopNew'), addBtn=extra.querySelector('#shopAdd');
+  const doAdd=()=>{ const v=(inp.value||'').trim(); if(!v)return; const a=cbShops(); if(a.includes(v)){ inp.value=''; return; } a.push(v); shops=a; saveState(); draw(); const ni=document.getElementById('shopNew'); if(ni)ni.focus(); };
+  if(addBtn)addBtn.onclick=doAdd;
+  if(inp)inp.addEventListener('keydown',e=>{ if(e.key==='Enter')doAdd(); });
+ };
+ cnBtn.onclick=close; ov.onclick=e=>{ if(e.target===ov)close(); };
+ draw();
+}
 const CB_BUMON={'月寒園':'月寒保育園','白石園':'白石保育園','サッポロファクトリー園':'ファクトリー保育園','幼稚舎':'幼稚園','資生館保育園':'資生館保育園'};
 // ===== 現金出納帳の数値入力の正規化 =====
 // 金額・日付欄を type="text" にしたため、全角数字/記号/日本語が混入し得る。
@@ -2792,6 +2849,7 @@ function renderCashbook(){
    (locked
      ? `<button id="cbPreview" class="btn btn-ghost" style="padding:7px 16px;font-size:13px;border-color:var(--berry);color:var(--berry)">👁 出力プレビュー</button>`
      : '')+
+   `<button id="cbShops" class="btn btn-ghost" style="padding:7px 14px;font-size:13px">🏷 店舗名</button>`+
    `</div>`;
  // 収入の内訳（ガッチャンコ表示）：区分ごとの合算
  h+=`<div class="noprint" style="padding:9px 22px;border-bottom:1px solid var(--line);display:flex;gap:16px;align-items:center;flex-wrap:wrap;font-size:12.5px;background:var(--leafsoft)">`+
@@ -2861,7 +2919,7 @@ function renderCashbook(){
       : `<td><select data-cb="${i}" data-f="tax" ${dis} class="inp" style="width:100%;padding:3px 5px;font-size:11px">${taxOpts}</select></td>`)+
     (fixed||timely
       ? `<td></td>`
-      : `<td><select data-cb="${i}" data-f="shop" ${dis} class="inp" style="width:100%;padding:3px 5px;font-size:12px"><option value="">店舗名…</option>${CB_SHOPS.map(s=>`<option value="${s}" ${r.shop===s?'selected':''}>${s}</option>`).join('')}${(r.shop&&!CB_SHOPS.includes(r.shop))?`<option value="${r.shop.replace(/"/g,'&quot;')}" selected>${r.shop}</option>`:''}<option value="__other__">✏️ その他（手入力）</option></select></td>`)+
+      : `<td><select data-cb="${i}" data-f="shop" ${dis} class="inp" style="width:100%;padding:3px 5px;font-size:12px"><option value="">店舗名…</option>${cbShops().map(s=>`<option value="${s}" ${r.shop===s?'selected':''}>${s}</option>`).join('')}${(r.shop&&!cbShops().includes(r.shop))?`<option value="${r.shop.replace(/"/g,'&quot;')}" selected>${r.shop}</option>`:''}<option value="__other__">✏️ その他（手入力）</option></select></td>`)+
     `<td><input type="text" data-cb="${i}" data-f="item" value="${(r.item||'').replace(/"/g,'&quot;')}" ${dis} class="inp" style="width:100%;padding:3px 6px" placeholder="${r.isCash?'現金入金':timely?'タイムリースクール':'商品名・費目'}"></td>`+
     `<td>${r.kind==='in'?`<input type="text" inputmode="numeric" data-cb="${i}" data-f="amt" value="${r.amt||''}" ${dis} class="inp" style="width:74px;padding:3px 5px;text-align:right">`:(locked?'':`<span style="color:var(--mut);font-size:11px;cursor:pointer" data-cbkind="${i}" data-k="in">入金に</span>`)}</td>`+
     `<td>${r.kind==='out'?`<input type="text" inputmode="numeric" data-cb="${i}" data-f="amt" value="${r.amt||''}" ${dis} class="inp" style="width:74px;padding:3px 5px;text-align:right">`:(locked||timely?'':`<span style="color:var(--mut);font-size:11px;cursor:pointer" data-cbkind="${i}" data-k="out">出金に</span>`)}</td>`+
@@ -2880,6 +2938,7 @@ function renderCashbook(){
  document.getElementById('cbOpening')&&(document.getElementById('cbOpening').onchange=e=>{cbGet().opening=moneyNormalize(e.target.value);render();});
  const opBy=document.getElementById('cbOpeningBy');if(opBy)opBy.onchange=e=>{cbGet().openingBy=e.target.value;render();};
  const addBtn=document.getElementById('cbAdd');if(addBtn)addBtn.onclick=()=>{cbGet().rows.push({mon:mm,day:'',acct:'',tax:'課税仕入 10%',shop:'',item:'',kind:'out',amt:'',by:''});render();};
+ const shopsBtn=document.getElementById('cbShops');if(shopsBtn)shopsBtn.onclick=cbManageShops;
  const addCashBtn=document.getElementById('cbAddCash');if(addCashBtn)addCashBtn.onclick=()=>{
    cbGet().rows.push({mon:mm,day:'',acct:1,tax:'',shop:'',item:'現金入金',kind:'in',amt:'',by:'',isCash:true});render();
  };
@@ -3681,7 +3740,7 @@ function syncTabs(){const el=document.getElementById('tabs');el.innerHTML='';
 const FAC_COLORS={'月寒園':'#3d7355','白石園':'#4a5a82','サッポロファクトリー園':'#a8466a','幼稚舎':'#9a6b2f','資生館保育園':'#6a548c','全施設':'var(--leaf)'};
 function applyParkColor(){const sel=document.getElementById('park');const c=FAC_COLORS[park]||'var(--leaf)';
  sel.style.borderColor=c;sel.style.color=c;sel.style.borderLeftWidth='5px';}
-document.getElementById('park').onchange=e=>{park=e.target.value;wakuFilter='すべて';clsFilter='すべて';applyParkColor();syncTabs();render();};
+document.getElementById('park').onchange=e=>{park=e.target.value;wakuFilter='すべて';clsFilter='すべて';applyParkColor();syncTabs();if(IS_HONBU){switchHonbuGarden(park);}else{render();}};
 // 対象年月を手動変更したら、この端末のローカルに記憶（今月と一致するときは記憶を消して“今月追従”へ戻す）
 function saveTargetYM(){
   try{
@@ -3706,6 +3765,34 @@ const firebaseConfig = {
   measurementId: "G-4B9TZYS5BE"
 };
 const CLOUD_COL='app', CLOUD_DOC_ID='state';
+// ===== 園ID分離（Phase1：資生館のみ園別ドキュメント。他アカウントは従来 app/state のまま）=====
+// メール→園ID。ここに無いアカウントは CURRENT_GARDEN=null となり、従来どおり app/state を使う。
+// ※このマップは Firestore セキュリティルールの gardenEmail() と同じ内容を二重管理する点に注意（片方だけ直さない）。
+const EMAIL_TO_GARDEN = {
+ 'tsukisamu@strawberry.com':'tsukisamu',
+ 'shiroishi@strawberry.com':'shiroishi',
+ 'factory@strawberry.com':'factory',
+ 'youchisha@strawberry.com':'youchisha',
+ 'shiseikan@strawberry.com':'shiseikan'
+}; // ※honbu@ はここに無い＝Phase2bの本部ピッカー実装まで従来の app/state を使う
+const GARDEN_TO_PARK  = {
+ 'tsukisamu':'月寒園',
+ 'shiroishi':'白石園',
+ 'factory':'サッポロファクトリー園',
+ 'youchisha':'幼稚舎',
+ 'shiseikan':'資生館保育園'
+};
+let CURRENT_GARDEN = null; // ログイン後に確定。null＝全園ドキュメント(app/state)
+// 単一園アカウントは自園に固定し、園セレクタを自園だけに絞る（切替不可）。
+function applyGardenLock(){
+ if(!CURRENT_GARDEN) return; // 従来アカウントは制限しない（初期化時の全施設セレクタのまま）
+ const pk=GARDEN_TO_PARK[CURRENT_GARDEN]; if(!pk) return;
+ park=pk;
+ const sel=document.getElementById('park');
+ if(sel){ sel.innerHTML=''; const o=document.createElement('option'); o.textContent=pk; o.selected=true; sel.appendChild(o); sel.disabled=true; }
+ if(typeof applyParkColor==='function') applyParkColor();
+ if(typeof syncTabs==='function') syncTabs();
+}
 // クラウド同期ステート（cloudDB/cloudReady/__cloudDirty/__pushTimer/__editSeq/__pushedSeq）は
 // TDZ回避のためスクリプト最上部（let park の直後）へ移動して先に初期化済み。
 // localStorage はプライベートブラウズや容量超過で例外を投げることがある。
@@ -3723,7 +3810,72 @@ let MY_DEVICE = (()=>{
 let currentOperator = (()=>{ try{ return localStorage.getItem('sf_operator')||''; }catch(e){ return ''; } })();
 let __lastRemote = null; // {by, at:Date}
 
-function cloudRef(){ return cloudDB.collection(CLOUD_COL).doc(CLOUD_DOC_ID); }
+// ===== Phase2b：本部(honbu@)ピッカー方式 =====
+// 本部は園を切替で1園ずつ編集。「全施設」は全園まとめ読みの閲覧専用（書込ブロック）。
+// すべて IS_HONBU のときだけ効き、単一園・従来アカウントの挙動は変えない。
+let IS_HONBU=false;      // honbu@ ログイン中
+let AGG_READONLY=false;  // 本部が「全施設」を閲覧中＝クラウドへ書き込まない
+let __cloudUnsub=null;   // 現在の onSnapshot 解除ハンドル
+const PARK_TO_GARDEN={ '月寒園':'tsukisamu','白石園':'shiroishi','サッポロファクトリー園':'factory','幼稚舎':'youchisha','資生館保育園':'shiseikan' };
+const ALL_GARDENS=['tsukisamu','shiroishi','factory','youchisha','shiseikan'];
+function applyHonbuSetup(){ // 本部：園ロックせず全園＋全施設のセレクタ。既定は全施設（閲覧）から開始。
+ const sel=document.getElementById('park'); if(sel) sel.disabled=false;
+ park='全施設';
+ if(typeof applyParkColor==='function') applyParkColor();
+ if(typeof syncTabs==='function') syncTabs();
+}
+function resetSyncState(){ // ドキュメント切替時：別ドキュメントの同期状態を持ち越さない
+ cloudReady=false; __cloudDirty=false; __pendingUserSave=false;
+ if(__pushTimer){ clearTimeout(__pushTimer); __pushTimer=null; }
+ try{__lastSavedJson=null;}catch(e){}
+ try{__pushedSeq=__editSeq;}catch(e){}
+ window.__cloudSubbed=false;
+}
+function switchHonbuGarden(parkName){ // 本部の園切替（購読の解除→再購読／全施設は集計）
+ if(!IS_HONBU){ render(); return; }
+ if(!AGG_READONLY && (__cloudDirty || __pushTimer)){ try{ cloudPushNow(); }catch(e){} } // 切替前に現在の園へ確定保存
+ if(__cloudUnsub){ try{__cloudUnsub();}catch(e){} __cloudUnsub=null; }
+ resetSyncState();
+ if(parkName==='全施設'){ AGG_READONLY=true; CURRENT_GARDEN=null; honbuAggregateLoad(); }
+ else { AGG_READONLY=false; CURRENT_GARDEN=PARK_TO_GARDEN[parkName]||null; if(!CURRENT_GARDEN){ render(); return; } startCloudSync(); }
+}
+function aggregateSlices(snaps){ // 全園スライスを1つのメモリ内stateへ統合（本部集計・税区分の閲覧用）
+ const out={ v:1, roster:[], rosterBase:[], bank:[], reissueFeeByPark:{}, cashbook:{}, cashbookEvent:{}, timelyData:{}, changeLog:{}, lookmeeCheck:{}, initSaleLog:{}, addons:[], meals:[], sched:[], schedMemo:'', shops:[], schedAmounts:{} };
+ snaps.forEach(s=>{ if(!s||!s.exists) return; let p; try{p=JSON.parse(s.data().payload||'{}');}catch(e){ return; }
+  out.roster=out.roster.concat(p.roster||[]);
+  out.rosterBase=out.rosterBase.concat(p.rosterBase||[]);
+  if((!out.bank||!out.bank.length)&&p.bank&&p.bank.length) out.bank=p.bank;
+  Object.assign(out.reissueFeeByPark, p.reissueFeeByPark||{});
+  Object.assign(out.cashbook, p.cashbook||{});
+  Object.assign(out.cashbookEvent, p.cashbookEvent||{});
+  Object.assign(out.timelyData, p.timelyData||{});
+  ['changeLog','lookmeeCheck'].forEach(K=>{ const src=p[K]||{}; for(const ym in src){ out[K][ym]=Object.assign(out[K][ym]||{}, src[ym]); } });
+  Object.assign(out.initSaleLog, p.initSaleLog||{});
+  out.addons=out.addons.concat(p.addons||[]);
+  out.meals=out.meals.concat(p.meals||[]);
+  if((!out.sched||!out.sched.length)&&p.sched&&p.sched.length) out.sched=p.sched;
+  if(!out.schedMemo&&p.schedMemo) out.schedMemo=p.schedMemo;
+  (p.shops||[]).forEach(s=>{ if(!out.shops.includes(s)) out.shops.push(s); });
+  Object.assign(out.schedAmounts, p.schedAmounts||{});
+ });
+ return out;
+}
+function honbuAggregateLoad(){ // 全園ドキュメントをまとめ読み→統合→閲覧専用で表示
+ if(!cloudDB){ return; }
+ cloudBarSet('connecting','全施設を集計中…');
+ Promise.all(ALL_GARDENS.map(gid=>cloudDB.collection('gardens').doc(gid).get()))
+  .then(snaps=>{
+    const merged=aggregateSlices(snaps);
+    window.__applyingRemote=true; cloudApplyObject(merged); render(); window.__applyingRemote=false;
+    cloudBarSet('readonly');
+  })
+  .catch(e=>{ console.error('全施設集計エラー',e); cloudBarSet('error','集計取得に失敗'); });
+}
+function cloudRef(){
+ // 園別アカウントは自園ドキュメント、それ以外は従来の全園ドキュメント
+ if(CURRENT_GARDEN) return cloudDB.collection('gardens').doc(CURRENT_GARDEN);
+ return cloudDB.collection(CLOUD_COL).doc(CLOUD_DOC_ID);
+}
 function cloudStateObject(){ // 端末保存と同じ内容＋送信時刻（保存対象キーの二重管理を避けるため stateForSave を使う）
  const d=stateForSave();
  d.savedAt=new Date().toISOString();
@@ -3743,6 +3895,8 @@ function cloudApplyObject(d){ // クラウド/他端末のデータをこの端�
  if(d.sched)sched=d.sched;
  if(typeof d.schedMemo==='string')schedMemo=d.schedMemo;
  if(d.meals)meals=d.meals;
+ if(d.shops!==undefined)shops=d.shops;
+ if(d.schedAmounts)schedAmounts=d.schedAmounts;
  try{localStorage.setItem(STORE_KEY, JSON.stringify(cloudStateObject()));}catch(e){}
  // 受信した内容＝いま保存済みの内容。これを基準にしておくことで、この直後の render→saveState が
  // 「無変更」と判定され、受け取ったデータをそのままクラウドへ送り返さない。
@@ -3755,7 +3909,7 @@ function cloudBarSet(state,msg){ window.__cloudState=state; window.__cloudMsg=ms
 function cloudBarRender(){
  const el=document.getElementById('cloudBar'); if(!el)return;
  const st=window.__cloudState||'';
- const map={connecting:['#b8860b','☁ 接続中…'],synced:['#3d7355','☁ 同期 最新'],dirty:['#b8860b','☁ 未保存…'],saving:['#b8860b','☁ 保存中…'],error:['#9a2540','⚠ '+(window.__cloudMsg||'同期エラー')],offline:['#9a2540','⚠ オフライン']};
+ const map={connecting:['#b8860b','☁ 接続中…'],synced:['#3d7355','☁ 同期 最新'],dirty:['#b8860b','☁ 未保存…'],saving:['#b8860b','☁ 保存中…'],readonly:['#5a6b82','👁 閲覧のみ（全施設）'],error:['#9a2540','⚠ '+(window.__cloudMsg||'同期エラー')],offline:['#9a2540','⚠ オフライン']};
  const pair=map[st]||['#888','☁ —'];
  let info='';
  if(__lastRemote&&__lastRemote.at){const t=__lastRemote.at.toLocaleString('ja-JP',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'});info=`最終更新：${__lastRemote.by||'—'}　${t}`;}
@@ -3885,16 +4039,27 @@ function askOperator(then){
 }
 
 // --- 同期本体 ---
+function loadShared(){ // 全社共通データ（現状：年間スケジュール schedShared）を shared/global から読込
+ if(!cloudDB) return;
+ cloudDB.collection('shared').doc('global').get().then(snap=>{
+  if(!snap.exists) return;
+  let d; try{ d=JSON.parse(snap.data().payload||'{}'); }catch(e){ return; }
+  if(Array.isArray(d.schedShared)) schedShared=d.schedShared;
+  if(typeof render==='function') render();
+ }).catch(e=>{ console.warn('shared読込失敗',e); });
+}
 function onSignedIn(){
  hideLogin();
- if(!currentOperator){ askOperator(startCloudSync); } else { startCloudSync(); }
+ loadShared();
+ const begin=()=> IS_HONBU ? switchHonbuGarden(park||'全施設') : startCloudSync();
+ if(!currentOperator){ askOperator(begin); } else { begin(); }
 }
 function startCloudSync(){
  if(window.__cloudSubbed)return; window.__cloudSubbed=true;
  cloudBarSet('connecting');
- cloudRef().onSnapshot({includeMetadataChanges:true},snap=>{
+ __cloudUnsub = cloudRef().onSnapshot({includeMetadataChanges:true},snap=>{
   cloudReady=true;
-  if(!snap.exists){ cloudPushNow(); return; } // クラウド未作成→ローカルを種まき
+  if(!snap.exists){ if(CURRENT_GARDEN){ cloudBarSet('error','この園のデータが未作成です（移行前）'); return; } cloudPushNow(); return; } // クラウド未作成→ローカルを種まき（園別は移行前の誤上書きを防ぐ）
   if(snap.metadata.hasPendingWrites){ cloudBarSet('saving'); return; } // 自分の未確定書き込み
   const data=snap.data();
   if(data.updatedAt) __lastRemote={by:data.updatedBy||'',at:data.updatedAt.toDate()};
@@ -3919,6 +4084,7 @@ function cloudMarkDirty(){
  __pushTimer=setTimeout(cloudPushNow,1200);
 }
 function cloudPushNow(){
+ if(AGG_READONLY) return; // 本部・全施設は閲覧専用（クラウドへ書き込まない）
  if(!cloudDB)return;
  cloudBarSet('saving');
  const seq=__editSeq; // この番号の状態を送る
@@ -3932,6 +4098,8 @@ function cloudPushNow(){
   .catch(e=>{ console.error('クラウド保存失敗',e); cloudBarSet('error','保存失敗'); });
 }
 function cloudManualRefresh(){
+ loadShared();
+ if(AGG_READONLY){ honbuAggregateLoad(); return; } // 全施設は再集計
  if(!cloudDB){return;}
  cloudBarSet('connecting','取得中…');
  cloudRef().get().then(snap=>{
@@ -3988,7 +4156,7 @@ function cloudInit(){
  try{
   firebase.initializeApp(firebaseConfig);
   cloudDB=firebase.firestore();
-  firebase.auth().onAuthStateChanged(user=>{ if(user){ onSignedIn(); } else { showLogin(); } });
+  firebase.auth().onAuthStateChanged(user=>{ if(user){ const em=((user.email||'').trim().toLowerCase()); CURRENT_GARDEN=EMAIL_TO_GARDEN[em]||null; IS_HONBU=(em==='honbu@strawberry.com'); if(IS_HONBU){ applyHonbuSetup(); } else { applyGardenLock(); } onSignedIn(); } else { CURRENT_GARDEN=null; IS_HONBU=false; showLogin(); } });
  }catch(e){ console.error('Firebase初期化失敗',e); cloudBarSet('error','初期化エラー'); const err=document.getElementById('loginErr'); if(err)err.textContent='初期化エラー：'+((e&&e.message)||e)+'（ページを再読み込みしてください）'; showLogin(); }
 }
 cloudInit();
