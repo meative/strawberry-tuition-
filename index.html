@@ -3933,13 +3933,21 @@ function cloudBarRender(){
  el.innerHTML=`<span style="color:${pair[0]};font-weight:700">${pair[1]}</span>`+
    (info?`<span style="color:var(--mut)">｜ ${info}</span>`:'')+
    `<span style="flex:1"></span>`+
+   `<span id="cloudEmail" title="ログイン中のアカウント" style="color:var(--mut);font-size:11px;margin-right:6px">${(typeof firebase!=='undefined'&&firebase.auth&&firebase.auth().currentUser&&firebase.auth().currentUser.email)?('🔓 '+firebase.auth().currentUser.email):''}</span>`+
    `<button id="cloudWho" title="担当者を変更" style="background:none;border:1px solid var(--line);border-radius:14px;padding:3px 10px;cursor:pointer;font-size:12px;font-family:inherit;color:var(--ink)">${currentOperator?'👤 '+currentOperator:'👤 担当者を選ぶ'}</button>`+
    `<button id="cloudRefresh" title="クラウドから今すぐ取得" style="background:none;border:1px solid var(--line);border-radius:14px;padding:3px 10px;cursor:pointer;font-size:12px;font-family:inherit;color:var(--ink)">🔄 取得</button>`+
-   `<button id="cloudPw" title="ログインパスワードを変更" style="background:none;border:1px solid var(--line);border-radius:14px;padding:3px 10px;cursor:pointer;font-size:12px;font-family:inherit;color:var(--ink)">🔑 パスワード変更</button>`;
+   `<button id="cloudPw" title="ログインパスワードを変更" style="background:none;border:1px solid var(--line);border-radius:14px;padding:3px 10px;cursor:pointer;font-size:12px;font-family:inherit;color:var(--ink)">🔑 パスワード変更</button>`+
+   `<button id="cloudLogout" title="ログアウトして別のアカウントで入り直す" style="background:none;border:1px solid var(--berry);border-radius:14px;padding:3px 10px;cursor:pointer;font-size:12px;font-family:inherit;color:var(--berry);font-weight:700">🚪 ログアウト</button>`;
  const rf=document.getElementById('cloudRefresh'); if(rf)rf.onclick=cloudManualRefresh;
  const wh=document.getElementById('cloudWho'); if(wh)wh.onclick=()=>askOperator();
  const pw=document.getElementById('cloudPw'); if(pw)pw.onclick=changePasswordDialog;
+ const lo=document.getElementById('cloudLogout'); if(lo)lo.onclick=doLogout;
 }
+// ログアウト（別アカウントで入り直すため）：確認→signOut→ログイン画面へ戻る
+function doLogout(){
+ const em=(typeof firebase!=='undefined'&&firebase.auth&&firebase.auth().currentUser&&firebase.auth().currentUser.email)?firebase.auth().currentUser.email:'';
+ if(!confirm('ログアウトします。よろしいですか？\n'+(em?('（現在：'+em+'）\n'):'')+'※保存済みのデータはクラウドに残ります。ログイン画面に戻ります。')) return;
+ try{ firebase.auth().signOut(); }catch(e){ try{ location.reload(); }catch(_){}} }
 // ログインパスワードの変更（管理者用暗証番号で本人確認→新パスワードに更新）
 function changePasswordDialog(){
  const user=firebase.auth().currentUser;
