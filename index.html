@@ -3946,8 +3946,11 @@ function cloudBarRender(){
 // ログアウト（別アカウントで入り直すため）：確認→signOut→ログイン画面へ戻る
 function doLogout(){
  const em=(typeof firebase!=='undefined'&&firebase.auth&&firebase.auth().currentUser&&firebase.auth().currentUser.email)?firebase.auth().currentUser.email:'';
- if(!confirm('ログアウトします。よろしいですか？\n'+(em?('（現在：'+em+'）\n'):'')+'※保存済みのデータはクラウドに残ります。ログイン画面に戻ります。')) return;
- try{ firebase.auth().signOut(); }catch(e){ try{ location.reload(); }catch(_){}} }
+ confirmDialog(
+   'ログアウトします。よろしいですか？'+(em?('\n（現在：'+em+'）'):'')+'\n※保存済みのデータはクラウドに残ります。ログイン画面に戻ります。',
+   ()=>{ try{ firebase.auth().signOut(); }catch(e){ try{ location.reload(); }catch(_){}} },
+   'ログアウト', 'ログアウト'
+ ); }
 // ログインパスワードの変更（管理者用暗証番号で本人確認→新パスワードに更新）
 function changePasswordDialog(){
  const user=firebase.auth().currentUser;
