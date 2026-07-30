@@ -861,7 +861,17 @@ function optionsFor(p){
  }
  return {items,amt};
 }
+function taienYM(p){ if(!p||!p.taien)return null; const s=String(p.taien); const y=+s.slice(0,4), m=+s.slice(5,7); return (y&&m)?(y*100+m):null; }
+function taienStopped(p){ const z=taienYM(p); return z!=null && (yy*100+mm)>z; }   // 対象月＞退園月＝請求・引落の対象外
+function taienLastMonth(p){ const z=taienYM(p); return z!=null && (yy*100+mm)===z; } // 対象月＝退園月＝最終請求月
 function calc(p,asNyuenMonth){
+ // 退園予定日を過ぎた月は請求・引落の対象外（すべて0）。当月＝退園月は通常請求＋「今月で退園」フラグ。
+ if(taienStopped(p)) return {type:facType(p.park),getsu:0,kyozai:0,sib:0,half:0,early:0,evs:[],evSum:0,sub:0,fee:0,total:0,flag:true,changed:false,reason:'退園済み（請求対象外）',isNew:false,taienStopped:true};
+ const c=_calcCore(p,asNyuenMonth);
+ if(taienLastMonth(p)){ c.flag=true; c.reason=(c.reason?c.reason+' / ':'')+'今月で退園（最終請求月）'; c.taienLast=true; }
+ return c;
+}
+function _calcCore(p,asNyuenMonth){
  const t=facType(p.park);
  const evs=eventsFor(p),ads=addonsFor(p);
  const opt=optionsFor(p); // 台帳オプション（マットレス・おむつ・制服レンタル）
@@ -1032,7 +1042,7 @@ function visible(){
 
 // ===== レンダリング =====
 function renderStats(){const rows=visible();let cnt=0,total=0,flag=0;
- rows.forEach(r=>{const c=calc(r);if(r.status==='在園中'||c.isNew){cnt++;total+=c.total;}if(c.flag)flag++;});
+ rows.forEach(r=>{const c=calc(r);if((r.status==='在園中'||c.isNew)&&!c.taienStopped){cnt++;total+=c.total;}if(c.flag)flag++;});
  // 定員：単一施設ならその施設、全施設なら定員のある施設合計
  const facData=M.facilities.filter(f=>f.capacity);
  const cap=(park==='全施設')?facData.reduce((a,f)=>a+f.capacity,0):(M.facilities.find(f=>f.name===park)||{}).capacity;
@@ -1204,7 +1214,7 @@ function renderRoster(){const rows=visible();
    availCls.map(c=>`<button data-cls="${c}" style="padding:6px 14px;border:1px solid ${clsFilter===c?'var(--leaf)':'var(--line)'};background:${clsFilter===c?'var(--leaf)':'var(--paper)'};color:${clsFilter===c?'#fff':'var(--ink)'};border-radius:18px;font-size:12px;cursor:pointer;font-family:inherit">${c} <span style="opacity:.75">${clsCount[c]}名</span></button>`).join('')+
    '</div>';
  }
- h+='<div class="tablewrap"><table><thead><tr><th style="width:42px;text-align:center">No.</th><th>所属園</th><th>生年月日</th><th>クラス<br><small style="color:var(--mut);font-weight:400;font-size:10px">自動</small></th><th>枠区分</th><th>園児名</th><th>口座名義</th><th>兄弟</th><th>納入方法</th>'+(showOpt?'<th>オプション（月額・あり/なし）</th>':'')+'<th>連携園</th><th class="r">ルクミーID</th><th></th></tr></thead><tbody>';
+ h+='<div class="tablewrap"><table><thead><tr><th style="width:42px;text-align:center">No.</th><th>所属園</th><th>生年月日</th><th>クラス<br><small style="color:var(--mut);font-weight:400;font-size:10px">自動</small></th><th>枠区分</th><th>園児名</th><th>口座名義</th><th>兄弟</th><th>納入方法</th>'+(showOpt?'<th>オプション（月額・あり/なし）</th>':'')+'<th>退園予定</th><th>連携園</th><th class="r">ルクミーID</th><th></th></tr></thead><tbody>';
  rows.forEach((r,idx)=>{const i=roster.indexOf(r);const ed=i>=0;const t=facType(r.park);
   // 生年月日があればクラスを自動計算（プルダウン編集なし）
   const autoCls=r.birth?classByBirth(r.birth,yy):'';
@@ -1229,6 +1239,7 @@ function renderRoster(){const rows=visible();
    `<td>${ed?`<select data-sib="${i}" class="inp" style="width:auto;padding:4px 8px;font-size:12px;color:${r.sib==='あり'?'var(--berry)':'var(--mut)'}"><option ${r.sib!=='あり'?'selected':''}>なし</option><option ${r.sib==='あり'?'selected':''}>あり</option></select>`:(r.sib||'なし')}</td>`+
    `<td>${ed?`<select data-pay="${i}" class="inp" style="width:auto;padding:4px 8px;font-size:12px;font-weight:700;color:${payMethod(r)==='振込'?'#fff':'var(--mut)'};background:${payMethod(r)==='振込'?'var(--berry)':'var(--paper)'};border-color:${payMethod(r)==='振込'?'var(--berry)':'var(--line)'}"><option ${payMethod(r)!=='振込'?'selected':''}>引落</option><option ${payMethod(r)==='振込'?'selected':''}>振込</option></select>`:`<span class="paytag" style="display:inline-block;padding:3px 10px;border-radius:10px;font-size:11px;font-weight:700;${payMethod(r)==='振込'?'background:var(--berry);color:#fff':'background:var(--paper);color:var(--mut);border:1px solid var(--line)'}">${payMethod(r)}</span>`}</td>`+
    (showOpt?`<td>${optCell}</td>`:'')+
+   `<td style="white-space:nowrap">${ed?`<input type="date" data-arr2="roster" data-i="${i}" data-f="taien" value="${r.taien||''}" class="inp" style="width:auto;padding:4px 6px;font-size:11px" title="退園予定日（この月の翌月から請求を止めます）">`:(r.taien||'—')}${!r.taien?'':taienStopped(r)?'<br><span style="font-size:10px;font-weight:700;color:#c0392b">⛔ 退園済み</span>':taienLastMonth(r)?'<br><span style="font-size:10px;font-weight:700;color:#b8860b">⚠ 今月で退園</span>':'<br><span style="font-size:10px;color:var(--mut)">退園予定</span>'}</td>`+
    `<td>${ed?`<select data-link="${i}" class="inp" style="width:auto;padding:4px 8px;font-size:12px;color:var(--berry)"><option value="">未設定</option><option value="tsukisamu" ${r.linkPark==='tsukisamu'?'selected':''}>月寒</option><option value="shiraishi" ${r.linkPark==='shiraishi'?'selected':''}>白石</option><option value="factory" ${r.linkPark==='factory'?'selected':''}>サッポロファクトリー</option><option value="shiseikan" ${r.linkPark==='shiseikan'?'selected':''}>資生館</option></select>`:(r.linkPark||'—')}</td>`+`<td class="num" style="color:var(--mut)">${r.lid||'—'}</td>`+
    `<td>${ed?`<button data-pupildel="${i}" title="この園児を削除" style="background:none;border:1px solid var(--line);border-radius:8px;color:var(--berry);cursor:pointer;font-size:13px;padding:5px 10px">削除</button>`:''}</td></tr>`;});
  h+='</tbody></table></div>';
@@ -1582,7 +1593,7 @@ function renderMonthly(){let rows=visible();
 }
 function lookmeeGuard(){ // チェック済みなのに担当者未設定の園児があれば名前を返す
  const k=ymKey();const store=lookmeeCheck[k];if(!store)return null;
- const rows=visible().filter(r=>r.status==='在園中'||calc(r).isNew);
+ const rows=visible().filter(r=>(r.status==='在園中'||calc(r).isNew)&&!taienStopped(r));
  const needsInput=r=>{const c=calc(r);return changesFor(r).length>0||c.flag||c.isNew;};
  const bad=rows.filter(needsInput).filter(r=>store[r.name]&&store[r.name].done&&!store[r.name].by).map(r=>r.name);
  return bad.length?bad:null;
@@ -1611,7 +1622,7 @@ function cashbookGuardOn(store){ // 指定の出納帳ストアで、入力済�
 }
 function cashbookGuard(){ return cashbookGuardOn(cashbook); }
 function cashbookEventGuard(){ return cashbookGuardOn(cashbookEvent); }
-function renderLookmee(){let rows=visible().filter(r=>r.status==='在園中'||calc(r).isNew);
+function renderLookmee(){let rows=visible().filter(r=>(r.status==='在園中'||calc(r).isNew)&&!taienStopped(r));
  const k=ymKey();
  if(!lookmeeCheck[k])lookmeeCheck[k]={};
  const store=lookmeeCheck[k];
@@ -1729,7 +1740,7 @@ function hqTaxBreakdown(y,m){
  allPupils().forEach(r=>{
   if(!res[r.park])return;
   const c=calc(r);
-  if(!(r.status==='在園中'||c.isNew))return;
+  if(!(r.status==='在園中'||c.isNew)||c.taienStopped)return;
   // 非課税：月謝・保育料・付帯費・割引・日割り・手数料・早期割引
   const nontax=c.getsu+c.kyozai+c.sib+c.half+(c.early||0)+c.fee;
   res[r.park].nontax+=nontax;
@@ -1762,7 +1773,7 @@ function renderHQ(){const allpks=['月寒園','白石園','サッポロファク
  let gt=0,gc=0,guni=0,gcap=0;
  let h='<div class="tablewrap"><table><thead><tr><th>施設</th><th class="r">在園数</th><th class="r">定員</th><th class="r">充足率</th><th class="r">請求合計</th><th class="r">うち月謝系</th><th class="r">うち制服代</th><th class="r">うち行事/その他</th></tr></thead><tbody>';
  pks.forEach(p=>{let cnt=0,tot=0,base=0,uni=0,ev=0;
-  allPupils().filter(r=>r.park===p).forEach(r=>{const c=calc(r);if(r.status==='在園中'||c.isNew){cnt++;tot+=c.total;base+=c.getsu+c.kyozai+c.sib+c.half+(c.early||0)+c.fee;
+  allPupils().filter(r=>r.park===p).forEach(r=>{const c=calc(r);if((r.status==='在園中'||c.isNew)&&!c.taienStopped){cnt++;tot+=c.total;base+=c.getsu+c.kyozai+c.sib+c.half+(c.early||0)+c.fee;
    c.evs.forEach(e=>{ if(isUniform(e.item)) uni+=e.amt; else ev+=e.amt; });}});
   gt+=tot;gc+=cnt;guni+=uni;
   const fac=M.facilities.find(f=>f.name===p);const cap=fac?fac.capacity:null;
@@ -2319,6 +2330,9 @@ function renderReissue(){
  // 振込期限と再振替日は別々に保持
  if(!window.__reissueDueFuri){window.__reissueDueFuri=addDaysYMD(issue,7);}
  if(!window.__reissueDueSai){window.__reissueDueSai=addDaysYMD(issue,7);}
+ // 自動引落日：本文に表示。基本は対象月の27日。土日祝でずれた場合は事務が手入力で修正できる（対象月を変えると27日に戻る）
+ if(!window.__reissueDebit || window.__reissueDebitYM!==(yy+'-'+mm)){ window.__reissueDebit=yy+'-'+('0'+mm).slice(-2)+'-27'; window.__reissueDebitYM=yy+'-'+mm; }
+ const debit=window.__reissueDebit;
  // タブ＝納入方法で自動振り分け（furi＝振込の人／hiki＝引落の人）
  if(!window.__reissueTab)window.__reissueTab='furi';
  const isFuriMode=window.__reissueTab==='furi';
@@ -2341,6 +2355,7 @@ function renderReissue(){
  // 操作バー（発行日・期限・手数料）
  h+=`<div class="noprint" style="padding:14px 22px;border-bottom:1px solid var(--line);font-size:13px;color:var(--mut);display:flex;gap:20px;align-items:center;flex-wrap:wrap">`+
    `<div>発行日：<input id="reIssue" type="date" value="${issue}" class="inp" style="width:auto;padding:4px 8px"></div>`+
+   `<div>自動引落日：<input id="reDebit" type="date" value="${debit}" class="inp" style="width:auto;padding:4px 8px"></div>`+
    `<div>${isFuriMode?'振込期限':'再振替日'}：<input id="reDue" type="date" value="${due}" data-duemode="${isFuriMode?'furi':'sai'}" class="inp" style="width:auto;padding:4px 8px"></div>`+
    `<div>事務手数料：¥<input id="reFee" type="number" step="10" value="${reissueFee}" data-feepark="${feePark}" class="inp" style="width:90px;padding:4px 8px"></div>`+
    `</div>`;
@@ -2410,8 +2425,8 @@ function renderReissue(){
   .redoc .footer{padding:22px 56px 32px;text-align:center;font-size:10px;color:#a89888;letter-spacing:.2em;border-top:1px solid #ebdfc8;}
   .redoc .footer .seal{display:inline-block;font-family:'Spline Sans Mono',monospace;font-size:9px;letter-spacing:.3em;border:1px solid ${facColor};padding:6px 14px;color:${facColor};margin-bottom:10px;}
  </style>`;
- const greetFuri=`いつも当園の活動にご理解、ご協力をいただきありがとうございます。<br>さて、月謝の納入についてですが、<b>${yy}年${mm}月分 ¥${monthly.toLocaleString()}</b>（${fmtJP(issue)}自動引落）の確認がとれませんでした。お手数ですが通帳をご確認いただきますようお願い申し上げます。<br>つきましては、下記のとおりお振込みをお願いいたします。`;
- const greetSai=`いつも当園の活動にご理解、ご協力をいただきありがとうございます。<br>さて、月謝の納入についてですが、<b>${yy}年${mm}月分 ¥${monthly.toLocaleString()}</b>（${fmtJP(issue)}自動引落）の確認がとれませんでした。お手数ですが通帳をご確認いただきますようお願い申し上げます。<br>つきましては、下記の日程で再度口座より引落しをさせていただきます。残高のご確認をお願い申し上げます。`;
+ const greetFuri=`いつも当園の活動にご理解、ご協力をいただきありがとうございます。<br>さて、月謝の納入についてですが、<b>${yy}年${mm}月分 ¥${monthly.toLocaleString()}</b>（${fmtJP(debit)}自動引落）の確認がとれませんでした。お手数ですが通帳をご確認いただきますようお願い申し上げます。<br>つきましては、下記のとおりお振込みをお願いいたします。`;
+ const greetSai=`いつも当園の活動にご理解、ご協力をいただきありがとうございます。<br>さて、月謝の納入についてですが、<b>${yy}年${mm}月分 ¥${monthly.toLocaleString()}</b>（${fmtJP(debit)}自動引落）の確認がとれませんでした。お手数ですが通帳をご確認いただきますようお願い申し上げます。<br>つきましては、下記の日程で再度口座より引落しをさせていただきます。残高のご確認をお願い申し上げます。`;
  h+=`<div class="redoc" id="reissueDoc">`+
    `<div class="topbar" style="display:block;text-align:center">`+
     `<div class="brandJP" style="font-size:15px;letter-spacing:.1em;color:${facColor}">${footName}</div>`+
@@ -2463,6 +2478,7 @@ function renderReissue(){
 function bindReissueBar(){
  document.querySelectorAll('[data-retab]').forEach(el=>{el.onclick=e=>{window.__reissueTab=e.currentTarget.dataset.retab;window.__rePick=0;render();};});
  const i=document.getElementById('reIssue');if(i)i.onchange=e=>{window.__reissueDate=e.target.value;const nd=addDaysYMD(e.target.value,7);window.__reissueDueFuri=nd;window.__reissueDueSai=nd;render();};
+ const idb=document.getElementById('reDebit');if(idb)idb.onchange=e=>{window.__reissueDebit=e.target.value;render();};
  const du=document.getElementById('reDue');if(du)du.onchange=e=>{if(e.target.dataset.duemode==='sai')window.__reissueDueSai=e.target.value;else window.__reissueDueFuri=e.target.value;render();};
  const f=document.getElementById('reFee');if(f)f.onchange=e=>{const pk=e.target.dataset.feepark;reissueFeeByPark[pk]=Number(e.target.value)||0;render();};
 }
@@ -2502,7 +2518,7 @@ function renderReadme(){
 let mealDate=todayYMD(); // 既定の対象日（初期＝今日／ローカル日付）
 function renderMeals(){
  // 幼稚舎の在園児（プルダウン候補：クラス＋名前）
- const pupils=allPupils().filter(r=>r.park==='幼稚舎'&&(r.status==='在園中'||calc(r).isNew));
+ const pupils=allPupils().filter(r=>r.park==='幼稚舎'&&(r.status==='在園中'||calc(r).isNew)&&!taienStopped(r));
  const today=todayYMD();
  const todayCount=meals.filter(r=>r.date===today&&(r.lunch||r.bread)).length;
  let h='';
@@ -2638,6 +2654,7 @@ function renderInitSale(){
 // 実際に使う勘定科目（used:true＝プルダウンに出す。false＝右側に薄く表示してロック）
 const CB_ACCTS=[
  {code:1,  name:'現金',        used:true,  side:'both'},
+ {code:3,  name:'立替金',      used:true,  side:'out', tax:'対象外仕入', femoku:'立替金'},
  {code:99, name:'当期商品仕入高',used:true,  side:'out', tax:'課税仕入 (軽)8%', femoku:'食品代'},
  {code:106,name:'旅費交通費',   used:true,  side:'out', tax:'課税仕入 10%',   femoku:'交通費（ガソリン代）'},
  {code:108,name:'委託費',       used:true,  side:'out', tax:'課税仕入 10%',   femoku:'英語代', shop:'オークツリー'},
@@ -3702,8 +3719,8 @@ function exportXlsx(){
  const m=[[`月次計算 ${yy}年${mm}月分 / ${park}`],[],['所属園','クラス','枠区分','園児名','基本月謝','教材費','兄弟割引','半額補正','早割','イベント/追加','手数料','請求合計','変動','フラグ事由']];
  visible().forEach(r=>{const c=calc(r);const chg=changesFor(r);m.push([r.park,r.cls,r.waku,r.name,c.getsu,c.kyozai,c.sib,c.half,c.early||0,c.evSum,c.fee,c.total,chg.length?'変動':'',chg.length?chg.map(x=>x.label).join('、'):(c.flag?c.reason:'')]);});add('月次計算',m);
  const l=[['園児ID','クラス','園児名','月極保育料金名称','単価','オプション名称1','オプション小計1','請求金額','変動']];
- visible().filter(r=>r.status==='在園中'||calc(r).isNew).forEach(r=>{const c=calc(r);const base=c.getsu+c.kyozai+c.sib+c.half+(c.early||0);const e0=c.evs[0];const chg=changesFor(r);l.push([r.lid,r.cls,r.name,'月謝（'+r.waku+'）',base,e0?e0.item:'',e0?e0.amt:'',c.total,chg.length?'変動':'']);});add('ルクミー出力',l);
- const hq=[['施設','在園数','請求合計','うち月謝系','うち制服代','うち行事/その他']];let gt=0,gc=0;['月寒園','白石園','サッポロファクトリー園','幼稚舎','資生館保育園'].forEach(p=>{let cnt=0,tot=0,base=0,uni=0,ev=0;allPupils().filter(r=>r.park===p).forEach(r=>{const c=calc(r);if(r.status==='在園中'||c.isNew){cnt++;tot+=c.total;base+=c.getsu+c.kyozai+c.sib+c.half+(c.early||0)+c.fee;c.evs.forEach(e=>{if(isUniform(e.item))uni+=e.amt;else ev+=e.amt;});}});gt+=tot;gc+=cnt;hq.push([p,cnt,tot,base,uni,ev]);});hq.push(['全施設合計',gc,gt,'','','']);add('本部用集計',hq);
+ visible().filter(r=>(r.status==='在園中'||calc(r).isNew)&&!taienStopped(r)).forEach(r=>{const c=calc(r);const base=c.getsu+c.kyozai+c.sib+c.half+(c.early||0);const e0=c.evs[0];const chg=changesFor(r);l.push([r.lid,r.cls,r.name,'月謝（'+r.waku+'）',base,e0?e0.item:'',e0?e0.amt:'',c.total,chg.length?'変動':'']);});add('ルクミー出力',l);
+ const hq=[['施設','在園数','請求合計','うち月謝系','うち制服代','うち行事/その他']];let gt=0,gc=0;['月寒園','白石園','サッポロファクトリー園','幼稚舎','資生館保育園'].forEach(p=>{let cnt=0,tot=0,base=0,uni=0,ev=0;allPupils().filter(r=>r.park===p).forEach(r=>{const c=calc(r);if((r.status==='在園中'||c.isNew)&&!c.taienStopped){cnt++;tot+=c.total;base+=c.getsu+c.kyozai+c.sib+c.half+(c.early||0)+c.fee;c.evs.forEach(e=>{if(isUniform(e.item))uni+=e.amt;else ev+=e.amt;});}});gt+=tot;gc+=cnt;hq.push([p,cnt,tot,base,uni,ev]);});hq.push(['全施設合計',gc,gt,'','','']);add('本部用集計',hq);
  const nw=[['状態','所属園','園児名','フリガナ','枠区分','クラス','口座名義','入園年月日']];roster.filter(r=>r.isNew).sort((a,b)=>(a.regSeq||0)-(b.regSeq||0)).forEach(n=>nw.push([n.confirmed?'確定済':'未確定',n.park,n.name,n.kana||'',n.waku,n.cls,n.koza,n.nyuen]));add('新規入園',nw);
  const ad=[['園児名','商品/項目','サイズ','数量','単価','小計','反映年','反映月']];addons.forEach(a=>ad.push([a.name,a.goods,a.size,a.qty,a.price,(a.price||0)*(a.qty||0),a.ry,a.rm]));add('追加申込み',ad);
  const ml=[['日付','園児名','昼食','パン','金額']];meals.forEach(r=>ml.push([r.date,r.name,r.lunch?'○':'',r.bread?'○':'',(r.lunch?M.mealfee.lunch:0)+(r.bread?M.mealfee.bread:0)]));add('給食記録',ml);
