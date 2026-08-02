@@ -3898,6 +3898,32 @@ function cloudStateObject(){ // 端末保存と同じ内容＋送信時刻（保
  d.savedAt=new Date().toISOString();
  return d;
 }
+// 【混入防止・根本修正】園別ドキュメントへ保存する内容を「その園ぶんだけ」に絞る。
+//   全施設集計や別園の内容がメモリに残っていても、保存内容には絶対に混ざらない（＝別園データの混入を原理的に不可能にする）。
+//   移行時（園ID分離）と同じスライス方法。元のメモリは壊さないよう必ずディープコピーしてから絞る。
+function sliceForGarden(src, G){
+ if(!G) return src;
+ const d=JSON.parse(JSON.stringify(src));
+ const inP=r=>r&&r.park===G;
+ d.roster=(d.roster||[]).filter(inP);
+ d.rosterBase=(d.rosterBase||[]).filter(inP);
+ const names=new Set(d.roster.map(r=>r.name));
+ const pickG=o=>{const r={}; if(o&&o[G]!==undefined) r[G]=o[G]; return r;};
+ const ymByName=log=>{const out={}; for(const ym in (log||{})){const inner=log[ym]||{},keep={}; for(const nm in inner) if(names.has(nm)) keep[nm]=inner[nm]; if(Object.keys(keep).length) out[ym]=keep;} return out;};
+ const byName=o=>{const out={}; for(const nm in (o||{})) if(names.has(nm)) out[nm]=o[nm]; return out;};
+ d.cashbook=pickG(d.cashbook);
+ d.cashbookEvent=pickG(d.cashbookEvent);
+ d.timelyData=pickG(d.timelyData);
+ d.reissueFeeByPark=pickG(d.reissueFeeByPark);
+ d.schedAmounts=pickG(d.schedAmounts);
+ d.changeLog=ymByName(d.changeLog);
+ d.lookmeeCheck=ymByName(d.lookmeeCheck);
+ d.initSaleLog=byName(d.initSaleLog);
+ d.addons=(d.addons||[]).filter(a=>a&&names.has(a.name));
+ d.meals=(d.meals||[]).filter(m=>m&&names.has(m.name));
+ // bank / sched / schedMemo / shops は全社共通に近いためそのまま
+ return d;
+}
 function cloudApplyObject(d){ // クラウド/他端末のデータをこの端末へ反映（ローカルにも保存）
  if(!d)return;
  if(d.roster)roster=d.roster;
@@ -4129,7 +4155,10 @@ function cloudPushNow(){
  }
  cloudBarSet('saving');
  const seq=__editSeq; // この番号の状態を送る
- const json=JSON.stringify(cloudStateObject());
+ // 園別ドキュメントへは「その園ぶんだけ」に絞って保存（別園データの混入を根本から防ぐ）
+ var __save=cloudStateObject();
+ if(CURRENT_GARDEN){ __save=sliceForGarden(__save, GARDEN_TO_PARK[CURRENT_GARDEN]); }
+ const json=JSON.stringify(__save);
  if(json.length>950000) console.warn('クラウド保存データが大きくなっています（'+json.length+'字）。1MB上限に注意。');
  __pushedSeq=seq;
  cloudRef().set({ payload:json, updatedBy:currentOperator||'(不明)', deviceId:MY_DEVICE,
