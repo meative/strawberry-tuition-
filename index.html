@@ -403,7 +403,7 @@ let park='全施設', yy=2026, mm=5, tab='settings';
 // --- クラウド同期ステート（TDZ回避のためスクリプト最上部で初期化）---
 // 起動直後に render→saveState→cloudMarkDirty が走っても、__editSeq / cloudReady が
 // 未初期化（Temporal Dead Zone）にならないよう、ここで先に宣言しておく。
-let cloudDB=null, cloudReady=false, __cloudDirty=false, __pushTimer=null;
+let cloudDB=null, cloudReady=false, __cloudDirty=false, __pushTimer=null, __syncApplied=false;
 // 編集の通し番号。push でクラウドへ送った時点の番号を控えておき、
 // 「送った後に増えていない」ときだけ __cloudDirty を落とす（送信後の編集を消さない）。
 let __editSeq=0, __pushedSeq=-1;
@@ -3842,7 +3842,7 @@ function applyHonbuSetup(){ // 本部：園ロックせず全園＋全施設の�
  if(typeof syncTabs==='function') syncTabs();
 }
 function resetSyncState(){ // ドキュメント切替時：別ドキュメントの同期状態を持ち越さない
- cloudReady=false; __cloudDirty=false; __pendingUserSave=false;
+ cloudReady=false; __cloudDirty=false; __pendingUserSave=false; __syncApplied=false; // 新しい園の初回スナップショットは必ず反映（自分の端末が最後に保存した園でも表示を更新する）
  if(__pushTimer){ clearTimeout(__pushTimer); __pushTimer=null; }
  try{__lastSavedJson=null;}catch(e){}
  try{__pushedSeq=__editSeq;}catch(e){}
@@ -4117,16 +4117,19 @@ function startCloudSync(){
   if(snap.metadata.hasPendingWrites){ cloudBarSet('saving'); return; } // 自分の未確定書き込み
   const data=snap.data();
   if(data.updatedAt) __lastRemote={by:data.updatedBy||'',at:data.updatedAt.toDate()};
-  // 自分の更新が確定。ただし送信後に新しい編集が入っていれば dirty は落とさない
-  if(data.deviceId===MY_DEVICE){ if(__editSeq===__pushedSeq){__cloudDirty=false;} cloudBarSet('synced'); return; }
+  // 自分の更新が確定（自分の保存エコー）。ただし送信後に新しい編集が入っていれば dirty は落とさない。
+  // ★園を切り替えた直後（この購読でまだ一度も反映していない）は、自分の端末が最後に保存した園でも
+  //   必ず中身を反映する。そうしないと前の園の表示が残り「切り替えても最新にならない」ため。
+  if(data.deviceId===MY_DEVICE && __syncApplied){ if(__editSeq===__pushedSeq){__cloudDirty=false;} cloudBarSet('synced'); return; }
   const payload=parsePayload(data);
   // __pendingUserSave も見る。自分の書き込みエコー（上の分岐）で __cloudDirty が
   // 落ちた直後に他端末の更新が届くと、編集直後なのに「編集中でない」と誤判定されるため。
   if(!__cloudDirty && !__pendingUserSave){ // 自分は編集中でない→そのまま反映
    window.__applyingRemote=true; if(payload){cloudApplyObject(payload);render();} window.__applyingRemote=false;
+   __syncApplied=true; // この園の中身を反映済み（以降は自分の保存エコーを再反映しない）
    cloudBarSet('synced');
-  } else { // 編集中に他端末が更新→警告（最終保存優先＋警告）
-   showConflict(data,payload);
+  } else { // 編集中に他端末が更新→自分の入力は保持し、静かに知らせるだけ（次の保存で自分の内容が反映される）
+   cloudNotice('他の端末でも更新がありました。あなたの入力はそのまま残しています（このまま保存すると反映されます）。');
   }
  }, err=>{ console.error('onSnapshot error',err); cloudBarSet('error','接続エラー'); });
 }
@@ -4180,6 +4183,18 @@ function cloudManualRefresh(){
   // 手動で最新を取得＝ローカルの編集は破棄。保存待ちフラグも畳む（残すと以降ずっと衝突扱いになる）
   __cloudDirty=false; __pendingUserSave=false; __pushedSeq=__editSeq; cloudBarSet('synced');
  }).catch(e=>{ cloudBarSet('error','取得失敗'); });
+}
+// 非ブロッキングの小さな通知（数秒で自動的に消える）。編集中に他端末の更新が届いた時に、
+// 画面を止めずに知らせるためのもの。※以前の「どちらを残しますか？」モーダルの置き換え。
+function cloudNotice(msg){
+ var el=document.getElementById('cloudNotice');
+ if(!el){ el=document.createElement('div'); el.id='cloudNotice';
+  el.style.cssText='position:fixed;left:50%;transform:translateX(-50%);bottom:22px;z-index:10034;background:#3d7355;color:#fff;border-radius:12px;padding:11px 18px;box-shadow:0 8px 28px rgba(0,0,0,.28);max-width:520px;width:90%;font-family:inherit;font-size:13px;line-height:1.6;text-align:center';
+  document.body.appendChild(el); }
+ el.textContent=msg;
+ el.style.display='block';
+ if(el.__t)clearTimeout(el.__t);
+ el.__t=setTimeout(function(){ el.style.display='none'; },5000);
 }
 function showConflict(data,payload){
  let el=document.getElementById('cloudConflict');
