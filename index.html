@@ -3346,6 +3346,7 @@ function cbShowPreview(){
      `<span style="font-size:12px;color:#777">${tl.length?`取込済み ${tl.length}件・¥${cashSum.toLocaleString()}`:'まだ取り込んでいません'}</span>`+
      `<div style="flex:1"></div>`+
      `<button class="btn btn-ghost" style="padding:6px 14px;font-size:12px;background:#fff" onclick="cbPvPickTimely()">${tl.length?'再読み込み':'CSVを読み込む'}</button>`+
+     (tl.length?`<button class="btn btn-ghost" style="padding:6px 14px;font-size:12px;background:#fff;border-color:var(--berry);color:var(--berry)" onclick="cbPvClearTimely()">🗑 取込データを削除</button>`:'')+
    `</div>`)+
    `<div style="display:flex;gap:2px;justify-content:center;border-bottom:1px solid #e6dcd0">`+
      (isEv?'':tabBtn('sales','売上'))+tabBtn('expense','経費')+tabBtn('total','総合（MF用）')+
@@ -3452,6 +3453,17 @@ function cbPvPickTimely(){
    fr.onload=ev=>{try{importTimelyCsv(String(ev.target.result||''));}catch(err){infoDialog('CSVの読み込み中にエラーが発生しました。\n'+err.message,'取込できません');}};
    fr.readAsText(f);};
  inp.click();
+}
+// 取り込んだタイムリー売上（この園・当月分）を削除する。間違えて取り込んだ時のやり直し用。
+function cbPvClearTimely(){
+ const store=cbTimelyGet()||[];
+ if(!store.length){ infoDialog('取り込んだタイムリー売上はありません。','削除できません'); return; }
+ const total=store.reduce((s,r)=>s+(Number(r.amt)||0),0);
+ confirmDialog(
+   `取り込んだタイムリー一時預かりの現金売上 ${store.length} 件・合計 ¥${total.toLocaleString()} を削除します。\n\n（この園・${yy}年${mm}月分のみ。経費や他の月・他の園には影響しません。）\n\nよろしいですか？`,
+   ()=>{ const s=cbTimelyGet(); s.length=0; saveState(); cbShowPreview(); },
+   'タイムリー取込データの削除','削除する'
+ );
 }
 // ===== 月売上表（本部提出・通帳照合用）=====
 // 当月の売上（タイムリー現金売上＋新規入園振込売上）を施設別に一覧表示
