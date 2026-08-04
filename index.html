@@ -554,7 +554,7 @@ function infoDialog(msg,title){
 let changeLog={};
 // ルクミー手入力の確認チェック：'YYYY-M' → { 園児名: {done:true, by:'氏名', at:'日時'} }
 let lookmeeCheck={};
-// 事務員（受領者・アドバイザー）一覧：端末に保存（追加・削除可能）。初期値は下記6名。
+// 事務員（受領者・アドバイザー）一覧：園ごとにクラウド保存（stateForSave/cloudApplyObjectで同期）＋端末にもキャッシュ。追加・削除可能。初期値は下記6名。
 const STAFF_KEY='sf_staff_list';
 const STAFF_DEFAULT=['細野','佐藤','伊藤','小野','水野','小林'];
 function loadStaffList(){
@@ -635,7 +635,7 @@ function promptStaffName(after){
   const err=document.getElementById('newStaffErr');
   if(!v){err.textContent='名前を入力してください。';return;}
   if(STAFF.includes(v)){err.textContent='同じ名前の担当者がすでにいます。';return;}
-  STAFF.push(v); saveStaffList(); close(); if(typeof after==='function')after();
+  STAFF.push(v); saveStaffList(); if(typeof saveState==='function')saveState(); close(); if(typeof after==='function')after();
  };
  okBtn.onclick=submit; inp.onkeydown=e=>{if(e.key==='Enter')submit();};
  cnBtn.onclick=close;
@@ -700,7 +700,7 @@ let __pendingUserSave=false;
 function stateForSave(){
  return {v:1,
   roster, changeLog, lookmeeCheck, rosterBase, bank, reissueFeeByPark, initSaleLog, cashbook, cashbookEvent, timelyData,
-  addons, sched, schedMemo, meals, shops, schedAmounts};
+  addons, sched, schedMemo, meals, shops, schedAmounts, staff:STAFF};
 }
 function saveState(){ // 入力データをまとめて端末に保存（連打防止のため少し遅延）
  // 【変更】render() は画面を描き直すたびに saveState() を呼ぶため、
@@ -807,6 +807,10 @@ function setTheme(t){curTheme=t;document.body.dataset.theme=t;buildThemeTog();}
 // ===== 計算ロジック（3体系対応：A保育園 / B幼稚舎 / C資生館）=====
 function facType(name){const f=M.facilities.find(x=>x.name===name);return f?f.type:'A';}
 function hasSibling(p){return p.sib==='あり';} // グループ全体判定（兄弟ありフラグで表現）
+// 兄弟割引の対象枠：地域系のみ（地域枠・旧地域枠・地域無償化）。企業提携枠・旧企業提携枠・従業員(自社/グループ会社)系は対象外。
+function sibDiscountOK(w){ return w==='地域枠'||w==='旧地域枠'||w==='地域無償化'; }
+// 手数料抜き（売上）金額＝請求合計−「実際に入っている手数料(c.fee)」。110が入っている園だけ差引く（資生館は手数料なし→差引かない＝請求額のまま）。
+function feeExcl(c){ if(!c) return 0; return (c.total||0)-(c.fee||0); }
 function schedKey(s){ return [s.year,s.month,s.item,s.cls,s.pupil||''].join('|'); } // 行事の識別（金額は含めない）
 function gardenAmt(pk,s){ const m=schedAmounts[pk]; const v=m?m[schedKey(s)]:undefined; return (v!=null&&v!=='')?(Number(v)||0):(Number(s.fix)||0); } // 全社行事の「この園の金額」（未設定なら本部の既定）
 function allSched(){ // 全社カレンダー(schedShared:行事は本部管理・金額は園別)＋この園の予定(sched) を重複排除で合成
@@ -938,28 +942,27 @@ function _calcCore(p,asNyuenMonth){
    return {type:'C',getsu:0,kyozai:fukushoku,sib:0,half:0,evs:allOpt,evSum,sub,fee:0,total:sub,flag:true,changed,reason:reason.join(' / '),isNew:false,muso:true};
   }else{ // 0-2歳（年齢差なし・一律）
    let base = S.age02[p.waku] || S.age02['地域枠'];
-   // 兄弟割引：従業員枠は対象外（Number9/ハイアイランド/アドバイザー/他園/保育士）
+   // 従業員枠の表示分岐は isEmployeeC を継続使用。兄弟割引は地域系のみ（企業提携・自社系は対象外）。
    const isEmployeeC=/^従業員\(/.test(p.waku||'');
-   const getsu_calc = (hasSibling(p)&&!isEmployeeC)? S.sib02 : base; // 兄弟ありで15000
-   const sib = (hasSibling(p)&&!isEmployeeC)? (getsu_calc-base) : 0; // 表示用の差額
+   const getsu_calc = (hasSibling(p)&&sibDiscountOK(p.waku))? S.sib02 : base; // 兄弟ありで15000（地域系のみ）
+   const sib = (hasSibling(p)&&sibDiscountOK(p.waku))? (getsu_calc-base) : 0; // 表示用の差額
    // 従業員枠は付帯費列に表示・手数料¥110を加算
    const dispGetsu = isEmployeeC? 0 : getsu_calc;
    const dispKyozai = isEmployeeC? getsu_calc : 0;
    const tesuC = (isEmployeeC && !hasSibling(p)) ? (M.prices[p.waku]||M.prices['地域枠']).tesu : 0;
    const sub=getsu_calc+evSum;
    const total=sub+tesuC;
-   const flag=(hasSibling(p)&&!isEmployeeC)||allOpt.length>0;
-   const changed=(hasSibling(p)&&!isEmployeeC)||allOpt.length>0; // 兄弟割引・OP・イベントがあれば変動
-   let reason=[];if(hasSibling(p)&&!isEmployeeC)reason.push('兄弟割引(¥15,000)');if(isEmployeeC)reason.push(p.waku==='従業員(保育士)'?'従業員割引(保育士)':'従業員割引');allOpt.forEach(e=>reason.push('OP:'+e.item));
+   const flag=(sib!==0)||allOpt.length>0;
+   const changed=(sib!==0)||allOpt.length>0; // 兄弟割引・OP・イベントがあれば変動
+   let reason=[];if(sib!==0)reason.push('兄弟割引(¥15,000)');if(isEmployeeC)reason.push(p.waku==='従業員(保育士)'?'従業員割引(保育士)':'従業員割引');allOpt.forEach(e=>reason.push('OP:'+e.item));
    return {type:'C',getsu:dispGetsu,kyozai:dispKyozai,sib,half:0,evs:allOpt,evSum,sub,fee:tesuC,total,flag,changed,reason:reason.join(' / '),isNew:false};
   }
  }
  // 体系A：保育園3園（既存ロジック）
  const pr=M.prices[p.waku]||{getsu:0,kyozai:0,tesu:0};
  const getsu=pr.getsu||0,kyozai=pr.kyozai||0,tesu=pr.tesu||0;
- // 兄弟割引：従業員枠は対象外（Number9/ハイアイランド/アドバイザー/他園）
- const isEmployee=/^従業員\(/.test(p.waku||'');
- const sib=(hasSibling(p)&&!isEmployee)?(M.sibling||0):0;
+ // 兄弟割引：地域系のみ対象（企業提携枠・旧企業提携枠・従業員/自社系は対象外）
+ const sib=(hasSibling(p)&&sibDiscountOK(p.waku))?(M.sibling||0):0;
  let half=0,isNew=false;
  if(p.nyuen){const d=new Date(p.nyuen);
    // 通常は対象年月(yy/mm)と入園月が一致する月のみ半額判定。
@@ -1041,8 +1044,8 @@ function visible(){
 }
 
 // ===== レンダリング =====
-function renderStats(){const rows=visible();let cnt=0,total=0,flag=0;
- rows.forEach(r=>{const c=calc(r);if((r.status==='在園中'||c.isNew)&&!c.taienStopped){cnt++;total+=c.total;}if(c.flag)flag++;});
+function renderStats(){const rows=visible();let cnt=0,total=0,flag=0,netTotal=0;
+ rows.forEach(r=>{const c=calc(r);if((r.status==='在園中'||c.isNew)&&!c.taienStopped){cnt++;total+=c.total;netTotal+=feeExcl(c);}if(c.flag)flag++;});
  // 定員：単一施設ならその施設、全施設なら定員のある施設合計
  const facData=M.facilities.filter(f=>f.capacity);
  const cap=(park==='全施設')?facData.reduce((a,f)=>a+f.capacity,0):(M.facilities.find(f=>f.name===park)||{}).capacity;
@@ -1050,6 +1053,7 @@ function renderStats(){const rows=visible();let cnt=0,total=0,flag=0;
  document.getElementById('stats').innerHTML=
   `<div class="stat"><div class="k">在園</div><div class="v">${cnt}<small> 名</small>${capText}</div></div>`+
   `<div class="stat berry"><div class="k">合計請求額</div><div class="v">¥${total.toLocaleString()}</div></div>`+
+  `<div class="stat"><div class="k">手数料抜き</div><div class="v">¥${netTotal.toLocaleString()}</div></div>`+
   `<div class="stat gold"><div class="k">フラグ</div><div class="v">${flag}<small> 件</small></div></div>`;}
 function fmt(n,cls){if(n===0||n==='')return `<td class="num zero">—</td>`;const m=n<0?' minus':'';return `<td class="num${m} ${cls||''}">${n<0?'-':''}¥${Math.abs(n).toLocaleString()}</td>`;}
 function bindEdit(){document.querySelectorAll('[contenteditable]').forEach(el=>{
@@ -3555,46 +3559,52 @@ function cbTimelyGet(){ // タイムリー売上の保存先（施設・対象�
  if(!timelyData[park][k])timelyData[park][k]=[];
  return timelyData[park][k];
 }
+// タイムリー(一時預かり)CSVの取込。列名の揺れに強くし、0件時は理由を具体的に表示する。
+// タイムリー「明細CSV」列：利用日,来園時刻,退園時刻,氏名,クラス,区分,基本料金,延長料金,合計,受領者,領収書番号,お伝え事項,備考
+// タイムリー「日別サマリーCSV」列：日付,利用者数,合計 ほか
 function importTimelyCsv(text){
  const rows=parseCsv(text);
  if(rows.length<2){infoDialog('CSVにデータが見つかりませんでした。','取込できません');return;}
- const head=rows[0].map(h=>String(h).trim());
- const idx=name=>head.findIndex(h=>h===name);
- const isSummary=idx('利用者数')>=0;
- const isDetail=idx('氏名')>=0||idx('領収書番号')>=0;
- if(!isSummary&&!isDetail){
-   infoDialog('タイムリースクールのCSV形式を判別できませんでした。\n\n日別サマリー（利用者数の列がある）か、明細（氏名・領収書番号の列がある）のCSVを選んでください。','取込できません');return;
- }
- const added=[];const skipped=[];
- if(isSummary){
-   const di=idx('日付'),ai=idx('合計'),ni=idx('利用者数');
-   rows.slice(1).forEach(r=>{
-     const d=cbParseDate(r[di]);const amt=Number(String(r[ai]||'').replace(/[^\d.-]/g,''))||0;
-     if(!d)return;
-     if(d.mon!==mm){skipped.push(`${d.mon}/${d.day}`);return;}
-     if(amt<=0)return;
-     const cnt=ni>=0?(Number(String(r[ni]||'').replace(/[^\d.-]/g,''))||0):0;
-     added.push({mon:d.mon,day:d.day,item:`タイムリースクール ${d.mon}/${d.day}分${cnt?`（利用${cnt}名）`:''}`,amt:amt,by:''});
-   });
- }else{
-   const di=idx('利用日'),ni=idx('氏名'),ki=idx('区分'),ai=idx('合計'),ri=idx('受領者'),bi=idx('領収書番号');
-   rows.slice(1).forEach(r=>{
-     const d=cbParseDate(r[di]);const amt=Number(String(r[ai]||'').replace(/[^\d.-]/g,''))||0;
-     if(!d)return;
-     if(d.mon!==mm){skipped.push(`${d.mon}/${d.day}`);return;}
-     if(amt<=0)return;
+ const head=rows[0].map(h=>String(h).replace(/^﻿/,'').trim());
+ const idxAny=names=>{for(const n of names){const i=head.findIndex(h=>h===n);if(i>=0)return i;}return -1;};
+ // 列名エイリアス（タイムリー側の列名が多少変わっても拾えるように）
+ const ai=idxAny(['合計','合計金額','金額','料金','利用料金','売上','売上金額','総額']);
+ const di=idxAny(['利用日','日付','ご利用日','利用年月日']);
+ const ni=idxAny(['氏名','お名前','お子さま氏名','お子様氏名','園児名','名前']);
+ const ci=idxAny(['利用者数','人数','件数','利用人数']);
+ const ki=idxAny(['区分','利用区分','種別']);
+ const ri=idxAny(['受領者','担当','受付','担当者','受付者']);
+ const bi=idxAny(['領収書番号','領収No','領収No.','受付番号','受付No']);
+ if(ai<0){ infoDialog('金額の列（「合計」など）が見つかりませんでした。\n\n読み込んだ見出し：\n'+head.join(' / ')+'\n\nタイムリーの「明細CSV」か「日別サマリーCSV」を選んでください。','取込できません'); return; }
+ if(di<0){ infoDialog('日付の列（「利用日」または「日付」）が見つかりませんでした。\n\n読み込んだ見出し：\n'+head.join(' / '),'取込できません'); return; }
+ const isDetail=(ni>=0||bi>=0);
+ const added=[];let noDate=0,zeroAmt=0;const skMonths={};
+ rows.slice(1).forEach(r=>{
+   const d=cbParseDate(r[di]);const amt=Number(String(r[ai]||'').replace(/[^\d.-]/g,''))||0;
+   if(!d){noDate++;return;}
+   if(d.mon!==mm){skMonths[d.mon]=(skMonths[d.mon]||0)+1;return;}
+   if(amt<=0){zeroAmt++;return;}
+   if(isDetail){
      const nm=ni>=0?String(r[ni]||'').trim():'';
      const kb=ki>=0?String(r[ki]||'').trim():'';
      const rno=bi>=0?String(r[bi]||'').trim():'';
      const rcv=ri>=0?String(r[ri]||'').trim():'';
      added.push({mon:d.mon,day:d.day,item:`タイムリースクール ${nm}${kb?`（${kb}）`:''}${rno?` 領収No.${rno}`:''}`,amt:amt,by:STAFF.includes(rcv)?rcv:''});
-   });
- }
+   }else{
+     const cnt=ci>=0?(Number(String(r[ci]||'').replace(/[^\d.-]/g,''))||0):0;
+     added.push({mon:d.mon,day:d.day,item:`タイムリースクール ${d.mon}/${d.day}分${cnt?`（利用${cnt}名）`:''}`,amt:amt,by:''});
+   }
+ });
  if(added.length===0){
-   const sk=skipped.length?`\n\n対象月（${mm}月）以外の ${[...new Set(skipped)].length} 件は取り込みませんでした。`:'';
-   infoDialog(`取り込めるデータがありませんでした。${sk}\n\n上部の対象年月が正しいか確認してください。`,'取込できません');return;
+   const months=Object.keys(skMonths).map(Number).sort((a,b)=>a-b);
+   const why=[];
+   if(months.length) why.push(`対象月（${mm}月）以外のデータが ${months.reduce((s,m)=>s+skMonths[m],0)}件（CSVは ${months.map(m=>m+'月').join('・')} のデータ）→ 上部の「対象月」を ${months[0]}月 に合わせてください`);
+   if(zeroAmt) why.push(`金額が0または空の行が ${zeroAmt}件（金額列＝「${head[ai]}」）`);
+   if(noDate) why.push(`日付が読めない行が ${noDate}件（日付列＝「${head[di]}」）`);
+   infoDialog('取り込めるデータがありませんでした。\n\n'+(why.length?('内訳：\n・'+why.join('\n・')):'対象月のデータが見つかりませんでした。上部の対象年月をご確認ください。'),'取込できません');return;
  }
- const skMsg=skipped.length?`\n（対象月以外の ${[...new Set(skipped)].length} 件は除外）`:'';
+ const skTotal=Object.values(skMonths).reduce((s,n)=>s+n,0);
+ const skMsg=skTotal?`\n（対象月以外の ${skTotal} 件は除外）`:'';
  const total=added.reduce((s,r)=>s+r.amt,0);
  confirmDialog(
    `タイムリースクールの現金売上 ${added.length} 件・合計 ¥${total.toLocaleString()} を取り込みます。${skMsg}\n\n※ 同じ月に再度読み込むと、前回分は置き換えられます。`,
@@ -3716,8 +3726,11 @@ function exportXlsx(){
  const ros=[['ID','ステータス','枠区分','クラス','園児名','兄弟有(下子)','口座名義','ルクミー園児ID','入園年月日','所属園','マットレス','バス','おむつサブスク','制服ﾚﾝﾀﾙ:ニット','制服ﾚﾝﾀﾙ:キャップ','制服ﾚﾝﾀﾙ:パーカー']];
  const yn=v=>v?'あり':'';
  allPupils().forEach((r,i)=>ros.push([i+1,r.status,r.waku,r.cls,r.name,r.sib,r.koza,r.lid,r.nyuen,r.park,yn(r.optMattress),yn(r.optBus),yn(r.optDiaper),yn(r.optKnit),yn(r.optCap),yn(r.optParka)]));add('園児台帳',ros);
- const m=[[`月次計算 ${yy}年${mm}月分 / ${park}`],[],['所属園','クラス','枠区分','園児名','基本月謝','教材費','兄弟割引','半額補正','早割','イベント/追加','手数料','請求合計','変動','フラグ事由']];
- visible().forEach(r=>{const c=calc(r);const chg=changesFor(r);m.push([r.park,r.cls,r.waku,r.name,c.getsu,c.kyozai,c.sib,c.half,c.early||0,c.evSum,c.fee,c.total,chg.length?'変動':'',chg.length?chg.map(x=>x.label).join('、'):(c.flag?c.reason:'')]);});add('月次計算',m);
+ const m=[[`月次計算 ${yy}年${mm}月分 / ${park}`],[],['所属園','クラス','枠区分','園児名','基本月謝','教材費','兄弟割引','半額補正','早割','イベント/追加','手数料','請求合計','手数料抜き','変動','フラグ事由']];
+ const mT={getsu:0,kyozai:0,sib:0,half:0,early:0,ev:0,fee:0,total:0,net:0};
+ visible().forEach(r=>{const c=calc(r);const chg=changesFor(r);const net=feeExcl(c);m.push([r.park,r.cls,r.waku,r.name,c.getsu,c.kyozai,c.sib,c.half,c.early||0,c.evSum,c.fee,c.total,net,chg.length?'変動':'',chg.length?chg.map(x=>x.label).join('、'):(c.flag?c.reason:'')]);mT.getsu+=c.getsu||0;mT.kyozai+=c.kyozai||0;mT.sib+=c.sib||0;mT.half+=c.half||0;mT.early+=c.early||0;mT.ev+=c.evSum||0;mT.fee+=c.fee||0;mT.total+=c.total||0;mT.net+=net;});
+ m.push([]);m.push(['合計','','','',mT.getsu,mT.kyozai,mT.sib,mT.half,mT.early,mT.ev,mT.fee,mT.total,mT.net,'','']);
+ add('月次計算',m);
  const l=[['園児ID','クラス','園児名','月極保育料金名称','単価','オプション名称1','オプション小計1','請求金額','変動']];
  visible().filter(r=>(r.status==='在園中'||calc(r).isNew)&&!taienStopped(r)).forEach(r=>{const c=calc(r);const base=c.getsu+c.kyozai+c.sib+c.half+(c.early||0);const e0=c.evs[0];const chg=changesFor(r);l.push([r.lid,r.cls,r.name,'月謝（'+r.waku+'）',base,e0?e0.item:'',e0?e0.amt:'',c.total,chg.length?'変動':'']);});add('ルクミー出力',l);
  const hq=[['施設','在園数','請求合計','うち月謝系','うち制服代','うち行事/その他']];let gt=0,gc=0;['月寒園','白石園','サッポロファクトリー園','幼稚舎','資生館保育園'].forEach(p=>{let cnt=0,tot=0,base=0,uni=0,ev=0;allPupils().filter(r=>r.park===p).forEach(r=>{const c=calc(r);if((r.status==='在園中'||c.isNew)&&!c.taienStopped){cnt++;tot+=c.total;base+=c.getsu+c.kyozai+c.sib+c.half+(c.early||0)+c.fee;c.evs.forEach(e=>{if(isUniform(e.item))uni+=e.amt;else ev+=e.amt;});}});gt+=tot;gc+=cnt;hq.push([p,cnt,tot,base,uni,ev]);});hq.push(['全施設合計',gc,gt,'','','']);add('本部用集計',hq);
@@ -3940,6 +3953,7 @@ function cloudApplyObject(d){ // クラウド/他端末のデータをこの端�
  if(d.meals)meals=d.meals;
  if(d.shops!==undefined)shops=d.shops;
  if(d.schedAmounts)schedAmounts=d.schedAmounts;
+ if(Array.isArray(d.staff)&&d.staff.length){ STAFF=d.staff; try{saveStaffList();}catch(e){} } // 担当者名（事務名）は園ごとにクラウド保存。この園の一覧を反映する。
  try{localStorage.setItem(STORE_KEY, JSON.stringify(cloudStateObject()));}catch(e){}
  // 受信した内容＝いま保存済みの内容。これを基準にしておくことで、この直後の render→saveState が
  // 「無変更」と判定され、受け取ったデータをそのままクラウドへ送り返さない。
@@ -4077,7 +4091,7 @@ function askOperator(then){
     if(STAFF.length<=1){ infoDialog('担当者は最低1人必要です。最後の1人は削除できません。','削除できません'); return; }
     requireAdminPin(()=>{
       confirmDialog(`${nm}さんを担当者から削除しますか？`,()=>{
-        const idx=STAFF.indexOf(nm); if(idx>=0)STAFF.splice(idx,1); saveStaffList();
+        const idx=STAFF.indexOf(nm); if(idx>=0)STAFF.splice(idx,1); saveStaffList(); if(typeof saveState==='function')saveState();
         if(currentOperator===nm){currentOperator='';localStorage.removeItem('sf_operator');cloudBarRender();}
         draw();
       },'担当者の削除','削除する');
