@@ -376,6 +376,7 @@ tr.changed:hover td{background:color-mix(in srgb,var(--gold) 22%,transparent)!im
 </div>
 <div class="actions">
  <button class="btn btn-primary" onclick="exportXlsx()">📊 スプレッドシート(xlsx)に出力</button>
+ <button class="btn btn-ghost" onclick="exportHokkaidoFurikaeCsv()" title="表示中の園・引落の園児の「顧客番号,引落金額」を北海道銀行ウェブ振替用CSVで出力">🏦 口座振替CSV（北海道銀行）</button>
  <button class="btn btn-ghost" id="addBtn" onclick="addAction()"></button>
  <span class="editbadge" id="editBadge"></span>
 </div>
@@ -1218,7 +1219,7 @@ function renderRoster(){const rows=visible();
    availCls.map(c=>`<button data-cls="${c}" style="padding:6px 14px;border:1px solid ${clsFilter===c?'var(--leaf)':'var(--line)'};background:${clsFilter===c?'var(--leaf)':'var(--paper)'};color:${clsFilter===c?'#fff':'var(--ink)'};border-radius:18px;font-size:12px;cursor:pointer;font-family:inherit">${c} <span style="opacity:.75">${clsCount[c]}名</span></button>`).join('')+
    '</div>';
  }
- h+='<div class="tablewrap"><table><thead><tr><th style="width:42px;text-align:center">No.</th><th>所属園</th><th>生年月日</th><th>クラス<br><small style="color:var(--mut);font-weight:400;font-size:10px">自動</small></th><th>枠区分</th><th>園児名</th><th>口座名義</th><th>兄弟</th><th>納入方法</th>'+(showOpt?'<th>オプション（月額・あり/なし）</th>':'')+'<th>退園予定</th><th>連携園</th><th class="r">ルクミーID</th><th></th></tr></thead><tbody>';
+ h+='<div class="tablewrap"><table><thead><tr><th style="width:42px;text-align:center">No.</th><th>所属園</th><th>生年月日</th><th>クラス<br><small style="color:var(--mut);font-weight:400;font-size:10px">自動</small></th><th>枠区分</th><th>園児名</th><th>口座名義</th><th>顧客番号<br><small style="color:var(--mut);font-weight:400;font-size:10px">振替用</small></th><th>兄弟</th><th>納入方法</th>'+(showOpt?'<th>オプション（月額・あり/なし）</th>':'')+'<th>退園予定</th><th>連携園</th><th class="r">ルクミーID</th><th></th></tr></thead><tbody>';
  rows.forEach((r,idx)=>{const i=roster.indexOf(r);const ed=i>=0;const t=facType(r.park);
   // 生年月日があればクラスを自動計算（プルダウン編集なし）
   const autoCls=r.birth?classByBirth(r.birth,yy):'';
@@ -1240,6 +1241,7 @@ function renderRoster(){const rows=visible();
    `<td>${ed?`<select class="inp" data-arr2="roster" data-i="${i}" data-f="waku" style="width:auto;padding:4px 8px;font-size:12px;color:var(--berry)">${(facType(r.park)==='C'?['地域枠','企業提携枠','旧企業提携枠','旧地域枠','地域無償化','非課税世帯','従業員(保育士)','従業員(アドバイザー)','従業員(ハイアイランド)','従業員(Number9)','従業員(他園)']:facType(r.park)==='B'?['早割','一般','従業員(保育士)','従業員(Number9)','従業員(ハイアイランド)','従業員(アドバイザー)']:Object.keys(M.prices).concat(['非課税世帯'])).map(w=>`<option ${r.waku===w?'selected':''}>${w}</option>`).join('')}</select>`:`<span class="waku">${r.waku||''}</span>`}</td>`+
    `<td class="name" ${ed?`contenteditable data-arr="roster" data-i="${i}" data-f="name"`:''}>${r.name||''}</td>`+
    `<td class="koza" ${ed?`contenteditable data-arr="roster" data-i="${i}" data-f="koza"`:''}>${r.koza||''}</td>`+
+   `<td ${ed?`contenteditable data-arr="roster" data-i="${i}" data-f="furikaeNo"`:''} style="font-size:12px;color:var(--mut);font-family:'Spline Sans Mono',monospace" title="北海道銀行の口座振替 顧客番号（半角数字）">${r.furikaeNo||''}</td>`+
    `<td>${ed?`<select data-sib="${i}" class="inp" style="width:auto;padding:4px 8px;font-size:12px;color:${r.sib==='あり'?'var(--berry)':'var(--mut)'}"><option ${r.sib!=='あり'?'selected':''}>なし</option><option ${r.sib==='あり'?'selected':''}>あり</option></select>`:(r.sib||'なし')}</td>`+
    `<td>${ed?`<select data-pay="${i}" class="inp" style="width:auto;padding:4px 8px;font-size:12px;font-weight:700;color:${payMethod(r)==='振込'?'#fff':'var(--mut)'};background:${payMethod(r)==='振込'?'var(--berry)':'var(--paper)'};border-color:${payMethod(r)==='振込'?'var(--berry)':'var(--line)'}"><option ${payMethod(r)!=='振込'?'selected':''}>引落</option><option ${payMethod(r)==='振込'?'selected':''}>振込</option></select>`:`<span class="paytag" style="display:inline-block;padding:3px 10px;border-radius:10px;font-size:11px;font-weight:700;${payMethod(r)==='振込'?'background:var(--berry);color:#fff':'background:var(--paper);color:var(--mut);border:1px solid var(--line)'}">${payMethod(r)}</span>`}</td>`+
    (showOpt?`<td>${optCell}</td>`:'')+
@@ -3735,9 +3737,9 @@ function render(){
 function exportXlsx(){
  if(!libReady('xlsx')){ withLib('xlsx',()=>exportXlsx()); return; }
  const wb=XLSX.utils.book_new();const add=(n,a)=>XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(a),n);
- const ros=[['ID','ステータス','枠区分','クラス','園児名','兄弟有(下子)','口座名義','ルクミー園児ID','入園年月日','所属園','マットレス','バス','おむつサブスク','制服ﾚﾝﾀﾙ:ニット','制服ﾚﾝﾀﾙ:キャップ','制服ﾚﾝﾀﾙ:パーカー']];
+ const ros=[['ID','ステータス','枠区分','クラス','園児名','兄弟有(下子)','口座名義','顧客番号','ルクミー園児ID','入園年月日','所属園','マットレス','バス','おむつサブスク','制服ﾚﾝﾀﾙ:ニット','制服ﾚﾝﾀﾙ:キャップ','制服ﾚﾝﾀﾙ:パーカー']];
  const yn=v=>v?'あり':'';
- allPupils().forEach((r,i)=>ros.push([i+1,r.status,r.waku,r.cls,r.name,r.sib,r.koza,r.lid,r.nyuen,r.park,yn(r.optMattress),yn(r.optBus),yn(r.optDiaper),yn(r.optKnit),yn(r.optCap),yn(r.optParka)]));add('園児台帳',ros);
+ allPupils().forEach((r,i)=>ros.push([i+1,r.status,r.waku,r.cls,r.name,r.sib,r.koza,r.furikaeNo||'',r.lid,r.nyuen,r.park,yn(r.optMattress),yn(r.optBus),yn(r.optDiaper),yn(r.optKnit),yn(r.optCap),yn(r.optParka)]));add('園児台帳',ros);
  const m=[[`月次計算 ${yy}年${mm}月分 / ${park}`],[],['所属園','クラス','枠区分','園児名','基本月謝','教材費','兄弟割引','半額補正','早割','イベント/追加','手数料','請求合計','手数料抜き','変動','フラグ事由']];
  const mT={getsu:0,kyozai:0,sib:0,half:0,early:0,ev:0,fee:0,total:0,net:0};
  visible().forEach(r=>{const c=calc(r);const chg=changesFor(r);const net=feeExcl(c);m.push([r.park,r.cls,r.waku,r.name,c.getsu,c.kyozai,c.sib,c.half,c.early||0,c.evSum,c.fee,c.total,net,chg.length?'変動':'',chg.length?chg.map(x=>x.label).join('、'):(c.flag?c.reason:'')]);mT.getsu+=c.getsu||0;mT.kyozai+=c.kyozai||0;mT.sib+=c.sib||0;mT.half+=c.half||0;mT.early+=c.early||0;mT.ev+=c.evSum||0;mT.fee+=c.fee||0;mT.total+=c.total||0;mT.net+=net;});
@@ -3753,6 +3755,39 @@ function exportXlsx(){
  const FACS=['月寒園','白石園','サッポロファクトリー園','幼稚舎','資生館保育園'];
  const bk=[['項目',...FACS]];bank.forEach(b=>bk.push([b.label,...FACS.map(f=>b[f]||'')]));add('設定_振込先',bk);
  XLSX.writeFile(wb,`月謝管理_${yy}-${('0'+mm).slice(-2)}_${park}.xlsx`);
+}
+// 顧客番号を半角に正規化（全角英数→半角、空白・カンマ除去）。北海道銀行は半角必須。
+function normFurikaeNo(s){
+ return String(s||'').replace(/[Ａ-Ｚａ-ｚ０-９]/g,ch=>String.fromCharCode(ch.charCodeAt(0)-0xFEE0)).replace(/[\s,、，]/g,'').trim();
+}
+// 北海道銀行ビジネスWEB「口座振替請求」用CSVを出力。表示中の園・引落の園児のみ。
+// 形式：顧客番号,引落金額（見出し無し・半角数字・3桁コンマ無し・カンマ区切り・BOM無し・CRLF）。
+function exportHokkaidoFurikaeCsv(){
+ if(park==='全施設'){ infoDialog('口座振替CSVは園ごとに作成します。\n\n上部の「施設」で対象の園を選んでから出力してください。','園を選んでください'); return; }
+ const list=allPupils().filter(r=>r.park===park && !(r.isNew&&!r.confirmed));
+ const lines=[]; const noNo=[]; let furikomi=0;
+ list.forEach(r=>{
+   const amt=(calc(r).total)||0;
+   if(amt<=0) return;                              // 退園・対象外は除外
+   if(payMethod(r)==='振込'){ furikomi++; return; }  // 振込は口座振替の対象外
+   const no=normFurikaeNo(r.furikaeNo);
+   if(!no){ noNo.push(r.name||'(名前未入力)'); return; }
+   lines.push(no+','+amt);
+ });
+ if(!lines.length){
+   const ex=noNo.length?`\n\n※ 引落対象で顧客番号が未入力：${noNo.length}名（${noNo.slice(0,12).join('、')}${noNo.length>12?' ほか':''}）`:'';
+   infoDialog(`出力できる引落データがありませんでした。${ex}\n\n園児台帳の「顧客番号」欄と、対象年月・園をご確認ください。`,'出力できません'); return;
+ }
+ const body=lines.join('\r\n')+'\r\n';
+ const blob=new Blob([body],{type:'text/csv'}); // BOM無し（データは半角数字とカンマのみ）
+ const url=URL.createObjectURL(blob);const a=document.createElement('a');
+ a.href=url;a.download=`口座振替_北海道銀行_${park}_${yy}年${('0'+mm).slice(-2)}月.csv`;a.click();URL.revokeObjectURL(url);
+ const total=lines.reduce((s,l)=>s+(Number(l.split(',')[1])||0),0);
+ let msg=`口座振替CSVを出力しました。\n\n・件数：${lines.length}件\n・合計引落額：¥${total.toLocaleString()}\n・形式：顧客番号,引落金額（見出し無し・半角・カンマ区切り）`;
+ if(noNo.length) msg+=`\n\n⚠ 顧客番号が未入力のため除外：${noNo.length}名\n（${noNo.slice(0,12).join('、')}${noNo.length>12?' ほか':''}）\n園児台帳で番号を入れて再出力してください。`;
+ if(furikomi) msg+=`\n\n（振込の ${furikomi}名は口座振替の対象外です）`;
+ msg+=`\n\n北海道銀行ビジネスWEB「口座振替請求」→「振込データの新規作成」→金額ファイルの取込 で読み込んでください。`;
+ infoDialog(msg,'口座振替CSV 出力完了');
 }
 
 // init
