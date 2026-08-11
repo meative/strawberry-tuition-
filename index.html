@@ -2368,6 +2368,12 @@ function renderReissue(){
  if(!window.__reissueTab)window.__reissueTab='furi';
  const isFuriMode=window.__reissueTab==='furi';
  const due=isFuriMode?window.__reissueDueFuri:window.__reissueDueSai;
+ // 催促の段階：first＝1回目（振込→2回目案内／引落→再引落案内）、final＝最終督促（15日振込＋延滞金）
+ if(!window.__reStage)window.__reStage='first';
+ const isFinal=window.__reStage==='final';
+ if(!window.__reissueDueFinal||window.__reissueDueFinalYM!==(yy+'-'+mm)){window.__reissueDueFinal=yy+'-'+('0'+mm).slice(-2)+'-15';window.__reissueDueFinalYM=yy+'-'+mm;}
+ const dueFinal=window.__reissueDueFinal;
+ const dueUsed=isFinal?dueFinal:due;
  // 当該タブの納入方法に該当する再請求対象だけを抽出
  const furiTargets=targets.filter(r=>payMethod(r)==='振込');
  const hikiTargets=targets.filter(r=>payMethod(r)==='引落');
@@ -2383,11 +2389,19 @@ function renderReissue(){
    `<span style="font-size:12px;color:var(--mut);margin-right:4px">納入方法で表示</span>`+
    tabBtn('furi','💳 振込の人',furiTargets.length)+tabBtn('hiki','🏦 引落の人',hikiTargets.length)+
    `</div>`;
+ // 催促の段階セレクタ（納入方法ごとに①の意味が変わる）
+ const stageBtn=(key,label)=>`<button data-restage="${key}" style="padding:7px 16px;border:1px solid ${window.__reStage===key?'#9a6b2f':'var(--line)'};background:${window.__reStage===key?'#9a6b2f':'var(--paper)'};color:${window.__reStage===key?'#fff':'var(--ink)'};border-radius:20px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">${label}</button>`;
+ h+=`<div class="noprint" style="padding:10px 22px;border-bottom:1px solid var(--line);display:flex;gap:10px;align-items:center;flex-wrap:wrap">`+
+   `<span style="font-size:12px;color:var(--mut);margin-right:4px">案内の段階</span>`+
+   stageBtn('first',isFuriMode?'① 2回目の振込案内':'① 再引き落としの案内')+
+   stageBtn('final','② 最終督促（15日・延滞金）')+
+   `<span style="font-size:11px;color:var(--mut)">${isFinal?'2回目も確認できなかった方向け：振込先＋最終期限＋延滞金の文言が入ります':'1回目が確認できなかった方向けの通常の案内です'}</span>`+
+   `</div>`;
  // 操作バー（発行日・期限・手数料）
  h+=`<div class="noprint" style="padding:14px 22px;border-bottom:1px solid var(--line);font-size:13px;color:var(--mut);display:flex;gap:20px;align-items:center;flex-wrap:wrap">`+
    `<div>発行日：<input id="reIssue" type="date" value="${issue}" class="inp" style="width:auto;padding:4px 8px"></div>`+
    `<div>自動引落日：<input id="reDebit" type="date" value="${debit}" class="inp" style="width:auto;padding:4px 8px"></div>`+
-   `<div>${isFuriMode?'振込期限':'再振替日'}：<input id="reDue" type="date" value="${due}" data-duemode="${isFuriMode?'furi':'sai'}" class="inp" style="width:auto;padding:4px 8px"></div>`+
+   `<div>${isFinal?'最終振込期限':(isFuriMode?'振込期限':'再振替日')}：<input id="reDue" type="date" value="${dueUsed}" data-duemode="${isFinal?'final':(isFuriMode?'furi':'sai')}" class="inp" style="width:auto;padding:4px 8px"></div>`+
    `<div>事務手数料：¥<input id="reFee" type="number" step="10" value="${reissueFee}" data-feepark="${feePark}" class="inp" style="width:90px;padding:4px 8px"></div>`+
    `</div>`;
  if(tabTargets.length===0){
@@ -2458,25 +2472,36 @@ function renderReissue(){
  </style>`;
  const greetFuri=`いつも当園の活動にご理解、ご協力をいただきありがとうございます。<br>さて、月謝の納入についてですが、<b>${yy}年${mm}月分 ¥${monthly.toLocaleString()}</b>（${fmtJP(debit)}自動引落）の確認がとれませんでした。お手数ですが通帳をご確認いただきますようお願い申し上げます。<br>つきましては、下記のとおりお振込みをお願いいたします。`;
  const greetSai=`いつも当園の活動にご理解、ご協力をいただきありがとうございます。<br>さて、月謝の納入についてですが、<b>${yy}年${mm}月分 ¥${monthly.toLocaleString()}</b>（${fmtJP(debit)}自動引落）の確認がとれませんでした。お手数ですが通帳をご確認いただきますようお願い申し上げます。<br>つきましては、下記の日程で再度口座より引落しをさせていただきます。残高のご確認をお願い申し上げます。`;
+ const greetFinal=`いつも当園の活動にご理解、ご協力をいただきありがとうございます。<br>さて、<b>${yy}年${mm}月分 ¥${monthly.toLocaleString()}</b>（${fmtJP(debit)}自動引落）につきまして、その後もご入金の確認がとれておりません。<br>つきましては、大変お手数ですが、下記口座へ<b>${fmtJP(dueUsed)}まで</b>にお振込みくださいますよう、お願い申し上げます。`;
  h+=`<div class="redoc" id="reissueDoc">`+
    `<div class="topbar" style="display:block;text-align:center">`+
     `<div class="brandJP" style="font-size:15px;letter-spacing:.1em;color:${facColor}">${footName}</div>`+
     `<div class="issuedate" style="text-align:center;margin-top:8px;font-size:13px;color:#5a4a3a">${fmtJP(issue)}</div>`+
    `</div>`+
    `<div class="titlewrap">`+
-    `<div class="titleEN">${isFuri?'Payment Reminder':'Re-debit Notice'}</div>`+
-    `<div class="titleJP">月謝納入のお願い</div>`+
+    `<div class="titleEN">${isFinal?'Final Notice':(isFuri?'Payment Reminder':'Re-debit Notice')}</div>`+
+    `<div class="titleJP">${isFinal?'月謝納入のお願い（最終のご案内）':'月謝納入のお願い'}</div>`+
    `</div>`+
    `<div class="body">`+
     `<div class="addr">${p.koza||p.name} <small>様</small></div>`+
-    `<div class="greet">${isFuri?greetFuri:greetSai}</div>`+
+    `<div class="greet">${isFinal?greetFinal:(isFuri?greetFuri:greetSai)}</div>`+
     `<div class="sec2"><span class="num">01</span><span class="lbl">ご請求金額</span><span class="line"></span></div>`+
     `<div class="amtbox">`+
      `<div class="amtrow"><span>${yy}年${mm}月分 月謝</span><span class="v">¥ ${monthly.toLocaleString()}</span></div>`+
      `<div class="amtrow"><span>事務手数料</span><span class="v">¥ ${(Number(reissueFee)||0).toLocaleString()}</span></div>`+
      `<div class="amttotal"><span class="l">${isFuri?'お振込金額':'再引落金額'}合計</span><span class="v">¥ ${payable.toLocaleString()}</span></div>`+
     `</div>`;
- if(isFuri){
+ if(isFinal){
+  h+=`<div class="sec2"><span class="num">02</span><span class="lbl">お振込先 / Payment</span><span class="line"></span></div>`+
+    `<dl class="bankcard">`+
+     `<dt>銀行名</dt><dd>${bk['振込先銀行名']||'—'}</dd>`+
+     `<dt>支店名</dt><dd>${bk['振込先支店名']||'—'}</dd>`+
+     `<dt>口座番号</dt><dd>${bk['口座種別']||''}　${bk['口座番号']||'—'}</dd>`+
+     `<dt>口座名義</dt><dd style="font-size:11.5px">${bk['口座名義(カナ)']||'—'}</dd>`+
+    `</dl>`+
+    `<div class="duebox"><div class="lbl">Final Due　最終お振込期限</div><div class="date">${fmtJP(dueUsed)}</div></div>`+
+    `<div class="closing">※ 上記のお振込期限を越えた場合は、翌日以降、お支払いいただけるまでの分について、年14.6%の割合による遅延損害金を申し受けます。<br>※ 振込手数料はお客様のご負担にてお願いいたします。<br>なお、行き違いでお振込みが完了しております際は、何卒ご容赦くださいませ。</div>`;
+ }else if(isFuri){
   h+=`<div class="sec2"><span class="num">02</span><span class="lbl">お振込先 / Payment</span><span class="line"></span></div>`+
     `<dl class="bankcard">`+
      `<dt>銀行名</dt><dd>${bk['振込先銀行名']||'—'}</dd>`+
@@ -2508,9 +2533,10 @@ function renderReissue(){
 }
 function bindReissueBar(){
  document.querySelectorAll('[data-retab]').forEach(el=>{el.onclick=e=>{window.__reissueTab=e.currentTarget.dataset.retab;window.__rePick=0;render();};});
+ document.querySelectorAll('[data-restage]').forEach(el=>{el.onclick=e=>{window.__reStage=e.currentTarget.dataset.restage;render();};});
  const i=document.getElementById('reIssue');if(i)i.onchange=e=>{window.__reissueDate=e.target.value;const nd=addDaysYMD(e.target.value,7);window.__reissueDueFuri=nd;window.__reissueDueSai=nd;render();};
  const idb=document.getElementById('reDebit');if(idb)idb.onchange=e=>{window.__reissueDebit=e.target.value;render();};
- const du=document.getElementById('reDue');if(du)du.onchange=e=>{if(e.target.dataset.duemode==='sai')window.__reissueDueSai=e.target.value;else window.__reissueDueFuri=e.target.value;render();};
+ const du=document.getElementById('reDue');if(du)du.onchange=e=>{const m=e.target.dataset.duemode;if(m==='sai')window.__reissueDueSai=e.target.value;else if(m==='final')window.__reissueDueFinal=e.target.value;else window.__reissueDueFuri=e.target.value;render();};
  const f=document.getElementById('reFee');if(f)f.onchange=e=>{const pk=e.target.dataset.feepark;reissueFeeByPark[pk]=Number(e.target.value)||0;render();};
 }
 function renderReadme(){
