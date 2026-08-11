@@ -3434,6 +3434,8 @@ function cbShowPreview(){
    `<div style="display:flex;gap:2px;justify-content:center;border-bottom:1px solid #e6dcd0">`+
      ((isEv||isExtra)?'':tabBtn('sales','売上'))+tabBtn('expense','経費')+tabBtn('total',isExtra?'MF出力（この帳簿）':'総合（MF用）')+
    `</div>`+
+   // 追加帳簿（ヴィレッジ等）の個別MF出力ボタンを、タブに関係なく常に見える位置（ヘッダー）に表示（通常帳簿のみ）
+   ((!isExtra&&!isEv&&cbExtraList().length)?`<div style="background:#fbf3ea;border:1px solid #ecd9c2;border-radius:9px;padding:9px 14px;margin:12px 0 2px;display:flex;align-items:center;gap:10px;flex-wrap:wrap"><span style="font-size:12px;font-weight:700;color:#9a6b2f">🚐 この園の追加帳簿を個別にMF出力：</span>${cbExtraList().map(b=>`<button class="btn btn-ghost" style="padding:6px 14px;font-size:12px;border-color:#9a6b2f;color:#9a6b2f;background:#fff" onclick="cbExportMF('extra:${b.key}')">${b.label}（部門：${b.bumon}）</button>`).join('')}<span style="font-size:11px;color:#b58a5a">（${park}本体とは別ファイル・別部門）</span></div>`:'')+
    `</div>`+
    `<div style="padding:18px 26px 24px 26px;overflow-y:auto;flex:1">`;
  // ---- 売上タブ ----
@@ -3515,9 +3517,7 @@ function cbShowPreview(){
        :`※ これは「${exd.disp}」専用のExcelです（部門「${exd.bumon}」）。${park}のマネーフォワードには含めません（別会計として取り込んでください）。`)
      :`※ マネーフォワードへインポートするのは、この総合タブのExcelです。下の表が、出力されるExcelの中身です（現金出納帳・イベント出納帳どちらのタブから出しても同じ合算ファイルになります）。`;
    h+=`<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px"><span style="font-weight:700;color:var(--leaf);font-size:14px">${mfTitle}</span><div style="flex:1"></div>`+
-     `<button class="btn btn-ghost" style="padding:7px 16px;font-size:13px;border-color:var(--leaf);color:var(--leaf)" onclick="cbExportMF()">📊 マネーフォワード用Excelを出力</button>`+
-     (exd?'':cbExtraList().map(b=>`<button class="btn btn-ghost" style="padding:7px 16px;font-size:13px;border-color:#9a6b2f;color:#9a6b2f" onclick="cbExportMF('extra:${b.key}')" title="${b.disp}経費を、別部門・別ファイルでマネーフォワード出力">${b.label}のMFを出力（部門：${b.bumon}）</button>`).join(''))+
-     `</div>`+
+     `<button class="btn btn-ghost" style="padding:7px 16px;font-size:13px;border-color:var(--leaf);color:var(--leaf)" onclick="cbExportMF()">📊 マネーフォワード用Excelを出力</button></div>`+
      `<div style="background:#faf6f1;border:1px solid #e6dcd0;border-radius:10px;padding:16px 18px">`+
        `<p style="font-size:13px;color:#555;margin:0 0 12px">${mfDesc}</p>`+
        `<div style="display:flex;gap:24px;flex-wrap:wrap;font-size:13px">`+
