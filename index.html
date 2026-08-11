@@ -3244,10 +3244,13 @@ function shokaiAutoRowsFor(){
 }
 // マネーフォワード様式のExcel（現金出納帳インポート用）を出力
 // 本物テンプレートのレイアウトに準拠：B列開始・Ver表記・E列に勘定科目コードのVLOOKUP・右側にマスター表
-function cbExportMF(){
+function cbExportMF(modeOverride){
  // xlsx は起動時に読み込まない。この関数が呼ばれた時点で未読み込みなら、読み込んでからやり直す。
- if(!libReady('xlsx')){ withLib('xlsx',()=>cbExportMF()); return; }
+ if(!libReady('xlsx')){ withLib('xlsx',()=>cbExportMF(modeOverride)); return; }
+ const _saveMode=cbMode; if(modeOverride)cbMode=modeOverride; // 指定帳簿で出力（白石園の画面からヴィレッジ等を別ファイルで個別出力する用）
+ try{
  const cb=cbGet();const _ex=cbExtraDef();const bumon=_ex?_ex.bumon:(CB_BUMON[park]||park);const _mfSub=_ex?(_ex.mfSub||''):'';const _fileDept=_ex?(_ex.bumon+(_ex.mfSub?'_'+_ex.mfSub:'')):bumon;
+ if(modeOverride&&!cbCollectMfRows().length){ infoDialog('この帳簿には今月（'+yy+'年'+mm+'月）のデータがありません。','出力できません'); return; }
  // MF勘定科目マスター（コード・名称・カテゴリ）— テンプレートの右側マスターと同一
  const MF_ACCTS=[[99,'当期商品仕入高','その他'],[100,'役員報酬',''],[101,'給与手当','仕入関係'],[102,'賞与',''],
    [103,'法定福利費',''],[104,'諸会費',''],[105,'広告宣伝費',''],[106,'旅費交通費',''],[107,'交際接待費',''],
@@ -3317,6 +3320,7 @@ function cbExportMF(){
  XLSX.utils.book_append_sheet(wb,ws,'現金出納帳');
  XLSX.writeFile(wb,`MF_現金出納帳_${yy}年${mm}月_${_fileDept}.xlsx`);
  infoDialog(`マネーフォワード用Excelを書き出しました。\n\n${_ex?`「${_ex.disp}」の経費だけを、`:'現金出納帳とイベント出納帳を1つに合算し、'}本物テンプレートと同じレイアウト（B列開始・Ver表記・勘定科目コード・残高つき）で出力しています。${_ex&&_mfSub?`\n部門「${bumon}」・補助科目（小分類）「${_mfSub}」で出力しています。`:''}\nそのままマネーフォワードの「現金出納帳」インポートに使えます。\n\nファイル：MF_現金出納帳_${yy}年${mm}月_${_fileDept}.xlsx`,'Excel出力完了');
+ }finally{ cbMode=_saveMode; } // 一時的に切り替えた帳簿モードを必ず元に戻す
 }
 // 当月の出納帳を「売上」と「支出」に分けて取り出す（タイムリーはプレビュー読込分も合算）
 function cbSplitData(cb){
@@ -3511,7 +3515,9 @@ function cbShowPreview(){
        :`※ これは「${exd.disp}」専用のExcelです（部門「${exd.bumon}」）。${park}のマネーフォワードには含めません（別会計として取り込んでください）。`)
      :`※ マネーフォワードへインポートするのは、この総合タブのExcelです。下の表が、出力されるExcelの中身です（現金出納帳・イベント出納帳どちらのタブから出しても同じ合算ファイルになります）。`;
    h+=`<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px"><span style="font-weight:700;color:var(--leaf);font-size:14px">${mfTitle}</span><div style="flex:1"></div>`+
-     `<button class="btn btn-ghost" style="padding:7px 16px;font-size:13px;border-color:var(--leaf);color:var(--leaf)" onclick="cbExportMF()">📊 マネーフォワード用Excelを出力</button></div>`+
+     `<button class="btn btn-ghost" style="padding:7px 16px;font-size:13px;border-color:var(--leaf);color:var(--leaf)" onclick="cbExportMF()">📊 マネーフォワード用Excelを出力</button>`+
+     (exd?'':cbExtraList().map(b=>`<button class="btn btn-ghost" style="padding:7px 16px;font-size:13px;border-color:#9a6b2f;color:#9a6b2f" onclick="cbExportMF('extra:${b.key}')" title="${b.disp}経費を、別部門・別ファイルでマネーフォワード出力">${b.label}のMFを出力（部門：${b.bumon}）</button>`).join(''))+
+     `</div>`+
      `<div style="background:#faf6f1;border:1px solid #e6dcd0;border-radius:10px;padding:16px 18px">`+
        `<p style="font-size:13px;color:#555;margin:0 0 12px">${mfDesc}</p>`+
        `<div style="display:flex;gap:24px;flex-wrap:wrap;font-size:13px">`+
@@ -3522,7 +3528,8 @@ function cbShowPreview(){
          `<div><div style="color:#777;font-size:11px">出金計（経費）</div><div style="font-weight:700;color:var(--berry)">¥${uExpSum.toLocaleString()}</div></div>`+
        `</div>`+
      `</div>`+
-     `<p style="font-size:12px;color:#999;margin-top:10px">${mfNote}</p>`;
+     `<p style="font-size:12px;color:#999;margin-top:10px">${mfNote}</p>`+
+     ((!exd&&cbExtraList().length)?`<p style="font-size:12px;color:#9a6b2f;margin-top:6px">🚐 この園には追加の経費出納帳（${cbExtraList().map(b=>b.disp).join('・')}）があります。上の茶色いボタンで<b>別部門・別ファイル</b>として個別に出力できます（${park}本体のマネーフォワードには合算されません）。</p>`:'');
    // MF出力と同じ中身のプレビュー表
    const mfRows=cbMfRows(cb);
    if(mfRows.length){
