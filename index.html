@@ -3428,7 +3428,7 @@ function cbShowPreview(){
      (tl.length?`<button class="btn btn-ghost" style="padding:6px 14px;font-size:12px;background:#fff;border-color:var(--berry);color:var(--berry)" onclick="cbPvClearTimely()">🗑 取込データを削除</button>`:'')+
    `</div>`)+
    `<div style="display:flex;gap:2px;justify-content:center;border-bottom:1px solid #e6dcd0">`+
-     ((isEv||isExtra)?'':tabBtn('sales','売上'))+tabBtn('expense','経費')+tabBtn('total','総合（MF用）')+
+     ((isEv||isExtra)?'':tabBtn('sales','売上'))+tabBtn('expense','経費')+tabBtn('total',isExtra?'MF出力（この帳簿）':'総合（MF用）')+
    `</div>`+
    `</div>`+
    `<div style="padding:18px 26px 24px 26px;overflow-y:auto;flex:1">`;
@@ -3498,19 +3498,31 @@ function cbShowPreview(){
    const uHojuSum=uni.filter(it=>it.acctName==='普通預金'&&it.order!==-1&&it.inn>0).reduce((s,it)=>s+(it.inn||0),0); // 現金補充
    const uExpSum=uni.filter(it=>!(it.acctName==='普通預金'&&it.out>0)).reduce((s,it)=>s+(it.out||0),0); // 経費（締めの預金振替は除く）
    const inTotal=openSum+uHojuSum+uCashSum+uFuriSum;
-   h+=`<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px"><span style="font-weight:700;color:var(--leaf);font-size:14px">総合（マネーフォワード出力用・通常＋イベント合算）</span><div style="flex:1"></div>`+
+   const exd=cbExtraDef();
+   const mfTitle=exd?`${exd.disp} 経費（マネーフォワード出力用・この帳簿だけ）`:'総合（マネーフォワード出力用・通常＋イベント合算）';
+   const mfDesc=exd
+     ?(exd.mfSub
+       ?`<b>「${exd.disp}」の経費だけ</b>を、マネーフォワードの「現金出納帳」インポート様式（B列開始・勘定科目コード・残高つき）で出力します。部門は「${exd.bumon}」、補助科目（小分類）は「${exd.mfSub}」です（＝MFでは${exd.bumon}に入りつつ、補助科目「${exd.mfSub}」で分けて集計）。${park}の通常の現金出納帳とは別ファイルです。明細は日付順です。`
+       :`<b>「${exd.disp}」の経費だけ</b>を、マネーフォワードの「現金出納帳」インポート様式（B列開始・勘定科目コード・残高つき）で出力します。部門は「${exd.bumon}」で、${park}とは<b>別部門</b>です。<b>${park}のマネーフォワードには合算しません</b>。明細は日付順です。`)
+     :`<b>現金出納帳とイベント出納帳を1つに合算</b>し、売上（タイムリー現金・新規入園振込）と経費（通常＋イベント）をまとめて、マネーフォワードの「現金出納帳」インポート様式（B列開始・勘定科目コード・残高つき）でxlsx出力します。明細は日付順です。`;
+   const mfNote=exd
+     ?(exd.mfSub
+       ?`※ これは「${exd.disp}」専用のExcelです。マネーフォワードでは部門「${exd.bumon}」＋補助科目「${exd.mfSub}」で取り込まれ、${park}本体とは分けて集計できます。`
+       :`※ これは「${exd.disp}」専用のExcelです（部門「${exd.bumon}」）。${park}のマネーフォワードには含めません（別会計として取り込んでください）。`)
+     :`※ マネーフォワードへインポートするのは、この総合タブのExcelです。下の表が、出力されるExcelの中身です（現金出納帳・イベント出納帳どちらのタブから出しても同じ合算ファイルになります）。`;
+   h+=`<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px"><span style="font-weight:700;color:var(--leaf);font-size:14px">${mfTitle}</span><div style="flex:1"></div>`+
      `<button class="btn btn-ghost" style="padding:7px 16px;font-size:13px;border-color:var(--leaf);color:var(--leaf)" onclick="cbExportMF()">📊 マネーフォワード用Excelを出力</button></div>`+
      `<div style="background:#faf6f1;border:1px solid #e6dcd0;border-radius:10px;padding:16px 18px">`+
-       `<p style="font-size:13px;color:#555;margin:0 0 12px"><b>現金出納帳とイベント出納帳を1つに合算</b>し、売上（タイムリー現金・新規入園振込）と経費（通常＋イベント）をまとめて、マネーフォワードの「現金出納帳」インポート様式（B列開始・勘定科目コード・残高つき）でxlsx出力します。明細は日付順です。</p>`+
+       `<p style="font-size:13px;color:#555;margin:0 0 12px">${mfDesc}</p>`+
        `<div style="display:flex;gap:24px;flex-wrap:wrap;font-size:13px">`+
-         `<div><div style="color:#777;font-size:11px">本部振替＋繰越<br>（通常＋イベント）</div><div style="font-weight:700">¥${openSum.toLocaleString()}</div></div>`+
-         `<div><div style="color:#777;font-size:11px">売上（現金）</div><div style="font-weight:700;color:var(--leaf)">¥${uCashSum.toLocaleString()}</div></div>`+
-         `<div><div style="color:#777;font-size:11px">売上（振込）</div><div style="font-weight:700;color:var(--leaf)">¥${uFuriSum.toLocaleString()}</div></div>`+
+         `<div><div style="color:#777;font-size:11px">${exd?'本部から振替（受入）':'本部振替＋繰越<br>（通常＋イベント）'}</div><div style="font-weight:700">¥${openSum.toLocaleString()}</div></div>`+
+         (exd?'':`<div><div style="color:#777;font-size:11px">売上（現金）</div><div style="font-weight:700;color:var(--leaf)">¥${uCashSum.toLocaleString()}</div></div>`+
+         `<div><div style="color:#777;font-size:11px">売上（振込）</div><div style="font-weight:700;color:var(--leaf)">¥${uFuriSum.toLocaleString()}</div></div>`)+
          `<div><div style="color:#777;font-size:11px">入金計</div><div style="font-weight:700">¥${inTotal.toLocaleString()}</div></div>`+
          `<div><div style="color:#777;font-size:11px">出金計（経費）</div><div style="font-weight:700;color:var(--berry)">¥${uExpSum.toLocaleString()}</div></div>`+
        `</div>`+
      `</div>`+
-     `<p style="font-size:12px;color:#999;margin-top:10px">※ マネーフォワードへインポートするのは、この総合タブのExcelです。下の表が、出力されるExcelの中身です（現金出納帳・イベント出納帳どちらのタブから出しても同じ合算ファイルになります）。</p>`;
+     `<p style="font-size:12px;color:#999;margin-top:10px">${mfNote}</p>`;
    // MF出力と同じ中身のプレビュー表
    const mfRows=cbMfRows(cb);
    if(mfRows.length){
