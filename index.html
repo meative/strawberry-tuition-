@@ -3835,7 +3835,16 @@ function addAction(){if(tab==='roster')roster.push({id:roster.length+1,status:'�
    if(__last&&__last.scrollIntoView)__last.scrollIntoView({block:'nearest'});
  });
 }
+// 旧データの口座名義を自動補正（保存済み設定が古い表記でも案内文で正しく表示）。既知の旧値のみ置換するので他の入力は壊さない。
+function fixLegacyBankNames(){
+ try{
+  const fix={'カ)ナンバーナイン':'（カ）ナンバーナイン','ハイアイランド(カ':'ハイアイランド（カ）'};
+  const row=Array.isArray(bank)?bank.find(b=>b&&b.label==='口座名義(カナ)'):null;
+  if(row){ for(const pk in row){ if(pk==='label')continue; if(Object.prototype.hasOwnProperty.call(fix,row[pk])) row[pk]=fix[row[pk]]; } }
+ }catch(e){}
+}
 function render(){
+ fixLegacyBankNames();
  // 案A：再描画（body.innerHTML の作り直し）でスクロール位置が最上部へ飛ぶのを防ぐ。
  //  作り直しの「前」に現在位置を控え、「後」に新しい要素へ復元する。render() を呼ぶ
  //  全箇所（入力ハンドラ・タブ切替・onSnapshot によるクラウド受信など）に一括で効く。
