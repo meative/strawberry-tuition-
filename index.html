@@ -3896,15 +3896,18 @@ function normFurikaeNo(s){
 function exportHokkaidoFurikaeCsv(){
  if(park==='全施設'){ infoDialog('口座振替CSVは園ごとに作成します。\n\n上部の「施設」で対象の園を選んでから出力してください。','園を選んでください'); return; }
  const list=allPupils().filter(r=>r.park===park && !(r.isNew&&!r.confirmed));
- const lines=[]; const noNo=[]; let furikomi=0;
+ const byNo=new Map(); const cntNo=new Map(); const order=[]; const noNo=[]; let furikomi=0;
  list.forEach(r=>{
    const amt=(calc(r).total)||0;
    if(amt<=0) return;                              // 退園・対象外は除外
    if(payMethod(r)==='振込'){ furikomi++; return; }  // 振込は口座振替の対象外
    const no=normFurikaeNo(r.furikaeNo);
    if(!no){ noNo.push(r.name||'(名前未入力)'); return; }
-   lines.push(no+','+amt);
+   // 同じ顧客番号（兄弟など）は1行に合算：道銀の金額ファイルは1顧客番号＝1行が基本
+   if(byNo.has(no)){ byNo.set(no,byNo.get(no)+amt); cntNo.set(no,cntNo.get(no)+1); }
+   else { byNo.set(no,amt); cntNo.set(no,1); order.push(no); }
  });
+ const lines=order.map(no=>no+','+byNo.get(no)); // 顧客番号ごとに1行（初出順・金額は合算済み）
  if(!lines.length){
    const ex=noNo.length?`\n\n※ 引落対象で顧客番号が未入力：${noNo.length}名（${noNo.slice(0,12).join('、')}${noNo.length>12?' ほか':''}）`:'';
    infoDialog(`出力できる引落データがありませんでした。${ex}\n\n園児台帳の「顧客番号」欄と、対象年月・園をご確認ください。`,'出力できません'); return;
@@ -3913,8 +3916,11 @@ function exportHokkaidoFurikaeCsv(){
  const blob=new Blob([body],{type:'text/csv'}); // BOM無し（データは半角数字とカンマのみ）
  const url=URL.createObjectURL(blob);const a=document.createElement('a');
  a.href=url;a.download=`口座振替_北海道銀行_${park}_${yy}年${('0'+mm).slice(-2)}月.csv`;a.click();URL.revokeObjectURL(url);
- const total=lines.reduce((s,l)=>s+(Number(l.split(',')[1])||0),0);
- let msg=`口座振替CSVを出力しました。\n\n・件数：${lines.length}件\n・合計引落額：¥${total.toLocaleString()}\n・形式：顧客番号,引落金額（見出し無し・半角・カンマ区切り）`;
+ const total=order.reduce((s,no)=>s+byNo.get(no),0);
+ const combinedNos=order.filter(no=>cntNo.get(no)>1);
+ const combinedPupils=combinedNos.reduce((s,no)=>s+cntNo.get(no),0);
+ let msg=`口座振替CSVを出力しました。\n\n・口座数（行数）：${lines.length}件\n・合計引落額：¥${total.toLocaleString()}\n・形式：顧客番号,引落金額（見出し無し・半角・カンマ区切り）`;
+ if(combinedNos.length) msg+=`\n\n👨‍👩‍👧 同じ顧客番号を合算：${combinedNos.length}口座（園児${combinedPupils}名分を各1行にまとめました）`;
  if(noNo.length) msg+=`\n\n⚠ 顧客番号が未入力のため除外：${noNo.length}名\n（${noNo.slice(0,12).join('、')}${noNo.length>12?' ほか':''}）\n園児台帳で番号を入れて再出力してください。`;
  if(furikomi) msg+=`\n\n（振込の ${furikomi}名は口座振替の対象外です）`;
  msg+=`\n\n北海道銀行ビジネスWEB「口座振替請求」→「振込データの新規作成」→金額ファイルの取込 で読み込んでください。`;
