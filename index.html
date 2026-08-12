@@ -968,7 +968,7 @@ function _calcCore(p,asNyuenMonth){
    const dispGetsu = isEmployeeC? 0 : getsu_calc;
    const dispKyozai = isEmployeeC? getsu_calc : 0;
    const tesuC = (isEmployeeC && !hasSibling(p)) ? (M.prices[p.waku]||M.prices['地域枠']).tesu : 0;
-   const sub=getsu_calc+evSum;
+   const sub=getsu_calc+sib+evSum; // 兄弟割引(sib)を合計に反映＝月次計算の列合計・実際の請求と一致（旧価格¥15,000は−¥15,000で¥0＋オプション）
    const total=sub+tesuC;
    const flag=(sib!==0)||allOpt.length>0;
    const changed=(sib!==0)||allOpt.length>0; // 兄弟割引・OP・イベントがあれば変動
@@ -1599,6 +1599,7 @@ function renderMonthly(){let rows=visible();
   }else{
     h+=fmt(c.getsu)+fmt(c.kyozai)+fmt(chosei)+fmt(opt)+fmt(c.fee);
   }
+  h+=`<td class="num total">¥${(c.total||0).toLocaleString()}</td>`; // 請求合計（欠落していた列を追加。¥0も明示・ルクミー/CSVと同じ実際の請求額）
   const ri=roster.indexOf(r);
   const payBadge=`<td style="text-align:center"><span style="display:inline-block;padding:3px 9px;border-radius:10px;font-size:11px;font-weight:700;${payMethod(r)==='振込'?'background:var(--berry);color:#fff':'background:var(--paper);color:var(--mut);border:1px solid var(--line)'}">${payMethod(r)}</span></td>`;
   const retryCell=`<td style="text-align:center">${ri>=0?`<input type="checkbox" data-retry="${ri}" ${r.retry?'checked':''} title="引落不能→再請求の対象にする" style="width:17px;height:17px;accent-color:var(--berry);cursor:pointer">`:'—'}</td>`;
