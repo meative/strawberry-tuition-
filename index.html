@@ -381,7 +381,7 @@ tr.changed:hover td{background:color-mix(in srgb,var(--gold) 22%,transparent)!im
  <span class="editbadge" id="editBadge"></span>
 </div>
 <div class="hint" id="hint"></div>
-<div class="foot">STRAWBERRY FIELD Children's Garden ／ ハイアイランド株式会社　—　月謝管理アプリ（方式B連動版）　<span style="display:inline-block;margin-left:8px;padding:2px 10px;border-radius:10px;background:var(--berry);color:#fff;font-weight:700;font-size:11px">更新 2026-08-17（予約ボード名簿ボタン＋給食記録の請求月を翌々月に修正）</span></div>
+<div class="foot">STRAWBERRY FIELD Children's Garden ／ ハイアイランド株式会社　—　月謝管理アプリ（方式B連動版）　<span style="display:inline-block;margin-left:8px;padding:2px 10px;border-radius:10px;background:var(--berry);color:#fff;font-weight:700;font-size:11px">更新 2026-08-17（予約ボード名簿ボタン／給食請求月を翌々月に／園児台帳フリガナ欄）</span></div>
 </div>
 <div id="loginOverlay" style="display:flex;position:fixed;inset:0;z-index:10040;background:linear-gradient(135deg,#7a2540,#3d2030);align-items:center;justify-content:center;padding:20px">
  <div style="background:#fff;border-radius:20px;max-width:380px;width:100%;padding:34px 30px 28px;box-shadow:0 20px 60px rgba(0,0,0,.4);text-align:center;font-family:inherit">
@@ -1290,7 +1290,10 @@ function renderRoster(){const rows=visible();
    `<span id="syncBoardMsg" style="font-size:12.5px;color:var(--mut);margin-left:auto;white-space:nowrap"></span>`+
   '</div>';
  }
- h+='<div class="tablewrap"><table><thead><tr><th style="width:42px;text-align:center">No.</th><th>所属園</th><th>生年月日</th><th>クラス<br><small style="color:var(--mut);font-weight:400;font-size:10px">自動</small></th><th>枠区分</th><th>園児名</th><th>口座名義</th><th>顧客番号<br><small style="color:var(--mut);font-weight:400;font-size:10px">振替用</small></th><th>兄弟</th><th>納入方法</th>'+(showOpt?'<th>オプション（月額・あり/なし）</th>':'')+'<th>退園予定</th><th>連携園</th><th class="r">ルクミーID</th><th></th></tr></thead><tbody>';
+ // フリガナ入力状況（五十音の並びに使用）＝現状確認用
+ const _kanaFilled=baseList.filter(r=>(r.kana||'').trim()).length;
+ h+='<div style="padding:8px 22px;font-size:12px;border-bottom:1px solid var(--line)">フリガナ入力済み：<b style="color:'+((baseList.length&&_kanaFilled===baseList.length)?'var(--leaf)':'var(--berry)')+'">'+_kanaFilled+' / '+baseList.length+'名</b> <span style="color:var(--mut)">（クラス内の五十音・ルクミー合わせの並び替えに使います。未入力の欄は薄い黄色でハイライト）</span></div>';
+ h+='<div class="tablewrap"><table><thead><tr><th style="width:42px;text-align:center">No.</th><th>所属園</th><th>生年月日</th><th>クラス<br><small style="color:var(--mut);font-weight:400;font-size:10px">自動</small></th><th>枠区分</th><th>園児名</th><th>フリガナ<br><small style="color:var(--mut);font-weight:400;font-size:10px">五十音順に使用</small></th><th>口座名義</th><th>顧客番号<br><small style="color:var(--mut);font-weight:400;font-size:10px">振替用</small></th><th>兄弟</th><th>納入方法</th>'+(showOpt?'<th>オプション（月額・あり/なし）</th>':'')+'<th>退園予定</th><th>連携園</th><th class="r">ルクミーID</th><th></th></tr></thead><tbody>';
  rows.forEach((r,idx)=>{const i=roster.indexOf(r);const ed=i>=0;const t=facType(r.park);
   // 生年月日があればクラスを自動計算（プルダウン編集なし）
   const autoCls=r.birth?classByBirth(r.birth,yy):'';
@@ -1313,6 +1316,7 @@ function renderRoster(){const rows=visible();
    `<td><span class="cls" style="${r.birth?'background:#fdf6e9;padding:3px 10px;border-radius:10px;display:inline-block;min-width:64px;text-align:center':''}">${r.cls||'—'}</span></td>`+
    `<td>${ed?`<select class="inp" data-arr2="roster" data-i="${i}" data-f="waku" style="width:auto;padding:4px 8px;font-size:12px;color:var(--berry)">${(facType(r.park)==='C'?['地域枠','企業提携枠','旧企業提携枠','旧地域枠','地域無償化','非課税世帯','従業員(保育士)','従業員(アドバイザー)','従業員(ハイアイランド)','従業員(Number9)','従業員(他園)']:facType(r.park)==='B'?['早割','一般','従業員(保育士)','従業員(Number9)','従業員(ハイアイランド)','従業員(アドバイザー)']:Object.keys(M.prices).concat(['非課税世帯'])).map(w=>`<option ${r.waku===w?'selected':''}>${w}</option>`).join('')}</select>`:`<span class="waku">${r.waku||''}</span>`}</td>`+
    `<td class="name" ${ed?`contenteditable data-arr="roster" data-i="${i}" data-f="name"`:''}>${r.name||''}</td>`+
+   `<td ${ed?`contenteditable data-arr="roster" data-i="${i}" data-f="kana"`:''} style="font-size:12px;color:var(--mut)${((r.kana||'').trim()||!ed)?'':';background:#fff8e1'}" title="フリガナ（カタカナ推奨・例：ヤマダ タロウ）。クラス内の五十音（ルクミー合わせ）の並びに使います">${r.kana||''}</td>`+
    `<td class="koza" ${ed?`contenteditable data-arr="roster" data-i="${i}" data-f="koza"`:''}>${r.koza||''}</td>`+
    `<td ${ed?`contenteditable data-arr="roster" data-i="${i}" data-f="furikaeNo"`:''} style="font-size:12px;color:var(--mut);font-family:'Spline Sans Mono',monospace" title="北海道銀行の口座振替 顧客番号（半角数字）">${r.furikaeNo||''}</td>`+
    `<td>${ed?`<select data-sib="${i}" class="inp" style="width:auto;padding:4px 8px;font-size:12px;color:${r.sib==='あり'?'var(--berry)':'var(--mut)'}"><option ${r.sib!=='あり'?'selected':''}>なし</option><option ${r.sib==='あり'?'selected':''}>あり</option></select>`:(r.sib||'なし')}</td>`+
