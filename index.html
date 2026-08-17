@@ -1138,17 +1138,6 @@ function renderSettings(){
    `</div>`+
    `<div style="font-size:12px;color:var(--mut);margin-top:10px;line-height:1.7">・「書き出し」で、データをファイルに保存できます（他のPC・iPadへの受け渡しや、万一に備えたバックアップ用）。<br>・「読み込み」で、書き出したファイルを取り込めます（今ある内容は上書きされます）。</div>`+
  `</div>`;
- // 予約ボード連携（延長保育ボードの幼稚舎名簿ミラーを更新）本部/幼稚舎のみ表示
- // ※IS_HONBU/CURRENT_GARDEN は後方でlet 宣言のため、初期描画時のTDZをtry/catchで安全化
- let _canSyncBoard=false;
- try{ _canSyncBoard=((IS_HONBU===true)||(CURRENT_GARDEN==='youchisha')); }catch(_e){ _canSyncBoard=false; }
- if(_canSyncBoard){
-   h+='<div class="setblock" style="background:var(--berrysoft);border:1.5px solid var(--berry);border-radius:14px;padding:18px"><h3 style="color:var(--berry);border-color:var(--berry)">📅 予約ボード連携（延長保育ボード）</h3>'+
-     `<div style="font-size:13px;color:var(--ink);line-height:1.8;margin-bottom:12px">延長保育ボード（早朝/夕）に表示する<b>幼稚舎の園児名簿</b>を、いまの幼稚舎の在籍データから更新します。園児を追加したり「連携園」を変更したら、このボタンで反映してください。<br><span style="color:var(--mut)">※ 予約データには触れません。いまボードに出ている名前は消えません（追加のみ）。</span></div>`+
-     `<button id="btnSyncBoard" class="btn btn-primary" style="padding:8px 18px;font-size:13px">📅 予約ボードの名簿を更新</button>`+
-     `<span id="syncBoardMsg" style="margin-left:12px;font-size:12.5px;color:var(--mut)"></span>`+
-   `</div>`;
- }
  // 管理者用暗証番号
  h+='<div class="setblock"><h3>🔐 管理者用暗証番号</h3>'+
    `<div style="font-size:13px;color:var(--ink);line-height:1.8;margin-bottom:12px">担当者の追加・削除、ログインパスワードの変更などの管理操作に使う暗証番号（4桁）です。</div>`+
@@ -1242,8 +1231,6 @@ function renderSettings(){
  if(bi&&fi){bi.onclick=()=>fi.click();fi.onchange=e=>{if(e.target.files&&e.target.files[0])importBackup(e.target.files[0]);e.target.value='';};}
  // 管理者用暗証番号の変更
  const bp=document.getElementById('btnChangePin');if(bp)bp.onclick=changePinDialog;
- // 予約ボードの名簿を更新
- const bsb=document.getElementById('btnSyncBoard');if(bsb)bsb.onclick=syncBoardRoster;
  // 編集ハンドラ
  document.querySelectorAll('[data-bank]').forEach(el=>{el.onblur=e=>{const i=+e.target.dataset.bank,pk=e.target.dataset.pk;bank[i][pk]=e.target.textContent.trim();saveState();};});
  document.querySelectorAll('[data-param]').forEach(el=>{el.onchange=e=>{M[e.target.dataset.param]=+e.target.value;render();};});
@@ -1295,6 +1282,14 @@ function renderRoster(){const rows=visible();
    availCls.map(c=>`<button data-cls="${c}" style="padding:6px 14px;border:1px solid ${clsFilter===c?'var(--leaf)':'var(--line)'};background:${clsFilter===c?'var(--leaf)':'var(--paper)'};color:${clsFilter===c?'#fff':'var(--ink)'};border-radius:18px;font-size:12px;cursor:pointer;font-family:inherit">${c} <span style="opacity:.75">${clsCount[c]}名</span></button>`).join('')+
    '</div>';
  }
+ // 予約ボード連携：幼稚舎の台帳にだけ「名簿更新」ボタンを表示（連携園を編集するこのページに設置）
+ if(park==='幼稚舎'){
+  h+='<div style="padding:12px 22px;border-bottom:1px solid var(--line);display:flex;gap:12px;align-items:center;flex-wrap:wrap;background:var(--berrysoft)">'+
+   `<button id="btnSyncBoard" class="btn btn-primary" style="padding:7px 16px;font-size:13px;white-space:nowrap">📅 予約ボードの名簿を更新</button>`+
+   `<span style="font-size:12px;color:var(--mut);line-height:1.6">「連携園」を変えたり園児を追加したら、これを押すと延長保育ボードに反映されます（予約データには触れません／今出ている名前は消えません）。</span>`+
+   `<span id="syncBoardMsg" style="font-size:12.5px;color:var(--mut);margin-left:auto;white-space:nowrap"></span>`+
+  '</div>';
+ }
  h+='<div class="tablewrap"><table><thead><tr><th style="width:42px;text-align:center">No.</th><th>所属園</th><th>生年月日</th><th>クラス<br><small style="color:var(--mut);font-weight:400;font-size:10px">自動</small></th><th>枠区分</th><th>園児名</th><th>口座名義</th><th>顧客番号<br><small style="color:var(--mut);font-weight:400;font-size:10px">振替用</small></th><th>兄弟</th><th>納入方法</th>'+(showOpt?'<th>オプション（月額・あり/なし）</th>':'')+'<th>退園予定</th><th>連携園</th><th class="r">ルクミーID</th><th></th></tr></thead><tbody>';
  rows.forEach((r,idx)=>{const i=roster.indexOf(r);const ed=i>=0;const t=facType(r.park);
   // 生年月日があればクラスを自動計算（プルダウン編集なし）
@@ -1328,6 +1323,7 @@ function renderRoster(){const rows=visible();
    `<td>${ed?`<button data-pupildel="${i}" title="この園児を削除" style="background:none;border:1px solid var(--line);border-radius:8px;color:var(--berry);cursor:pointer;font-size:13px;padding:5px 10px">削除</button>`:''}</td></tr>`;});
  h+='</tbody></table></div>';
  document.getElementById('body').innerHTML=h;bindEdit();
+ const bsb=document.getElementById('btnSyncBoard');if(bsb)bsb.onclick=syncBoardRoster;
  // 兄弟プルダウン
  document.querySelectorAll('[data-sort]').forEach(el=>{el.onclick=e=>{sortMode=e.currentTarget.dataset.sort;render();};});
  document.querySelectorAll('[data-waku]').forEach(el=>{el.onclick=e=>{wakuFilter=e.currentTarget.dataset.waku;render();};});
