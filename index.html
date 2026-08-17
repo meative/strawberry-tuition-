@@ -330,7 +330,7 @@ tr.changed:hover td{background:color-mix(in srgb,var(--gold) 22%,transparent)!im
 <div class="app">
 <header>
  <div class="brand"><h1>STRAWBERRY FIELD 月謝管理</h1>
-  <div class="tagline">Multi-Garden Tuition System　<span style="display:inline-block;padding:1px 8px;border-radius:8px;background:var(--berry);color:#fff;font-weight:700;font-size:10px;letter-spacing:.02em;vertical-align:middle">更新 2026-08-12</span></div></div>
+  <div class="tagline">Multi-Garden Tuition System　<span style="display:inline-block;padding:1px 8px;border-radius:8px;background:var(--berry);color:#fff;font-weight:700;font-size:10px;letter-spacing:.02em;vertical-align:middle">更新 2026-08-17</span></div></div>
  <div class="theme-tog" id="themeTog"></div>
 </header>
 <div class="controls">
@@ -381,7 +381,7 @@ tr.changed:hover td{background:color-mix(in srgb,var(--gold) 22%,transparent)!im
  <span class="editbadge" id="editBadge"></span>
 </div>
 <div class="hint" id="hint"></div>
-<div class="foot">STRAWBERRY FIELD Children's Garden ／ ハイアイランド株式会社　—　月謝管理アプリ（方式B連動版）　<span style="display:inline-block;margin-left:8px;padding:2px 10px;border-radius:10px;background:var(--berry);color:#fff;font-weight:700;font-size:11px">更新 2026-08-12（早朝延長・兄弟割修正）</span></div>
+<div class="foot">STRAWBERRY FIELD Children's Garden ／ ハイアイランド株式会社　—　月謝管理アプリ（方式B連動版）　<span style="display:inline-block;margin-left:8px;padding:2px 10px;border-radius:10px;background:var(--berry);color:#fff;font-weight:700;font-size:11px">更新 2026-08-17（予約ボード名簿の更新ボタン追加）</span></div>
 </div>
 <div id="loginOverlay" style="display:flex;position:fixed;inset:0;z-index:10040;background:linear-gradient(135deg,#7a2540,#3d2030);align-items:center;justify-content:center;padding:20px">
  <div style="background:#fff;border-radius:20px;max-width:380px;width:100%;padding:34px 30px 28px;box-shadow:0 20px 60px rgba(0,0,0,.4);text-align:center;font-family:inherit">
@@ -1083,6 +1083,47 @@ function bindEdit(){document.querySelectorAll('[contenteditable]').forEach(el=>{
   render();};
  el.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();e.target.blur();}};});}
 
+// 予約ボード（延長保育）の幼稚舎名簿ミラーを、いまの幼稚舎在籍から再生成する。
+// 触るのは kindergarten_public/roster（表示用ミラー）のみ。予約データ・園児データには触れない。
+// 現ミラーの名前は消さずUNION（追加のみ）。人数0なら中止。本部/幼稚舎ログイン時のみボタン表示。
+async function syncBoardRoster(){
+ const btn=document.getElementById('btnSyncBoard');const msg=document.getElementById('syncBoardMsg');
+ const setMsg=(t,c)=>{if(msg){msg.textContent=t;msg.style.color=c||'var(--mut)';}};
+ if(!cloudDB){alert('クラウドに接続されていません。ログインし直してください。');return;}
+ const NM={tsukisamu:'月寒',shiraishi:'白石',factory:'サッポロファクトリー',shiseikan:'資生館'};
+ try{
+  if(btn)btn.disabled=true; setMsg('読み込み中…');
+  const snap=await cloudDB.collection('gardens').doc('youchisha').get();
+  if(!snap.exists){ setMsg('幼稚舎の名簿が読めませんでした（本部または幼稚舎でログインしてください）','var(--berry)'); return; }
+  const doc=snap.data()||{}; let payload=doc.payload;
+  if(typeof payload==='string'){ try{payload=JSON.parse(payload);}catch(e){ setMsg('名簿データの解析に失敗しました','var(--berry)'); return; } }
+  const rosterArr=(payload&&Array.isArray(payload.roster))?payload.roster:null;
+  if(!rosterArr){ setMsg('名簿を取得できませんでした','var(--berry)'); return; }
+  const withLink=[],noLink=[];
+  rosterArr.forEach(p=>{ if(!p||!p.name)return; const nm=String(p.name).trim(); if(!nm)return; if(p.linkPark&&NM[p.linkPark])withLink.push({name:nm,linkPark:p.linkPark}); else noLink.push(nm); });
+  const cur=await cloudDB.collection('kindergarten_public').doc('roster').get();
+  const curPupils=(cur.exists&&Array.isArray(cur.data().pupils))?cur.data().pupils:[];
+  const map=new Map();
+  withLink.forEach(p=>map.set(p.name,{name:p.name,linkPark:p.linkPark}));
+  curPupils.forEach(cp=>{ const nm=String((cp&&cp.name)||'').trim(); if(nm&&!map.has(nm)){ map.set(nm,{name:nm,linkPark:(cp.linkPark||'')}); } });
+  const finalPupils=[...map.values()];
+  const curNames=new Set(curPupils.map(p=>String((p&&p.name)||'').trim()));
+  const added=finalPupils.filter(p=>!curNames.has(p.name)).map(p=>p.name+'（'+(NM[p.linkPark]||'未設定')+'）');
+  if(finalPupils.length===0){ setMsg('人数が0のため中止しました（誤消去防止）','var(--berry)'); return; }
+  let cm='予約ボードの名簿を更新します。\n\n合計 '+finalPupils.length+'名';
+  cm+= added.length? ('\n\n新しく追加：'+added.length+'名\n・'+added.join('\n・')) : '\n\n（追加なし＝すでに最新です）';
+  if(noLink.length) cm+='\n\n⚠ 連携園が未設定でボードに出せない子：'+noLink.length+'名\n・'+noLink.join('\n・')+'\n（園児台帳で「連携園」を設定すると次回から載ります）';
+  cm+='\n\nよろしいですか？';
+  if(!confirm(cm)){ setMsg('キャンセルしました'); return; }
+  setMsg('更新中…');
+  await cloudDB.collection('kindergarten_public').doc('roster').set({
+   updatedBy:'tuition-app-button', updatedAt:firebase.firestore.FieldValue.serverTimestamp(),
+   pupils:finalPupils, count:finalPupils.length
+  });
+  setMsg('✅ 更新しました（'+finalPupils.length+'名'+(added.length?'／追加'+added.length+'名':'')+'）。予約ボードを開いて再読込してください。','var(--leaf)');
+ }catch(e){ setMsg('エラー：'+((e&&e.message)?e.message:e),'var(--berry)'); }
+ finally{ if(btn)btn.disabled=false; }
+}
 function renderSettings(){
  let h='<div class="setgrid">';
  // データ保存・バックアップ
@@ -1097,6 +1138,17 @@ function renderSettings(){
    `</div>`+
    `<div style="font-size:12px;color:var(--mut);margin-top:10px;line-height:1.7">・「書き出し」で、データをファイルに保存できます（他のPC・iPadへの受け渡しや、万一に備えたバックアップ用）。<br>・「読み込み」で、書き出したファイルを取り込めます（今ある内容は上書きされます）。</div>`+
  `</div>`;
+ // 予約ボード連携（延長保育ボードの幼稚舎名簿ミラーを更新）本部/幼稚舎のみ表示
+ // ※IS_HONBU/CURRENT_GARDEN は後方でlet 宣言のため、初期描画時のTDZをtry/catchで安全化
+ let _canSyncBoard=false;
+ try{ _canSyncBoard=((IS_HONBU===true)||(CURRENT_GARDEN==='youchisha')); }catch(_e){ _canSyncBoard=false; }
+ if(_canSyncBoard){
+   h+='<div class="setblock" style="background:var(--berrysoft);border:1.5px solid var(--berry);border-radius:14px;padding:18px"><h3 style="color:var(--berry);border-color:var(--berry)">📅 予約ボード連携（延長保育ボード）</h3>'+
+     `<div style="font-size:13px;color:var(--ink);line-height:1.8;margin-bottom:12px">延長保育ボード（早朝/夕）に表示する<b>幼稚舎の園児名簿</b>を、いまの幼稚舎の在籍データから更新します。園児を追加したり「連携園」を変更したら、このボタンで反映してください。<br><span style="color:var(--mut)">※ 予約データには触れません。いまボードに出ている名前は消えません（追加のみ）。</span></div>`+
+     `<button id="btnSyncBoard" class="btn btn-primary" style="padding:8px 18px;font-size:13px">📅 予約ボードの名簿を更新</button>`+
+     `<span id="syncBoardMsg" style="margin-left:12px;font-size:12.5px;color:var(--mut)"></span>`+
+   `</div>`;
+ }
  // 管理者用暗証番号
  h+='<div class="setblock"><h3>🔐 管理者用暗証番号</h3>'+
    `<div style="font-size:13px;color:var(--ink);line-height:1.8;margin-bottom:12px">担当者の追加・削除、ログインパスワードの変更などの管理操作に使う暗証番号（4桁）です。</div>`+
@@ -1190,6 +1242,8 @@ function renderSettings(){
  if(bi&&fi){bi.onclick=()=>fi.click();fi.onchange=e=>{if(e.target.files&&e.target.files[0])importBackup(e.target.files[0]);e.target.value='';};}
  // 管理者用暗証番号の変更
  const bp=document.getElementById('btnChangePin');if(bp)bp.onclick=changePinDialog;
+ // 予約ボードの名簿を更新
+ const bsb=document.getElementById('btnSyncBoard');if(bsb)bsb.onclick=syncBoardRoster;
  // 編集ハンドラ
  document.querySelectorAll('[data-bank]').forEach(el=>{el.onblur=e=>{const i=+e.target.dataset.bank,pk=e.target.dataset.pk;bank[i][pk]=e.target.textContent.trim();saveState();};});
  document.querySelectorAll('[data-param]').forEach(el=>{el.onchange=e=>{M[e.target.dataset.param]=+e.target.value;render();};});
