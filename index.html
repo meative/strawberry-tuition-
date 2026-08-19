@@ -381,7 +381,7 @@ tr.changed:hover td{background:color-mix(in srgb,var(--gold) 22%,transparent)!im
  <span class="editbadge" id="editBadge"></span>
 </div>
 <div class="hint" id="hint"></div>
-<div class="foot">STRAWBERRY FIELD Children's Garden ／ ハイアイランド株式会社　—　月謝管理アプリ（方式B連動版）　<span style="display:inline-block;margin-left:8px;padding:2px 10px;border-radius:10px;background:var(--berry);color:#fff;font-weight:700;font-size:11px">更新 2026-08-17（予約ボード名簿／給食請求月／園児台帳フリガナ欄＋クラス順を五十音）</span></div>
+<div class="foot">STRAWBERRY FIELD Children's Garden ／ ハイアイランド株式会社　—　月謝管理アプリ（方式B連動版）　<span style="display:inline-block;margin-left:8px;padding:2px 10px;border-radius:10px;background:var(--berry);color:#fff;font-weight:700;font-size:11px">更新 2026-08-17（フリガナ五十音／給食請求月／xlsx金額を3桁カンマ表示 ほか）</span></div>
 </div>
 <div id="loginOverlay" style="display:flex;position:fixed;inset:0;z-index:10040;background:linear-gradient(135deg,#7a2540,#3d2030);align-items:center;justify-content:center;padding:20px">
  <div style="background:#fff;border-radius:20px;max-width:380px;width:100%;padding:34px 30px 28px;box-shadow:0 20px 60px rgba(0,0,0,.4);text-align:center;font-family:inherit">
@@ -3937,7 +3937,12 @@ function render(){
 // xlsx出力（全シート）
 function exportXlsx(){
  if(!libReady('xlsx')){ withLib('xlsx',()=>exportXlsx()); return; }
- const wb=XLSX.utils.book_new();const add=(n,a)=>XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(a),n);
+ const wb=XLSX.utils.book_new();
+ // money=金額列（0始まり）のインデックス配列。該当列の数値セルだけ 3桁カンマ表示（#,##0）にする。値は数値のまま（合計計算OK）。ID・顧客番号・年月には付けない。
+ const add=(n,a,money)=>{const ws=XLSX.utils.aoa_to_sheet(a);
+  if(money&&money.length&&ws['!ref']){const rng=XLSX.utils.decode_range(ws['!ref']);
+   for(let R=rng.s.r;R<=rng.e.r;R++)money.forEach(C=>{const cell=ws[XLSX.utils.encode_cell({r:R,c:C})];if(cell&&cell.t==='n')cell.z='#,##0';});}
+  XLSX.utils.book_append_sheet(wb,ws,n);};
  const ros=[['ID','ステータス','枠区分','クラス','園児名','兄弟有(下子)','口座名義','顧客番号','ルクミー園児ID','入園年月日','所属園','マットレス','バス','おむつサブスク','制服ﾚﾝﾀﾙ:ニット','制服ﾚﾝﾀﾙ:キャップ','制服ﾚﾝﾀﾙ:パーカー']];
  const yn=v=>v?'あり':'';
  allPupils().forEach((r,i)=>ros.push([i+1,r.status,r.waku,r.cls,r.name,r.sib,r.koza,r.furikaeNo||'',r.lid,r.nyuen,r.park,yn(r.optMattress),yn(r.optBus),yn(r.optDiaper),yn(r.optKnit),yn(r.optCap),yn(r.optParka)]));add('園児台帳',ros);
@@ -3945,14 +3950,14 @@ function exportXlsx(){
  const mT={getsu:0,kyozai:0,sib:0,half:0,early:0,ev:0,fee:0,total:0,net:0};
  visible().forEach(r=>{const c=calc(r);const chg=changesFor(r);const net=feeExcl(c);m.push([r.park,r.cls,r.waku,r.name,c.getsu,c.kyozai,c.sib,c.half,c.early||0,c.evSum,c.fee,c.total,net,chg.length?'変動':'',chg.length?chg.map(x=>x.label).join('、'):(c.flag?c.reason:'')]);mT.getsu+=c.getsu||0;mT.kyozai+=c.kyozai||0;mT.sib+=c.sib||0;mT.half+=c.half||0;mT.early+=c.early||0;mT.ev+=c.evSum||0;mT.fee+=c.fee||0;mT.total+=c.total||0;mT.net+=net;});
  m.push([]);m.push(['合計','','','',mT.getsu,mT.kyozai,mT.sib,mT.half,mT.early,mT.ev,mT.fee,mT.total,mT.net,'','']);
- add('月次計算',m);
+ add('月次計算',m,[4,5,6,7,8,9,10,11,12]);
  const l=[['園児ID','クラス','園児名','月極保育料金名称','単価','オプション名称1','オプション小計1','請求金額','変動']];
- visible().filter(r=>(r.status==='在園中'||calc(r).isNew)&&!taienStopped(r)).forEach(r=>{const c=calc(r);const base=c.getsu+c.kyozai+c.sib+c.half+(c.early||0);const e0=c.evs[0];const chg=changesFor(r);l.push([r.lid,r.cls,r.name,'月謝（'+r.waku+'）',base,e0?e0.item:'',e0?e0.amt:'',c.total,chg.length?'変動':'']);});add('ルクミー出力',l);
- const hq=[['施設','在園数','請求合計','うち月謝系','うち制服代','うち行事/その他']];let gt=0,gc=0;['月寒園','白石園','サッポロファクトリー園','幼稚舎','資生館保育園'].forEach(p=>{let cnt=0,tot=0,base=0,uni=0,ev=0;allPupils().filter(r=>r.park===p).forEach(r=>{const c=calc(r);if((r.status==='在園中'||c.isNew)&&!c.taienStopped){cnt++;tot+=c.total;base+=c.getsu+c.kyozai+c.sib+c.half+(c.early||0)+c.fee;c.evs.forEach(e=>{if(isUniform(e.item))uni+=e.amt;else ev+=e.amt;});}});gt+=tot;gc+=cnt;hq.push([p,cnt,tot,base,uni,ev]);});hq.push(['全施設合計',gc,gt,'','','']);add('本部用集計',hq);
+ visible().filter(r=>(r.status==='在園中'||calc(r).isNew)&&!taienStopped(r)).forEach(r=>{const c=calc(r);const base=c.getsu+c.kyozai+c.sib+c.half+(c.early||0);const e0=c.evs[0];const chg=changesFor(r);l.push([r.lid,r.cls,r.name,'月謝（'+r.waku+'）',base,e0?e0.item:'',e0?e0.amt:'',c.total,chg.length?'変動':'']);});add('ルクミー出力',l,[4,6,7]);
+ const hq=[['施設','在園数','請求合計','うち月謝系','うち制服代','うち行事/その他']];let gt=0,gc=0;['月寒園','白石園','サッポロファクトリー園','幼稚舎','資生館保育園'].forEach(p=>{let cnt=0,tot=0,base=0,uni=0,ev=0;allPupils().filter(r=>r.park===p).forEach(r=>{const c=calc(r);if((r.status==='在園中'||c.isNew)&&!c.taienStopped){cnt++;tot+=c.total;base+=c.getsu+c.kyozai+c.sib+c.half+(c.early||0)+c.fee;c.evs.forEach(e=>{if(isUniform(e.item))uni+=e.amt;else ev+=e.amt;});}});gt+=tot;gc+=cnt;hq.push([p,cnt,tot,base,uni,ev]);});hq.push(['全施設合計',gc,gt,'','','']);add('本部用集計',hq,[2,3,4,5]);
  const nw=[['状態','所属園','園児名','フリガナ','枠区分','クラス','口座名義','入園年月日']];roster.filter(r=>r.isNew).sort((a,b)=>(a.regSeq||0)-(b.regSeq||0)).forEach(n=>nw.push([n.confirmed?'確定済':'未確定',n.park,n.name,n.kana||'',n.waku,n.cls,n.koza,n.nyuen]));add('新規入園',nw);
- const ad=[['園児名','商品/項目','サイズ','数量','単価','小計','反映年','反映月']];addons.forEach(a=>ad.push([a.name,a.goods,a.size,a.qty,a.price,(a.price||0)*(a.qty||0),a.ry,a.rm]));add('追加申込み',ad);
- const ml=[['日付','園児名','昼食','パン','金額']];meals.forEach(r=>ml.push([r.date,r.name,r.lunch?'○':'',r.bread?'○':'',(r.lunch?M.mealfee.lunch:0)+(r.bread?M.mealfee.bread:0)]));add('給食記録',ml);
- const sc=[['年','月','項目','対象','個別園児','金額','状態']];sched.forEach(s=>sc.push([s.year,s.month,s.item,s.cls,s.pupil||'',s.fix||0,s.state]));add('年間スケジュール',sc);
+ const ad=[['園児名','商品/項目','サイズ','数量','単価','小計','反映年','反映月']];addons.forEach(a=>ad.push([a.name,a.goods,a.size,a.qty,a.price,(a.price||0)*(a.qty||0),a.ry,a.rm]));add('追加申込み',ad,[4,5]);
+ const ml=[['日付','園児名','昼食','パン','金額']];meals.forEach(r=>ml.push([r.date,r.name,r.lunch?'○':'',r.bread?'○':'',(r.lunch?M.mealfee.lunch:0)+(r.bread?M.mealfee.bread:0)]));add('給食記録',ml,[4]);
+ const sc=[['年','月','項目','対象','個別園児','金額','状態']];sched.forEach(s=>sc.push([s.year,s.month,s.item,s.cls,s.pupil||'',s.fix||0,s.state]));add('年間スケジュール',sc,[5]);
  const FACS=['月寒園','白石園','サッポロファクトリー園','幼稚舎','資生館保育園'];
  const bk=[['項目',...FACS]];bank.forEach(b=>bk.push([b.label,...FACS.map(f=>b[f]||'')]));add('設定_振込先',bk);
  XLSX.writeFile(wb,`月謝管理_${yy}-${('0'+mm).slice(-2)}_${park}.xlsx`);
