@@ -1360,6 +1360,18 @@ function renderRoster(){const rows=visible();
   :'青字セルとオプションのチェックを編集すると、月次計算・ルクミー出力・本部集計が自動再計算されます。園児の追加は「新規入園」タブから。削除は各行の「削除」ボタンから行えます。';
  setCard('園児台帳',`${rows.length}件 ／ ${park}`,note,'none');
 }
+// 品目マスターの検索。同名でも園ごとに単価が違う品目（例：キャップ 資生館¥2,000／他園¥3,850）があるため、
+// その園で使える方を優先して返す。園指定なし・該当なしのときは従来どおり名前だけで検索。
+function findGoods(name,parkName){
+ if(!name)return null;
+ const list=M.goods.filter(x=>x.name===name);
+ if(!list.length)return null;
+ if(parkName){
+  const hit=list.find(x=>Array.isArray(x.facs)&&x.facs.includes(parkName));
+  if(hit)return hit;
+ }
+ return list[0];
+}
 function initOptsSum(n){ // 新規入園の初回オプション合計
  if(!n.initOpts)return 0;
  return n.initOpts.reduce((s,o)=>s+(Number(o.price)||0)*(Number(o.qty)||0),0);
@@ -1457,7 +1469,7 @@ function renderNew(){
     const sub=(Number(o.price)||0)*(Number(o.qty)||0);
     const goodsOptions=`<option value="">（選択）</option>`+(n.park==='資生館保育園'?goodsList.filter(g=>Array.isArray(g.facs)&&g.facs.includes('資生館保育園')):goodsList).map(g=>`<option value="${g.name}" ${o.goods===g.name&&!o.custom?'selected':''}>${g.cat}：${g.name}（¥${g.price.toLocaleString()}）</option>`).join('')+`<option value="__custom" ${o.custom?'selected':''}>その他（自由入力）</option>`;
     // 選んだ商品のサイズ配列を取得（自由入力時は空）
-    const g=o.custom?null:M.goods.find(x=>x.name===o.goods);
+    const g=o.custom?null:findGoods(o.goods,n.park);
     const sizes=(g&&g.sizes)?g.sizes:[];
     // サイズセル：選択肢の数で表示を切替（追加申込みと同じロジック）
     let sizeCell;
@@ -1510,7 +1522,7 @@ function renderNew(){
      if(of==='sel'){const v=e.target.value;
        if(v==='__custom'){o.custom=true;o.goods='';o.price=0;o.size='';}
        else if(v===''){o.goods='';o.price=0;o.size='';}
-       else{const g=M.goods.find(x=>x.name===v);o.custom=false;o.goods=v;
+       else{const g=findGoods(v,roster[i].park);o.custom=false;o.goods=v;
          if(g){o.price=g.price;const sz=(g.sizes&&g.sizes.length>0)?g.sizes[0]:'';o.size=sz;}
        }
        render();
@@ -1539,7 +1551,7 @@ function renderAddon(){
  const refundItems=['おむつ代','バス代','給食費','教材費','制服代','イベント費','その他'];
  addons.forEach((a,i)=>{const isRefund=a.kind==='返金';
   const qty=a.qty||1;const rawSub=(a.price||0)*qty;const sub=isRefund?-Math.abs(rawSub):rawSub;
-  const g=M.goods.find(x=>x.name===a.goods);
+  const g=findGoods(a.goods,(allPupils().find(pp=>pp.name===a.name)||{}).park||(park!=='全施設'?park:''));
   const sizes=(g&&g.sizes)?g.sizes:[];
   let pupilOpts=allPupils();
   if(park!=='全施設')pupilOpts=pupilOpts.filter(p=>p.park===park);
@@ -1601,7 +1613,7 @@ function renderAddon(){
      else{addons[i].custom=false;addons[i].goods=v;}
    }else if(f==='customgoods'){addons[i].goods=v;}
    else addons[i][f]=v;
-   if(f==='goods'&&addons[i].kind!=='返金'){const g=M.goods.find(x=>x.name===v);
+   if(f==='goods'&&addons[i].kind!=='返金'){const _ap=(allPupils().find(pp=>pp.name===addons[i].name)||{}).park||(park!=='全施設'?park:'');const g=findGoods(v,_ap);
      addons[i].price=g?g.price:0;
      const sizes=(g&&g.sizes)?g.sizes:[];
      addons[i].size=sizes.length?sizes[0]:'';
