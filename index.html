@@ -381,7 +381,7 @@ tr.changed:hover td{background:color-mix(in srgb,var(--gold) 22%,transparent)!im
  <span class="editbadge" id="editBadge"></span>
 </div>
 <div class="hint" id="hint"></div>
-<div class="foot">STRAWBERRY FIELD Children's Garden ／ ハイアイランド株式会社　—　月謝管理アプリ（方式B連動版）　<span style="display:inline-block;margin-left:8px;padding:2px 10px;border-radius:10px;background:var(--berry);color:#fff;font-weight:700;font-size:11px">更新 2026-08-24（振込期限を手動変更可・初回案内の内訳を園別に整理・資生館キャップ¥2,500）</span></div>
+<div class="foot">STRAWBERRY FIELD Children's Garden ／ ハイアイランド株式会社　—　月謝管理アプリ（方式B連動版）　<span style="display:inline-block;margin-left:8px;padding:2px 10px;border-radius:10px;background:var(--berry);color:#fff;font-weight:700;font-size:11px">更新 2026-08-25（内訳にマイナス金額も表示・初回オプションをワンクリック追加）</span></div>
 </div>
 <div id="loginOverlay" style="display:flex;position:fixed;inset:0;z-index:10040;background:linear-gradient(135deg,#7a2540,#3d2030);align-items:center;justify-content:center;padding:20px">
  <div style="background:#fff;border-radius:20px;max-width:380px;width:100%;padding:34px 30px 28px;box-shadow:0 20px 60px rgba(0,0,0,.4);text-align:center;font-family:inherit">
@@ -1464,6 +1464,17 @@ function renderNew(){
   if(isOpen){
    h+=`<div style="background:var(--panel2);padding:16px 18px;border-top:1px solid var(--line)">`+
      `<div style="font-size:13px;color:var(--berry);font-weight:600;margin-bottom:10px">${n.name||'（園児名未入力）'} さんの初回オプション（制服・マット・おむつ等）</div>`+
+     // ワンクリック追加：ボタンを押すだけで「項目＋単価」が入った行が増える（選択と金額入力の手間をなくす）
+     (()=>{const pick=(n.park==='資生館保育園')?goodsList.filter(g=>Array.isArray(g.facs)&&g.facs.includes('資生館保育園')):goodsList;
+       const chip='border:1px solid var(--line);border-radius:14px;background:var(--paper);color:var(--ink);cursor:pointer;font-size:12px;padding:5px 12px;font-family:inherit';
+       return `<div style="margin-bottom:10px;display:flex;gap:6px;flex-wrap:wrap;align-items:center">`+
+         `<span style="font-size:11px;color:var(--mut);margin-right:2px">クリックで追加：</span>`+
+         pick.filter(g=>(Number(g.price)||0)>0).map(g=>`<button data-qadd="${i}" data-qname="${(g.name||'').replace(/"/g,'&quot;')}" style="${chip}">${g.name} <span style="color:var(--mut)">¥${(g.price||0).toLocaleString()}</span></button>`).join('')+
+         `<button data-qsib="${i}" style="${chip};border-color:var(--berry);color:var(--berry)">兄弟割引 −¥${(M.sibling||0).toLocaleString()}</button>`+
+         `<button data-qminus="${i}" style="${chip};border-color:var(--berry);color:var(--berry)">相殺・値引き（マイナス）</button>`+
+         `<button data-qcustom="${i}" style="${chip}">自由入力</button>`+
+         ((n.initOpts||[]).length?`<button data-qclear="${i}" style="${chip};margin-left:auto;color:var(--berry)">すべて削除</button>`:'')+
+       `</div>`;})()+
      `<div style="overflow-x:auto"><table style="width:100%;font-size:13px;min-width:520px"><thead><tr style="color:var(--mut);text-align:left"><th style="padding:4px 8px">項目</th><th style="padding:4px 8px">サイズ</th><th style="padding:4px 8px;text-align:right">単価</th><th style="padding:4px 8px;text-align:right">数量</th><th style="padding:4px 8px;text-align:right">小計</th><th></th></tr></thead><tbody>`;
    (n.initOpts||[]).forEach((o,oi)=>{
     const sub=(Number(o.price)||0)*(Number(o.qty)||0);
@@ -1516,6 +1527,28 @@ function renderNew(){
  // オプション項目の削除
  document.querySelectorAll('[data-ioptdel]').forEach(el=>{el.onclick=e=>{const i=+e.currentTarget.dataset.ioptdel,oi=+e.currentTarget.dataset.oi;
    roster[i].initOpts.splice(oi,1);render();};});
+ // ワンクリック追加（品目ボタン）：品目名から、その園の単価・サイズを入れて1行追加
+ document.querySelectorAll('[data-qadd]').forEach(el=>{el.onclick=e=>{const i=+e.currentTarget.dataset.qadd,nm=e.currentTarget.dataset.qname;
+   if(!roster[i].initOpts)roster[i].initOpts=[];
+   const g=findGoods(nm,roster[i].park);
+   roster[i].initOpts.push({goods:nm,size:(g&&g.sizes&&g.sizes.length===1)?g.sizes[0]:((g&&g.sizes&&g.sizes.length>1)?g.sizes[0]:''),price:g?g.price:0,qty:1,custom:false});
+   render();};});
+ // ワンクリック追加（兄弟割引）：マイナス金額の行を追加
+ document.querySelectorAll('[data-qsib]').forEach(el=>{el.onclick=e=>{const i=+e.currentTarget.dataset.qsib;
+   if(!roster[i].initOpts)roster[i].initOpts=[];
+   roster[i].initOpts.push({goods:'兄弟割引',size:'',price:-Math.abs(Number(M.sibling)||0),qty:1,custom:true});render();};});
+ // ワンクリック追加（相殺・値引き）：名称と金額を手入力するマイナス行
+ document.querySelectorAll('[data-qminus]').forEach(el=>{el.onclick=e=>{const i=+e.currentTarget.dataset.qminus;
+   if(!roster[i].initOpts)roster[i].initOpts=[];
+   roster[i].initOpts.push({goods:'調整（相殺・値引き）',size:'',price:0,qty:1,custom:true});render();};});
+ // ワンクリック追加（自由入力）
+ document.querySelectorAll('[data-qcustom]').forEach(el=>{el.onclick=e=>{const i=+e.currentTarget.dataset.qcustom;
+   if(!roster[i].initOpts)roster[i].initOpts=[];
+   roster[i].initOpts.push({goods:'',size:'',price:0,qty:1,custom:true});render();};});
+ // すべて削除
+ document.querySelectorAll('[data-qclear]').forEach(el=>{el.onclick=e=>{const i=+e.currentTarget.dataset.qclear;
+   const nm=(roster[i].name?roster[i].name+'さんの':'')+'初回オプション';
+   confirmDialog(`「${nm}」をすべて削除します。\nこの操作は取り消せません。よろしいですか？`,()=>{roster[i].initOpts=[];render();});};});
  // オプション項目の編集
  document.querySelectorAll('[data-iopt]').forEach(el=>{
    const handler=e=>{const i=+e.target.dataset.iopt,oi=+e.target.dataset.oi,of=e.target.dataset.of;const o=roster[i].initOpts[oi];
@@ -2302,7 +2335,12 @@ function renderPDF(){
       (c.half?`<tr class="neg"><td>途中入園 半額補正</td><td>- ¥ ${Math.abs(c.half).toLocaleString()}</td></tr>`:'')+
       (c.sib?`<tr class="neg"><td>兄弟割引</td><td>- ¥ ${Math.abs(c.sib).toLocaleString()}</td></tr>`:'')+
       (c.early?`<tr class="neg"><td>早割（幼稚舎）</td><td>- ¥ ${Math.abs(c.early).toLocaleString()}</td></tr>`:'')+
-      ((p.initOpts||[]).filter(o=>o.goods&&(Number(o.price)||0)>0).map(o=>{const sub=(Number(o.price)||0)*(Number(o.qty)||1);return `<tr><td>${(o.goods||'').replace(/</g,'&lt;')}${o.size?'（'+o.size+'）':''}${(Number(o.qty)||1)>1?' ×'+(Number(o.qty)||1):''}</td><td>¥ ${sub.toLocaleString()}</td></tr>`;}).join(''))+
+      // 初回オプション：マイナス金額（兄弟割引・相殺など）も内訳に表示する（合計と明細を一致させるため）
+      ((p.initOpts||[]).filter(o=>o.goods&&(Number(o.price)||0)!==0).map(o=>{const sub=(Number(o.price)||0)*(Number(o.qty)||1);
+        const nm=`${(o.goods||'').replace(/</g,'&lt;')}${o.size?'（'+o.size+'）':''}${(Number(o.qty)||1)>1?' ×'+(Number(o.qty)||1):''}`;
+        return sub<0
+          ?`<tr class="neg"><td>${nm}</td><td>- ¥ ${Math.abs(sub).toLocaleString()}</td></tr>`
+          :`<tr><td>${nm}</td><td>¥ ${sub.toLocaleString()}</td></tr>`;}).join(''))+
      `</table>`+
      `<div class="billtotal"><span class="lbl">ご請求金額合計</span><span class="amt">¥ ${initialBillTotal(p).toLocaleString()}</span></div>`+
 
