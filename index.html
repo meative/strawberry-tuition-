@@ -2497,7 +2497,7 @@ function renderReissue(){
  // 催促の段階：first＝1回目（振込→2回目案内／引落→再引落案内）、final＝最終督促（15日振込＋延滞金）
  if(!window.__reStage)window.__reStage='first';
  const isFinal=window.__reStage==='final';
- if(!window.__reissueDueFinal||window.__reissueDueFinalYM!==(yy+'-'+mm)){window.__reissueDueFinal=yy+'-'+('0'+mm).slice(-2)+'-15';window.__reissueDueFinalYM=yy+'-'+mm;}
+ if(!window.__reissueDueFinal||window.__reissueDueFinalYM!==(yy+'-'+mm)){const _ffm=(Number(mm)===12?1:Number(mm)+1),_ffy=(Number(mm)===12?Number(yy)+1:Number(yy));window.__reissueDueFinal=_ffy+'-'+('0'+_ffm).slice(-2)+'-15';window.__reissueDueFinalYM=yy+'-'+mm;}
  const dueFinal=window.__reissueDueFinal;
  const dueUsed=isFinal?dueFinal:due;
  // 当該タブの納入方法に該当する再請求対象だけを抽出
