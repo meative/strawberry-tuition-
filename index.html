@@ -2526,7 +2526,7 @@ function renderReissue(){
  // 操作バー（発行日・期限・手数料）
  h+=`<div class="noprint" style="padding:14px 22px;border-bottom:1px solid var(--line);font-size:13px;color:var(--mut);display:flex;gap:20px;align-items:center;flex-wrap:wrap">`+
    `<div>発行日：<input id="reIssue" type="date" value="${issue}" class="inp" style="width:auto;padding:4px 8px"></div>`+
-   `<div>自動引落日：<input id="reDebit" type="date" value="${debit}" class="inp" style="width:auto;padding:4px 8px"></div>`+
+   `<div>${(park==='資生館保育園'&&isFuriMode)?'前回の振込期限':'自動引落日'}：<input id="reDebit" type="date" value="${debit}" class="inp" style="width:auto;padding:4px 8px"></div>`+
    `<div>${isFinal?'最終振込期限':(isFuriMode?'振込期限':'再振替日')}：<input id="reDue" type="date" value="${dueUsed}" data-duemode="${isFinal?'final':(isFuriMode?'furi':'sai')}" class="inp" style="width:auto;padding:4px 8px"></div>`+
    `<div>事務手数料：¥<input id="reFee" type="number" step="10" value="${reissueFee}" data-feepark="${feePark}" class="inp" style="width:90px;padding:4px 8px"></div>`+
    `</div>`;
@@ -2596,7 +2596,10 @@ function renderReissue(){
   .redoc .footer{padding:22px 56px 32px;text-align:center;font-size:10px;color:#a89888;letter-spacing:.2em;border-top:1px solid #ebdfc8;}
   .redoc .footer .seal{display:inline-block;font-family:'Spline Sans Mono',monospace;font-size:9px;letter-spacing:.3em;border:1px solid ${facColor};padding:6px 14px;color:${facColor};margin-bottom:10px;}
  </style>`;
- const greetFuri=`いつも当園の活動にご理解、ご協力をいただきありがとうございます。<br>さて、月謝の納入についてですが、<b>${yy}年${mm}月分 ¥${monthly.toLocaleString()}</b>（${fmtJP(debit)}自動引落）の確認がとれませんでした。お手数ですが通帳をご確認いただきますようお願い申し上げます。<br>つきましては、下記のとおりお振込みをお願いいたします。`;
+ const isShiseiFuri=(park==='資生館保育園'&&isFuriMode);
+ const greetFuri=isShiseiFuri
+   ?`いつも当園の活動にご理解、ご協力をいただきありがとうございます。<br>さて、月謝の納入についてですが、<b>${yy}年${mm}月分 ¥${monthly.toLocaleString()}</b>（${fmtJP(debit)} 振込期限）の確認がとれませんでした。<br>つきましては、下記のとおりお振込みをお願いいたします。`
+   :`いつも当園の活動にご理解、ご協力をいただきありがとうございます。<br>さて、月謝の納入についてですが、<b>${yy}年${mm}月分 ¥${monthly.toLocaleString()}</b>（${fmtJP(debit)}自動引落）の確認がとれませんでした。お手数ですが通帳をご確認いただきますようお願い申し上げます。<br>つきましては、下記のとおりお振込みをお願いいたします。`;
  const greetSai=`いつも当園の活動にご理解、ご協力をいただきありがとうございます。<br>さて、月謝の納入についてですが、<b>${yy}年${mm}月分 ¥${monthly.toLocaleString()}</b>（${fmtJP(debit)}自動引落）の確認がとれませんでした。お手数ですが通帳をご確認いただきますようお願い申し上げます。<br>つきましては、下記の日程で再度口座より引落しをさせていただきます。残高のご確認をお願い申し上げます。`;
  const greetFinal=`いつも当園の活動にご理解、ご協力をいただきありがとうございます。<br>さて、<b>${yy}年${mm}月分 ¥${monthly.toLocaleString()}</b>（${fmtJP(debit)}自動引落）につきまして、その後もご入金の確認がとれておりません。<br>つきましては、大変お手数ですが、下記口座へ<b>${fmtJP(dueUsed)}まで</b>にお振込みくださいますよう、お願い申し上げます。`;
  h+=`<div class="redoc" id="reissueDoc">`+
