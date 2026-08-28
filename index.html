@@ -2601,7 +2601,9 @@ function renderReissue(){
    ?`いつも当園の活動にご理解、ご協力をいただきありがとうございます。<br>さて、月謝の納入についてですが、<b>${yy}年${mm}月分 ¥${monthly.toLocaleString()}</b>（${fmtJP(debit)} 振込期限）の確認がとれませんでした。<br>つきましては、下記のとおりお振込みをお願いいたします。`
    :`いつも当園の活動にご理解、ご協力をいただきありがとうございます。<br>さて、月謝の納入についてですが、<b>${yy}年${mm}月分 ¥${monthly.toLocaleString()}</b>（${fmtJP(debit)}自動引落）の確認がとれませんでした。お手数ですが通帳をご確認いただきますようお願い申し上げます。<br>つきましては、下記のとおりお振込みをお願いいたします。`;
  const greetSai=`いつも当園の活動にご理解、ご協力をいただきありがとうございます。<br>さて、月謝の納入についてですが、<b>${yy}年${mm}月分 ¥${monthly.toLocaleString()}</b>（${fmtJP(debit)}自動引落）の確認がとれませんでした。お手数ですが通帳をご確認いただきますようお願い申し上げます。<br>つきましては、下記の日程で再度口座より引落しをさせていただきます。残高のご確認をお願い申し上げます。`;
- const greetFinal=`いつも当園の活動にご理解、ご協力をいただきありがとうございます。<br>さて、<b>${yy}年${mm}月分 ¥${monthly.toLocaleString()}</b>（${fmtJP(debit)}自動引落）につきまして、その後もご入金の確認がとれておりません。<br>つきましては、大変お手数ですが、下記口座へ<b>${fmtJP(dueUsed)}まで</b>にお振込みくださいますよう、お願い申し上げます。`;
+ const greetFinal=isShiseiFuri
+   ?`いつも当園の活動にご理解、ご協力をいただきありがとうございます。<br>さて、<b>${yy}年${mm}月分 ¥${monthly.toLocaleString()}</b>（${fmtJP(debit)} 振込期限）につきまして、その後もご入金の確認がとれておりません。<br>つきましては、大変お手数ですが、下記口座へ<b>${fmtJP(dueUsed)}まで</b>にお振込みくださいますよう、お願い申し上げます。`
+   :`いつも当園の活動にご理解、ご協力をいただきありがとうございます。<br>さて、<b>${yy}年${mm}月分 ¥${monthly.toLocaleString()}</b>（${fmtJP(debit)}自動引落）につきまして、その後もご入金の確認がとれておりません。<br>つきましては、大変お手数ですが、下記口座へ<b>${fmtJP(dueUsed)}まで</b>にお振込みくださいますよう、お願い申し上げます。`;
  h+=`<div class="redoc" id="reissueDoc">`+
    `<div class="topbar" style="display:block;text-align:center">`+
     `<div class="brandJP" style="font-size:15px;letter-spacing:.1em;color:${facColor}">${footName}</div>`+
