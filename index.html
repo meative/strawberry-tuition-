@@ -1123,11 +1123,42 @@ async function syncBoardRoster(){
   const curNames=new Set(curPupils.map(p=>String((p&&p.name)||'').trim()));
   const added=finalPupils.filter(p=>!curNames.has(p.name)).map(p=>p.name+'（'+(NM[p.linkPark]||'未設定')+'）');
   if(finalPupils.length===0){ setMsg('人数が0のため中止しました（誤消去防止）','var(--berry)'); return; }
-  let cm='予約ボードの名簿を更新します。\n\n合計 '+finalPupils.length+'名';
-  cm+= added.length? ('\n\n新しく追加：'+added.length+'名\n・'+added.join('\n・')) : '\n\n（追加なし＝すでに最新です）';
-  if(noLink.length) cm+='\n\n⚠ 連携園が未設定でボードに出せない子：'+noLink.length+'名\n・'+noLink.join('\n・')+'\n（園児台帳で「連携園」を設定すると次回から載ります）';
-  cm+='\n\nよろしいですか？';
-  if(!confirm(cm)){ setMsg('キャンセルしました'); return; }
+  /* SF-ROSTERUI-20260829 : ブラウザ標準の confirm ではなく、このアプリ共通の中央ダイアログで確認する。 */
+  var _eh=function(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');};
+  var withBirth=finalPupils.filter(function(p){return p&&p.birthY&&p.birthM;}).length;
+  var noBirth=finalPupils.length-withBirth;
+  var _row=function(label,val,col){
+   return '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:14px;padding:4px 0"><span style="color:var(--mut)">'+label+'</span><span style="font-weight:700;color:'+(col||'var(--ink)')+'">'+val+'</span></div>';
+  };
+  var extraHtml='<div style="text-align:left;background:var(--panel2);border:1px solid var(--line);border-radius:14px;padding:14px 16px;font-size:13px;line-height:1.7">'
+   +_row('ボードに載る人数',finalPupils.length+'名')
+   +_row('うち生年月あり',withBirth+'名（実年齢で表示）','var(--leaf)')
+   +(noBirth?_row('生年月なし',noBirth+'名（3歳〜のまま）','var(--mut)'):'')
+   +_row('新しく追加',added.length?added.length+'名':'なし（すでに最新）')
+   +'</div>';
+  if(added.length){
+   extraHtml+='<div style="text-align:left;margin-top:12px;padding:12px 14px;background:var(--leafsoft);border:1px solid var(--leaf);border-radius:14px;font-size:12.5px;line-height:1.9;max-height:180px;overflow:auto"><b style="color:var(--leaf)">新しく追加される園児</b><br>'+added.map(_eh).join('<br>')+'</div>';
+  }
+  if(noLink.length){
+   extraHtml+='<div style="text-align:left;margin-top:12px;padding:12px 14px;background:var(--berrysoft);border:1px solid var(--berry);border-radius:14px;font-size:12.5px;line-height:1.9;max-height:180px;overflow:auto"><b style="color:var(--berry)">⚠ 連携園が未設定でボードに出せない子：'+noLink.length+'名</b><br>'+noLink.map(_eh).join('<br>')+'<div style="color:var(--mut);margin-top:6px">園児台帳の「連携園」を設定すると次回から載ります。</div></div>';
+  }
+  if(btn)btn.disabled=false;
+  setMsg('確認をお願いします');
+  var _doWrite=async function(){
+   try{
+    if(btn)btn.disabled=true; setMsg('更新中…');
+    await cloudDB.collection('kindergarten_public').doc('roster').set({
+     updatedBy:'tuition-app-button', updatedAt:firebase.firestore.FieldValue.serverTimestamp(),
+     pupils:finalPupils, count:finalPupils.length
+    });
+    setMsg('✅ 更新しました（'+finalPupils.length+'名'+(withBirth?'／生年月あり'+withBirth+'名':'')+'）。予約ボードを開いて再読込してください。','var(--leaf)');
+   }catch(e){ setMsg('エラー：'+((e&&e.message)?e.message:e),'var(--berry)'); }
+   finally{ if(btn)btn.disabled=false; }
+  };
+  confirmDialog('この内容で予約ボードの名簿を更新します。予約データには触れません。今出ている名前も消えません。',
+   function(){ _doWrite(); }, '予約ボードの名簿を更新', '更新する');
+  try{ document.getElementById('confirmExtra').innerHTML=extraHtml; }catch(e){}
+  return;
   setMsg('更新中…');
   await cloudDB.collection('kindergarten_public').doc('roster').set({
    updatedBy:'tuition-app-button', updatedAt:firebase.firestore.FieldValue.serverTimestamp(),
