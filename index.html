@@ -1304,6 +1304,9 @@ function renderRoster(){const rows=visible();
   '</div>';
  }
  // フリガナ入力状況（五十音の並びに使用）＝現状確認用
+ /* SF-BIRTHEDIT-20260829 : 生年月日の入力状況。クラス自動判定と予約ボードの年齢表示に効くので見えるようにする。 */
+ const _birthFilled=baseList.filter(r=>{const b=String((r&&r.birth)||'').trim();return b&&!isNaN(new Date(b).getTime());}).length;
+ h+='<div style="padding:8px 22px;font-size:12px;border-bottom:1px solid var(--line)">生年月日入力済み：<b style="color:'+((baseList.length&&_birthFilled===baseList.length)?'var(--leaf)':'var(--berry)')+'">'+_birthFilled+' / '+baseList.length+'名</b> <span style="color:var(--mut)">（クラスの自動判定と、予約ボードの年齢表示に使います。未入力の欄は薄い黄色でハイライト）</span></div>';
  const _kanaFilled=baseList.filter(r=>(r.kana||'').trim()).length;
  h+='<div style="padding:8px 22px;font-size:12px;border-bottom:1px solid var(--line)">フリガナ入力済み：<b style="color:'+((baseList.length&&_kanaFilled===baseList.length)?'var(--leaf)':'var(--berry)')+'">'+_kanaFilled+' / '+baseList.length+'名</b> <span style="color:var(--mut)">（クラス内の五十音・ルクミー合わせの並び替えに使います。未入力の欄は薄い黄色でハイライト）</span></div>';
  h+='<div class="tablewrap"><table><thead><tr><th style="width:42px;text-align:center">No.</th><th>所属園</th><th>生年月日</th><th>クラス<br><small style="color:var(--mut);font-weight:400;font-size:10px">自動</small></th><th>枠区分</th><th>園児名</th><th>フリガナ<br><small style="color:var(--mut);font-weight:400;font-size:10px">五十音順に使用</small></th><th>口座名義</th><th>顧客番号<br><small style="color:var(--mut);font-weight:400;font-size:10px">振替用</small></th><th>兄弟</th><th>納入方法</th>'+(showOpt?'<th>オプション（月額・あり/なし）</th>':'')+'<th>退園予定</th><th>連携園</th><th class="r">ルクミーID</th><th></th></tr></thead><tbody>';
@@ -1325,7 +1328,8 @@ function renderRoster(){const rows=visible();
    if(!optCell)optCell='<span style="color:var(--mut);font-size:12px">—</span>';
   }
   h+=`<tr><td style="text-align:center;color:var(--mut);font-size:12px;font-weight:600">${idx+1}</td><td><span class="ptag pt-${r.park}">${r.park||'—'}</span></td>`+
-   `<td><span style="font-size:12px;color:var(--mut);font-family:'Spline Sans Mono',monospace">${r.birth||'—'}</span></td>`+
+   /* SF-BIRTHEDIT-20260829 : 生年月日をこの場で直せるようにする。保存経路(data-arr2)は既存で、f==='birth' のときクラスを自動再計算する分岐も既にある。 */
+   `<td>${ed?`<input type="date" class="inp" data-arr2="roster" data-i="${i}" data-f="birth" value="${r.birth||''}" style="width:auto;padding:4px 6px;font-size:11px${(r.birth||'').trim()?'':';background:#fff8e1'}" title="生年月日。クラスの自動判定と、予約ボードの年齢表示に使います">`:`<span style="font-size:12px;color:var(--mut);font-family:'Spline Sans Mono',monospace">${r.birth||'—'}</span>`}</td>`+
    `<td><span class="cls" style="${r.birth?'background:#fdf6e9;padding:3px 10px;border-radius:10px;display:inline-block;min-width:64px;text-align:center':''}">${r.cls||'—'}</span></td>`+
    `<td>${ed?`<select class="inp" data-arr2="roster" data-i="${i}" data-f="waku" style="width:auto;padding:4px 8px;font-size:12px;color:var(--berry)">${(facType(r.park)==='C'?['地域枠','企業提携枠','旧企業提携枠','旧地域枠','地域無償化','非課税世帯','従業員(保育士)','従業員(アドバイザー)','従業員(ハイアイランド)','従業員(Number9)','従業員(他園)']:facType(r.park)==='B'?['早割','一般','従業員(保育士)','従業員(Number9)','従業員(ハイアイランド)','従業員(アドバイザー)']:Object.keys(M.prices).concat(['非課税世帯'])).map(w=>`<option ${r.waku===w?'selected':''}>${w}</option>`).join('')}</select>`:`<span class="waku">${r.waku||''}</span>`}</td>`+
    `<td class="name" ${ed?`contenteditable data-arr="roster" data-i="${i}" data-f="name"`:''}>${r.name||''}</td>`+
