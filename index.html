@@ -1106,12 +1106,19 @@ async function syncBoardRoster(){
   const rosterArr=(payload&&Array.isArray(payload.roster))?payload.roster:null;
   if(!rosterArr){ setMsg('名簿を取得できませんでした','var(--berry)'); return; }
   const withLink=[],noLink=[];
-  rosterArr.forEach(p=>{ if(!p||!p.name)return; const nm=String(p.name).trim(); if(!nm)return; if(p.linkPark&&NM[p.linkPark])withLink.push({name:nm,linkPark:p.linkPark}); else noLink.push(nm); });
+  rosterArr.forEach(p=>{ if(!p||!p.name)return; const nm=String(p.name).trim(); if(!nm)return;
+  if(p.linkPark&&NM[p.linkPark]){
+   /* SF-ROSTER-BIRTH-20260829 : 生年月（年・月のみ）を名簿に載せ、予約ボードで実年齢を表示できるようにする。
+      kindergarten_public は未認証で読めるミラーのため、日にちは載せない（最小限の情報のみ）。 */
+   const e={name:nm,linkPark:p.linkPark,birthY:null,birthM:null};
+   if(p.birth){ const bm=String(p.birth).match(/^(\d{4})[-\/](\d{1,2})/); if(bm){ e.birthY=+bm[1]; e.birthM=+bm[2]; } }
+   withLink.push(e);
+  } else noLink.push(nm); });
   const cur=await cloudDB.collection('kindergarten_public').doc('roster').get();
   const curPupils=(cur.exists&&Array.isArray(cur.data().pupils))?cur.data().pupils:[];
   const map=new Map();
-  withLink.forEach(p=>map.set(p.name,{name:p.name,linkPark:p.linkPark}));
-  curPupils.forEach(cp=>{ const nm=String((cp&&cp.name)||'').trim(); if(nm&&!map.has(nm)){ map.set(nm,{name:nm,linkPark:(cp.linkPark||'')}); } });
+  withLink.forEach(p=>map.set(p.name,p)); /* SF-ROSTER-BIRTH-20260829 : birthY/birthM も保持 */
+  curPupils.forEach(cp=>{ const nm=String((cp&&cp.name)||'').trim(); if(nm&&!map.has(nm)){ map.set(nm,{name:nm,linkPark:(cp.linkPark||''),birthY:(cp.birthY!=null?cp.birthY:null),birthM:(cp.birthM!=null?cp.birthM:null)}); } }); /* SF-ROSTER-BIRTH-20260829 */
   const finalPupils=[...map.values()];
   const curNames=new Set(curPupils.map(p=>String((p&&p.name)||'').trim()));
   const added=finalPupils.filter(p=>!curNames.has(p.name)).map(p=>p.name+'（'+(NM[p.linkPark]||'未設定')+'）');
