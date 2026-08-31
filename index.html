@@ -3033,7 +3033,7 @@ function shokaiAutoRows(){
    if(amt<=0)return;
    out.push({mon:pm,day:pdd,acct:128,tax:'非課税売上',shop:'',
      item:`新規入園 ${p.name} 初回月謝`,kind:'in',amt:amt,
-     by:(STAFF.includes(log.by)?log.by:''),src:'shokai',auto:true});
+     by:(log.by||'')/*SF-TANTOU-KEEP-20260831*/,src:'shokai',auto:true});
  });
  return out;
 }
@@ -3151,7 +3151,7 @@ function renderCashbook(){
  // 繰越金行：イベント出納帳で前月から繰り越しがあれば、その額を開始残高として表示
  h+=`<tr style="background:var(--berrysoft)"><td></td><td colspan="3" style="color:var(--mut)">繰越金${carryIn>0?'（前月のイベント残金）':''}</td><td colspan="2">${carryIn>0?'<span style="color:#9a6b2f;font-size:11px">前月繰越</span>':'—'}</td><td class="num">${carryIn>0?'¥'+carryIn.toLocaleString():''}</td><td class="num"></td><td class="num">¥${carryIn.toLocaleString()}</td><td></td><td></td></tr>`;
  const openByOpts=`<option value="">担当を選択…</option>`+STAFF.map(s=>`<option ${cb.openingBy===s?'selected':''}>${s}</option>`).join('');
- h+=`<tr style="background:var(--berrysoft)"><td></td><td>${yy}/${mm}/1</td><td colspan="2">1 現金</td><td colspan="2">${isEv?'イベント予算 振替':'本部から振替'}</td><td class="num total" style="color:var(--leaf)">¥${(Number(cb.opening)||0).toLocaleString()}</td><td class="num"></td><td class="num">¥${(carryIn+(Number(cb.opening)||0)).toLocaleString()}</td><td><select id="cbOpeningBy" ${locked?'disabled':''} class="inp" style="width:100%;padding:3px 4px;font-size:11px;${cb.openingBy?'':'border-color:var(--berry);background:#fff'}">${openByOpts}</select></td><td></td></tr>`;
+ h+=`<tr style="background:var(--berrysoft)"><td></td><td><div style="display:flex;align-items:center;gap:1px"><input type="text" inputmode="numeric" data-cbopen="mon" value="${(cb.openingMon!=null&&cb.openingMon!=='')?cb.openingMon:mm}" class="inp" style="width:44px;padding:3px 3px;flex-shrink:0;text-align:center;${(String((cb.openingMon!=null&&cb.openingMon!=='')?cb.openingMon:mm)!==String(mm))?'background:#fff7e6;border-color:#e0b76b':''}" title="月（本部から振替の日付。通帳に合わせて変更できます。締め後も変更可）"><span style="font-size:10px;color:var(--mut)">月</span><input type="text" inputmode="numeric" data-cbopen="day" value="${(cb.openingDay!=null&&cb.openingDay!=='')?cb.openingDay:1}" class="inp" style="width:44px;padding:3px 3px;flex-shrink:0;text-align:center;${(String((cb.openingMon!=null&&cb.openingMon!=='')?cb.openingMon:mm)!==String(mm))?'background:#fff7e6;border-color:#e0b76b':''}" title="日"><span style="font-size:10px;color:var(--mut)">日</span></div></td><td colspan="2">1 現金</td><td colspan="2">${isEv?'イベント予算 振替':'本部から振替'}</td><td class="num total" style="color:var(--leaf)">¥${(Number(cb.opening)||0).toLocaleString()}</td><td class="num"></td><td class="num">¥${(carryIn+(Number(cb.opening)||0)).toLocaleString()}</td><td><select id="cbOpeningBy" ${locked?'disabled':''} class="inp" style="width:100%;padding:3px 4px;font-size:11px;${cb.openingBy?'':'border-color:var(--berry);background:#fff'}">${openByOpts}</select></td><td></td></tr>`;
  // 明細行（No.は領収書番号と照合できるよう連番）。本部振替の担当が未選択のうちは入力ロック
  if(!openSet){
   h+=`<tr><td colspan="11" style="padding:20px 16px;text-align:center;color:var(--berry);font-size:13px;background:#fff7fa">まず「本部から振替」の担当（右端のプルダウン）を選んでください。<br>担当を選ぶと、明細の入力ができるようになります。</td></tr>`;
@@ -3178,7 +3178,8 @@ function renderCashbook(){
   }
   const acctOpts=`<option value="">選択…</option>`+CB_USED.map(a=>`<option value="${a.code}" ${String(r.acct)===String(a.code)?'selected':''}>${a.code} ${a.name}</option>`).join('');
   const taxOpts=CB_TAXES.map(tx=>`<option ${r.tax===tx?'selected':''}>${tx}</option>`).join('');
-  const byOpts=`<option value="">担当…</option>`+STAFF.map(s=>`<option ${r.by===s?'selected':''}>${s}</option>`).join('');
+  /* SF-TANTOU-KEEP-20260831 : 取込時の受領者がSTAFF未登録の名前でも、選択済みの候補として残す（沼山等） */
+  const byOpts=`<option value="">担当…</option>`+STAFF.map(s=>`<option ${r.by===s?'selected':''}>${s}</option>`).join('')+((r.by&&!STAFF.includes(r.by))?`<option selected>${String(r.by).replace(/&/g,'&amp;').replace(/</g,'&lt;')}</option>`:'');
   const dis=locked?'disabled':''; // 締め済みは全項目を編集不可
   const dateDis=(locked&&!r.isClose)?'disabled':''; // 締め済みでも「締めの行」の日付だけは後から修正できる（他項目・他行はロックのまま）
   const dateHi=(locked&&r.isClose)?'background:#fff7e6;border-color:#e0b76b':''; // 編集できる締めの日付を淡く強調
@@ -3218,6 +3219,8 @@ function renderCashbook(){
  // ハンドラ
  document.getElementById('cbOpening')&&(document.getElementById('cbOpening').onchange=e=>{cbGet().opening=moneyNormalize(e.target.value);render();});
  const opBy=document.getElementById('cbOpeningBy');if(opBy)opBy.onchange=e=>{cbGet().openingBy=e.target.value;render();};
+ /* SF-CBOPENDATE-20260831 : 本部から振替の日付を手入力可に。明細行の日付と同じ dateNormalize で正規化 */
+ document.querySelectorAll('[data-cbopen]').forEach(el=>{el.onchange=e=>{const f=e.target.dataset.cbopen,cur=cbGet();if(f==='mon')cur.openingMon=dateNormalize(e.target.value,'mon');else cur.openingDay=dateNormalize(e.target.value,'day');render();};});
  const addBtn=document.getElementById('cbAdd');if(addBtn)addBtn.onclick=()=>{cbGet().rows.push({mon:mm,day:'',acct:'',tax:'課税仕入 10%',shop:'',item:'',kind:'out',amt:'',by:''});render();};
  const shopsBtn=document.getElementById('cbShops');if(shopsBtn)shopsBtn.onclick=cbManageShops;
  const addCashBtn=document.getElementById('cbAddCash');if(addCashBtn)addCashBtn.onclick=()=>{
@@ -3347,7 +3350,7 @@ function cbExportCsv(eventOnly){
  const rows=[['No.','日付','区分','相手勘定科目コード','相手勘定科目','相手部門','相手税区分','摘要','入金','出金','残高','担当']];
  if(!eventOnly){
    rows.push(['','','','','','','','繰越金','','',0,'']);
-   rows.push(['',`${yy}/${mm}/1`,'通常',1,'現金',bumon,'','本部から振替',cb.opening||0,'',cb.opening||0,cb.openingBy||'']);
+   rows.push(['',`${yy}/${cb.openingMon||mm}/${cb.openingDay||1}`,'通常',1,'現金',bumon,'','本部から振替',cb.opening||0,'',cb.opening||0,cb.openingBy||'']);
  }
  cbAllRows(cb).forEach((r,i)=>{const inn=r.kind==='in'?(Number(r.amt)||0):0,out=r.kind==='out'?(Number(r.amt)||0):0;bal=bal+inn-out;
    if(eventOnly&&!r.event)return; // イベント費のみ出力
@@ -3397,7 +3400,7 @@ function cbCollectMfRows(){
    }
    // 本部より振替（イベントはイベント予算）。order=0で日付先頭に置く
    if((Number(cb.opening)||0)>0){
-     add(mm,1,'普通預金','対象外',isEv?'イベント予算 振替':'本部から振替',Number(cb.opening)||0,0,-1);
+     add(cb.openingMon||mm,cb.openingDay||1,'普通預金','対象外',isEv?'イベント予算 振替':'本部から振替',Number(cb.opening)||0,0,-1);
    }
    (cb.rows||[]).forEach(r=>{
      const mo=(r.mon!=null&&r.mon!=='')?r.mon:mm;
@@ -3432,7 +3435,7 @@ function cbCollectMfRowsExtra(){
  const ds=(mo,day)=>day?`${yy}/${mo}/${day}`:`${yy}/${mm}/1`;
  const add=(mo,day,acctName,tax,tekiyo,inn,out,order)=>items.push({date:ds(mo,day),acctName,tax,tekiyo,inn:inn||0,out:out||0,dnum:dnum(mo,day),order:order||0});
  const cb=cbGet();
- if((Number(cb.opening)||0)>0)add(mm,1,'普通預金','対象外','本部から振替',Number(cb.opening)||0,0,-1);
+ if((Number(cb.opening)||0)>0)add(cb.openingMon||mm,cb.openingDay||1,'普通預金','対象外','本部から振替',Number(cb.opening)||0,0,-1);
  (cb.rows||[]).forEach(r=>{
    const mo=(r.mon!=null&&r.mon!=='')?r.mon:mm;
    if(r.isCash&&r.kind==='in'&&!r.isClose){add(mo,r.day,'普通預金',(r.tax||'対象外'),'現金入金（補充）',Number(r.amt)||0,0);return;}
@@ -3451,7 +3454,7 @@ function shokaiAutoRowsFor(){
    const d=String(log.paidDate);const m=d.match(/(\d{4})-(\d{2})-(\d{2})/);if(!m)return;
    if(+m[1]!==yy||+m[2]!==mm)return;
    const amt=initSaleAmount(p);if(!(amt>0))return;
-   out.push({mon:+m[2],day:+m[3],item:`新規入園 ${p.name} 初回月謝`,amt,by:(STAFF.includes(log.by)?log.by:'')});
+   out.push({mon:+m[2],day:+m[3],item:`新規入園 ${p.name} 初回月謝`,amt,by:(log.by||'')/*SF-TANTOU-KEEP-20260831*/});
  });
  return out;
 }
@@ -3790,7 +3793,7 @@ function salesRowsForPark(pk){
    const m=String(log.paidDate||'').match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);if(!m)return;
    if(+m[1]!==yy||+m[2]!==mm)return;
    const amt=initSaleAmount(p);if(amt<=0)return;
-   out.push({mon:+m[2],day:+m[3],kind:'振込',item:`新規入園 ${p.name} 初回月謝`,amt:amt,by:(STAFF.includes(log.by)?log.by:''),park:pk});
+   out.push({mon:+m[2],day:+m[3],kind:'振込',item:`新規入園 ${p.name} 初回月謝`,amt:amt,by:(log.by||'')/*SF-TANTOU-KEEP-20260831*/,park:pk});
  });
  // 日付順
  out.sort((a,b)=>(a.day||0)-(b.day||0));
@@ -3912,7 +3915,7 @@ function importTimelyCsv(text){
      const kb=ki>=0?String(r[ki]||'').trim():'';
      const rno=bi>=0?String(r[bi]||'').trim():'';
      const rcv=ri>=0?String(r[ri]||'').trim():'';
-     added.push({mon:d.mon,day:d.day,item:`タイムリースクール ${nm}${kb?`（${kb}）`:''}${rno?` 領収No.${rno}`:''}`,amt:amt,by:STAFF.includes(rcv)?rcv:''});
+     added.push({mon:d.mon,day:d.day,item:`タイムリースクール ${nm}${kb?`（${kb}）`:''}${rno?` 領収No.${rno}`:''}`,amt:amt,by:rcv/*SF-TANTOU-KEEP-20260831*/});
    }else{
      const cnt=ci>=0?(Number(String(r[ci]||'').replace(/[^\d.-]/g,''))||0):0;
      added.push({mon:d.mon,day:d.day,item:`タイムリースクール ${d.mon}/${d.day}分${cnt?`（利用${cnt}名）`:''}`,amt:amt,by:''});
@@ -3961,7 +3964,7 @@ function importShokaiCsv(text){
    if(fac&&fac!==park){skipped.push(`${nm}（${fac}）`);return;}
    added.push({mon:d.mon,day:d.day,acct:128,tax:'非課税売上',shop:'',
      item:`新規入園 ${nm} 初回月謝`,
-     kind:'in',amt:amt,by:STAFF.includes(rcv)?rcv:(cb.openingBy||''),src:'shokai'});
+     kind:'in',amt:amt,by:(rcv||cb.openingBy||'')/*SF-TANTOU-KEEP-20260831*/,src:'shokai'});
  });
  cbConfirmImport(added,skipped,'新規入園');
 }
