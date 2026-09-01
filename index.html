@@ -1110,7 +1110,10 @@ async function syncBoardRoster(){
   if(p.linkPark&&NM[p.linkPark]){
    /* SF-ROSTER-BIRTH-20260829 : 生年月（年・月のみ）を名簿に載せ、予約ボードで実年齢を表示できるようにする。
       kindergarten_public は未認証で読めるミラーのため、日にちは載せない（最小限の情報のみ）。 */
-   const e={name:nm,linkPark:p.linkPark,birthY:null,birthM:null};
+   /* SF-AMPMPARK-20260901 : 早朝／夕方の園も名簿に載せる。予約ボードがこれを見て、
+      その区分のチップに常時出すかどうかを決める。空なら linkPark と同じ扱い。
+      載るのは園のコードだけで、個人情報は増えない。 */
+   const e={name:nm,linkPark:p.linkPark,linkParkAm:(p.linkParkAm||''),linkParkPm:(p.linkParkPm||''),birthY:null,birthM:null};
    if(p.birth){ const bm=String(p.birth).match(/^(\d{4})[-\/](\d{1,2})/); if(bm){ e.birthY=+bm[1]; e.birthM=+bm[2]; } }
    withLink.push(e);
   } else noLink.push(nm); });
@@ -1118,7 +1121,7 @@ async function syncBoardRoster(){
   const curPupils=(cur.exists&&Array.isArray(cur.data().pupils))?cur.data().pupils:[];
   const map=new Map();
   withLink.forEach(p=>map.set(p.name,p)); /* SF-ROSTER-BIRTH-20260829 : birthY/birthM も保持 */
-  curPupils.forEach(cp=>{ const nm=String((cp&&cp.name)||'').trim(); if(nm&&!map.has(nm)){ map.set(nm,{name:nm,linkPark:(cp.linkPark||''),birthY:(cp.birthY!=null?cp.birthY:null),birthM:(cp.birthM!=null?cp.birthM:null)}); } }); /* SF-ROSTER-BIRTH-20260829 */
+  curPupils.forEach(cp=>{ const nm=String((cp&&cp.name)||'').trim(); if(nm&&!map.has(nm)){ map.set(nm,{name:nm,linkPark:(cp.linkPark||''),linkParkAm:(cp.linkParkAm||''),linkParkPm:(cp.linkParkPm||''),birthY:(cp.birthY!=null?cp.birthY:null),birthM:(cp.birthM!=null?cp.birthM:null)});/* SF-AMPMPARK-20260901 */ } }); /* SF-ROSTER-BIRTH-20260829 */
   const finalPupils=[...map.values()];
   const curNames=new Set(curPupils.map(p=>String((p&&p.name)||'').trim()));
   const added=finalPupils.filter(p=>!curNames.has(p.name)).map(p=>p.name+'（'+(NM[p.linkPark]||'未設定')+'）');
@@ -1133,6 +1136,8 @@ async function syncBoardRoster(){
   var extraHtml='<div style="text-align:left;background:var(--panel2);border:1px solid var(--line);border-radius:14px;padding:14px 16px;font-size:13px;line-height:1.7">'
    +_row('ボードに載る人数',finalPupils.length+'名')
    +_row('うち生年月あり',withBirth+'名（実年齢で表示）','var(--leaf)')
+   /* SF-AMPMPARK-20260901 : 朝夕で園が違う子がいるかを確認画面に出す */
+   +(function(){var n=finalPupils.filter(function(p){return p&&((p.linkParkAm&&p.linkParkAm!==p.linkPark)||(p.linkParkPm&&p.linkParkPm!==p.linkPark));}).length;return n?_row('朝夕で園が違う',n+'名','var(--berry)'):'';})()
    +(noBirth?_row('生年月なし',noBirth+'名（3歳〜のまま）','var(--mut)'):'')
    +_row('新しく追加',added.length?added.length+'名':'なし（すでに最新）')
    +'</div>';
@@ -1340,7 +1345,7 @@ function renderRoster(){const rows=visible();
  h+='<div style="padding:8px 22px;font-size:12px;border-bottom:1px solid var(--line)">生年月日入力済み：<b style="color:'+((baseList.length&&_birthFilled===baseList.length)?'var(--leaf)':'var(--berry)')+'">'+_birthFilled+' / '+baseList.length+'名</b> <span style="color:var(--mut)">（クラスの自動判定と、予約ボードの年齢表示に使います。未入力の欄は薄い黄色でハイライト）</span></div>';
  const _kanaFilled=baseList.filter(r=>(r.kana||'').trim()).length;
  h+='<div style="padding:8px 22px;font-size:12px;border-bottom:1px solid var(--line)">フリガナ入力済み：<b style="color:'+((baseList.length&&_kanaFilled===baseList.length)?'var(--leaf)':'var(--berry)')+'">'+_kanaFilled+' / '+baseList.length+'名</b> <span style="color:var(--mut)">（クラス内の五十音・ルクミー合わせの並び替えに使います。未入力の欄は薄い黄色でハイライト）</span></div>';
- h+='<div class="tablewrap"><table><thead><tr><th style="width:42px;text-align:center">No.</th><th>所属園</th><th>生年月日</th><th>クラス<br><small style="color:var(--mut);font-weight:400;font-size:10px">自動</small></th><th>枠区分</th><th>園児名</th><th>フリガナ<br><small style="color:var(--mut);font-weight:400;font-size:10px">五十音順に使用</small></th><th>口座名義</th><th>顧客番号<br><small style="color:var(--mut);font-weight:400;font-size:10px">振替用</small></th><th>兄弟</th><th>納入方法</th>'+(showOpt?'<th>オプション（月額・あり/なし）</th>':'')+'<th>退園予定</th><th>連携園</th><th class="r">ルクミーID</th><th></th></tr></thead><tbody>';
+ h+='<div class="tablewrap"><table><thead><tr><th style="width:42px;text-align:center">No.</th><th>所属園</th><th>生年月日</th><th>クラス<br><small style="color:var(--mut);font-weight:400;font-size:10px">自動</small></th><th>枠区分</th><th>園児名</th><th>フリガナ<br><small style="color:var(--mut);font-weight:400;font-size:10px">五十音順に使用</small></th><th>口座名義</th><th>顧客番号<br><small style="color:var(--mut);font-weight:400;font-size:10px">振替用</small></th><th>兄弟</th><th>納入方法</th>'+(showOpt?'<th>オプション（月額・あり/なし）</th>':'')+'<th>退園予定</th><th>連携園</th><th>早朝の園<br><small style="color:var(--mut);font-weight:400;font-size:10px">空欄=連携園</small></th><th>夕方の園<br><small style="color:var(--mut);font-weight:400;font-size:10px">空欄=連携園</small></th><th class="r">ルクミーID</th><th></th></tr></thead><tbody>';
  rows.forEach((r,idx)=>{const i=roster.indexOf(r);const ed=i>=0;const t=facType(r.park);
   // 生年月日があればクラスを自動計算（プルダウン編集なし）
   const autoCls=r.birth?classByBirth(r.birth,yy):'';
@@ -1371,7 +1376,10 @@ function renderRoster(){const rows=visible();
    `<td>${ed?`<select data-pay="${i}" class="inp" style="width:auto;padding:4px 8px;font-size:12px;font-weight:700;color:${payMethod(r)==='振込'?'#fff':'var(--mut)'};background:${payMethod(r)==='振込'?'var(--berry)':'var(--paper)'};border-color:${payMethod(r)==='振込'?'var(--berry)':'var(--line)'}"><option ${payMethod(r)!=='振込'?'selected':''}>引落</option><option ${payMethod(r)==='振込'?'selected':''}>振込</option></select>`:`<span class="paytag" style="display:inline-block;padding:3px 10px;border-radius:10px;font-size:11px;font-weight:700;${payMethod(r)==='振込'?'background:var(--berry);color:#fff':'background:var(--paper);color:var(--mut);border:1px solid var(--line)'}">${payMethod(r)}</span>`}</td>`+
    (showOpt?`<td>${optCell}</td>`:'')+
    `<td style="white-space:nowrap">${ed?`<input type="date" data-arr2="roster" data-i="${i}" data-f="taien" value="${r.taien||''}" class="inp" style="width:auto;padding:4px 6px;font-size:11px" title="退園予定日（この月の翌月から請求を止めます）">`:(r.taien||'—')}${!r.taien?'':taienStopped(r)?'<br><span style="font-size:10px;font-weight:700;color:#c0392b">⛔ 退園済み</span>':taienLastMonth(r)?'<br><span style="font-size:10px;font-weight:700;color:#b8860b">⚠ 今月で退園</span>':'<br><span style="font-size:10px;color:var(--mut)">退園予定</span>'}</td>`+
-   `<td>${ed?`<select data-link="${i}" class="inp" style="width:auto;padding:4px 8px;font-size:12px;color:var(--berry)"><option value="">未設定</option><option value="tsukisamu" ${r.linkPark==='tsukisamu'?'selected':''}>月寒</option><option value="shiraishi" ${r.linkPark==='shiraishi'?'selected':''}>白石</option><option value="factory" ${r.linkPark==='factory'?'selected':''}>サッポロファクトリー</option><option value="shiseikan" ${r.linkPark==='shiseikan'?'selected':''}>資生館</option></select>`:(r.linkPark||'—')}</td>`+`<td class="num" style="color:var(--mut)">${r.lid||'—'}</td>`+
+   `<td>${ed?`<select data-link="${i}" class="inp" style="width:auto;padding:4px 8px;font-size:12px;color:var(--berry)"><option value="">未設定</option><option value="tsukisamu" ${r.linkPark==='tsukisamu'?'selected':''}>月寒</option><option value="shiraishi" ${r.linkPark==='shiraishi'?'selected':''}>白石</option><option value="factory" ${r.linkPark==='factory'?'selected':''}>サッポロファクトリー</option><option value="shiseikan" ${r.linkPark==='shiseikan'?'selected':''}>資生館</option></select>`:(r.linkPark||'—')}</td>`+/* SF-AMPMPARK-20260901 : 朝と夕方で通う園が違う子がいる（例：朝は白石で早朝、バスで幼稚園、夕方は月寒で延長）。
+    空欄なら連携園と同じ扱いなので、既存の登録は何も変わらない。 */
+   `<td>${ed?`<select data-linkam="${i}" class="inp" style="width:auto;padding:4px 8px;font-size:12px;color:var(--berry)"><option value="">連携園と同じ</option><option value="tsukisamu" ${r.linkParkAm==='tsukisamu'?'selected':''}>月寒</option><option value="shiraishi" ${r.linkParkAm==='shiraishi'?'selected':''}>白石</option><option value="factory" ${r.linkParkAm==='factory'?'selected':''}>サッポロファクトリー</option><option value="shiseikan" ${r.linkParkAm==='shiseikan'?'selected':''}>資生館</option></select>`:(r.linkParkAm||'—')}</td>`+
+   `<td>${ed?`<select data-linkpm="${i}" class="inp" style="width:auto;padding:4px 8px;font-size:12px;color:var(--berry)"><option value="">連携園と同じ</option><option value="tsukisamu" ${r.linkParkPm==='tsukisamu'?'selected':''}>月寒</option><option value="shiraishi" ${r.linkParkPm==='shiraishi'?'selected':''}>白石</option><option value="factory" ${r.linkParkPm==='factory'?'selected':''}>サッポロファクトリー</option><option value="shiseikan" ${r.linkParkPm==='shiseikan'?'selected':''}>資生館</option></select>`:(r.linkParkPm||'—')}</td>`+`<td class="num" style="color:var(--mut)">${r.lid||'—'}</td>`+
    `<td>${ed?`<button data-pupildel="${i}" title="この園児を削除" style="background:none;border:1px solid var(--line);border-radius:8px;color:var(--berry);cursor:pointer;font-size:13px;padding:5px 10px">削除</button>`:''}</td></tr>`;});
  h+='</tbody></table></div>';
  document.getElementById('body').innerHTML=h;bindEdit();
@@ -1389,6 +1397,9 @@ function renderRoster(){const rows=visible();
    roster[i].sib=v;logChange(roster[i].name,'sib',label,null,v);render();};});
  document.querySelectorAll('[data-pay]').forEach(el=>{el.onchange=e=>{const i=+e.target.dataset.pay;const v=e.target.value;
    roster[i].pay=v;logChange(roster[i].name,'pay','納入方法を'+v+'に変更',null,v);render();};});document.querySelectorAll('[data-link]').forEach(el=>{el.onchange=e=>{const i=+e.target.dataset.link;const v=e.target.value;const NM={tsukisamu:'月寒',shiraishi:'白石',factory:'サッポロファクトリー',shiseikan:'資生館'};roster[i].linkPark=v;logChange(roster[i].name,'linkPark','連携園を'+(NM[v]||'未設定')+'に変更',null,v);render();};});
+ /* SF-AMPMPARK-20260901 : 早朝／夕方それぞれの園。空欄は「連携園と同じ」。 */
+ document.querySelectorAll('[data-linkam]').forEach(el=>{el.onchange=e=>{const i=+e.target.dataset.linkam;const v=e.target.value;const NM={tsukisamu:'月寒',shiraishi:'白石',factory:'サッポロファクトリー',shiseikan:'資生館'};roster[i].linkParkAm=v;logChange(roster[i].name,'linkParkAm','早朝の園を'+(NM[v]||'連携園と同じ')+'に変更',null,v);render();};});
+ document.querySelectorAll('[data-linkpm]').forEach(el=>{el.onchange=e=>{const i=+e.target.dataset.linkpm;const v=e.target.value;const NM={tsukisamu:'月寒',shiraishi:'白石',factory:'サッポロファクトリー',shiseikan:'資生館'};roster[i].linkParkPm=v;logChange(roster[i].name,'linkParkPm','夕方の園を'+(NM[v]||'連携園と同じ')+'に変更',null,v);render();};});
  // オプションチェックボックス
  document.querySelectorAll('[data-opt]').forEach(el=>{el.onchange=e=>{const i=+e.target.dataset.opt,f=e.target.dataset.of;const v=e.target.checked;
    const names={optMattress:'マットレス',optBus:'バス',optDiaper:'おむつサブスク',optKnit:'制服ﾚﾝﾀﾙ:ニット',optCap:'制服ﾚﾝﾀﾙ:キャップ',optParka:'制服ﾚﾝﾀﾙ:パーカー'};
