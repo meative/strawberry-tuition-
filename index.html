@@ -2984,6 +2984,10 @@ function cbManageShops(){ // この園の店舗名を追加・削除（園ごと
  draw();
 }
 const CB_BUMON={'月寒園':'月寒保育園','白石園':'白石保育園','サッポロファクトリー園':'ファクトリー保育園','幼稚舎':'幼稚園','資生館保育園':'資生館保育園'};
+// MF出力(K1)の事業者名を園別に出し分け。資生館保育園のみ別法人、その他はハイアイランド株式会社。
+// 対応表に無い園はハイアイランド株式会社にフォールバック（将来の園追加に備える）。
+const CB_JIGYOSHA={'資生館保育園':'株式会社Number9'};
+const CB_JIGYOSHA_DEFAULT='ハイアイランド株式会社';
 // 追加の経費出納帳（園の中のサブ帳簿）。key=保存キー, label=サブ切替の表示, disp=画面の部門表示, bumon=マネーフォワードの部門, mfSub=MF補助科目(小分類)
 const CB_EXTRA={
  '白石園':[{key:'village', label:'🚐 ヴィレッジ経費', disp:'ヴィレッジ', bumon:'ヴィレッジ', mfSub:''}],
@@ -3500,7 +3504,7 @@ function cbExportMF(modeOverride){
    else{ws[addr]={t:'n',v:val,f:formula};}
  };
  // 見出し部
- set('B1','現金出納帳');set('F1','事業者名／事業者番号');set('K1','ハイアイランド株式会社');set('L1','部門');set('M1',bumon);
+ set('B1','現金出納帳');set('F1','事業者名／事業者番号');set('K1',CB_JIGYOSHA[park]||CB_JIGYOSHA_DEFAULT);set('L1','部門');set('M1',bumon);
  set('B2','Ver e4.0');set('C2','現金出納帳');set('L2','補助科目');
  // 取引ヘッダ（3行目）
  set('B3','日付');set('D3','相手勘定科目');set('F3','相手補助科目');set('G3','相手部門');set('H3','相手取引先');
