@@ -3123,7 +3123,7 @@ function renderCashbook(){
  let h='';
  // ヘッダ：事業者・部門・繰越/本部振替
  h+=`<div style="padding:10px 22px;border-bottom:1px solid var(--line);display:flex;gap:24px;align-items:center;flex-wrap:wrap;font-size:13px">`+
-   `<span>事業者：<b>ハイアイランド株式会社</b></span>`+
+   `<span>事業者：<b>${CB_JIGYOSHA[park]||CB_JIGYOSHA_DEFAULT}</b></span>`+
    `<span>部門：<b style="color:var(--leaf)">${bumon}</b></span>`+
    `<span>${yy}年 ${mm}月</span>`+
    `<div style="flex:1"></div>`+
