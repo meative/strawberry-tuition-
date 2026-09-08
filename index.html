@@ -330,7 +330,7 @@ tr.changed:hover td{background:color-mix(in srgb,var(--gold) 22%,transparent)!im
 <div class="app">
 <header>
  <div class="brand"><h1>STRAWBERRY FIELD 月謝管理</h1>
-  <div class="tagline">Multi-Garden Tuition System　<span style="display:inline-block;padding:1px 8px;border-radius:8px;background:var(--berry);color:#fff;font-weight:700;font-size:10px;letter-spacing:.02em;vertical-align:middle">更新 2026-08-17</span></div></div>
+  <div class="tagline">Multi-Garden Tuition System　<span id="updBadgeHead" style="display:inline-block;padding:1px 8px;border-radius:8px;background:var(--berry);color:#fff;font-weight:700;font-size:10px;letter-spacing:.02em;vertical-align:middle"></span><!-- SF-UPDBADGE-20260908 : 更新日は APP_UPDATED（1箇所）から埋める --></div></div>
  <div class="theme-tog" id="themeTog"></div>
 </header>
 <div class="controls">
@@ -381,7 +381,7 @@ tr.changed:hover td{background:color-mix(in srgb,var(--gold) 22%,transparent)!im
  <span class="editbadge" id="editBadge"></span>
 </div>
 <div class="hint" id="hint"></div>
-<div class="foot">STRAWBERRY FIELD Children's Garden ／ ハイアイランド株式会社　—　月謝管理アプリ（方式B連動版）　<span style="display:inline-block;margin-left:8px;padding:2px 10px;border-radius:10px;background:var(--berry);color:#fff;font-weight:700;font-size:11px">更新 2026-08-25（内訳にマイナス金額も表示・初回オプションをワンクリック追加）</span></div>
+<div class="foot">STRAWBERRY FIELD Children's Garden ／ ハイアイランド株式会社　—　月謝管理アプリ（方式B連動版）　<span id="updBadgeFoot" style="display:inline-block;margin-left:8px;padding:2px 10px;border-radius:10px;background:var(--berry);color:#fff;font-weight:700;font-size:11px"></span><!-- SF-UPDBADGE-20260908 : 更新日は APP_UPDATED（1箇所）から埋める --></div>
 </div>
 <div id="loginOverlay" style="display:flex;position:fixed;inset:0;z-index:10040;background:linear-gradient(135deg,#7a2540,#3d2030);align-items:center;justify-content:center;padding:20px">
  <div style="background:#fff;border-radius:20px;max-width:380px;width:100%;padding:34px 30px 28px;box-shadow:0 20px 60px rgba(0,0,0,.4);text-align:center;font-family:inherit">
@@ -4199,6 +4199,14 @@ function saveTargetYM(){
 document.getElementById('yy').onchange=e=>{yy=+e.target.value;saveTargetYM();render();};
 document.getElementById('mm').onchange=e=>{mm=+e.target.value;saveTargetYM();render();};
 loadState();
+/* SF-UPDBADGE-20260908 : 更新日バッジ。従来ヘッダー(2026-08-17)とフッター(2026-08-25)で別々にハードコードされ
+   日付がズレていたため、この1箇所の定数に集約し、両バッジをここから埋める。表示のみでロジック・データには無関係。 */
+const APP_UPDATED='2026-09-08';
+const APP_UPDATED_NOTE='入園前の月を月次計算から除外・領収書No.欄・資生館MF対応';
+try{
+ const _bh=document.getElementById('updBadgeHead'); if(_bh)_bh.textContent='更新 '+APP_UPDATED;
+ const _bf=document.getElementById('updBadgeFoot'); if(_bf)_bf.textContent='更新 '+APP_UPDATED+'（'+APP_UPDATED_NOTE+'）';
+}catch(e){}
 syncTabs();applyParkColor();render();
 
 // ===== クラウド同期（Firebase）：共通ログイン・保存ごと自動同期＋鮮度表示・最終保存優先＋警告 =====
