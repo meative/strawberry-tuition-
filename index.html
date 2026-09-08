@@ -1674,7 +1674,9 @@ function renderAddon(){
   else if(sizes.length===1){sizeCell=`<span class="cls">${sizes[0]}</span>`;}
   else{sizeCell=`<select class="inp" data-add="${i}" data-f="size">${sizes.map(s=>`<option ${a.size===s?'selected':''}>${s}</option>`).join('')}</select>`;}
   // 単価セル：返金は手入力、申込は商品単価
-  const priceCell=isRefund
+  /* SF-ADDONOTHER-20260908 : 申込でも項目が「その他」（単価0の自由項目）のときは金額を手入力できるようにする。
+     返金と同じ data-f="price" の経路（数値化→a.price→addonsFor の raw）に乗せる。符号反転はせず通常のプラス金額。 */
+  const priceCell=(isRefund||a.goods==='その他')
    ?`<input class="inp num" type="number" data-add="${i}" data-f="price" value="${a.price||0}" style="text-align:right;width:90px">`
    :`¥${(a.price||0).toLocaleString()}`;
   // 反映年月プルダウン
@@ -2988,6 +2990,11 @@ const CB_BUMON={'月寒園':'月寒保育園','白石園':'白石保育園','サ
 // 対応表に無い園はハイアイランド株式会社にフォールバック（将来の園追加に備える）。
 const CB_JIGYOSHA={'資生館保育園':'株式会社Number9'};
 const CB_JIGYOSHA_DEFAULT='ハイアイランド株式会社';
+/* SF-ACCT99-20260908 : 勘定科目名の園別上書き表。資生館（株式会社Number9）のMF登録名はコード99が
+   「保育商品仕入高」のため、名称が一致せず取込チェックが外れていた。表に無い園・コードは
+   CB_ACCTS の既定名にフォールバック。税区分・費目・金額計算には一切影響しない（名称のみ）。 */
+const CB_ACCT_NAME_BY_PARK={'資生館保育園':{99:'保育商品仕入高'}};
+function cbAcctName(code){const ov=CB_ACCT_NAME_BY_PARK[park];if(ov&&ov[+code]!=null)return ov[+code];const a=CB_ACCT_BY[+code];return a?a.name:'';}
 // 追加の経費出納帳（園の中のサブ帳簿）。key=保存キー, label=サブ切替の表示, disp=画面の部門表示, bumon=マネーフォワードの部門, mfSub=MF補助科目(小分類)
 const CB_EXTRA={
  '白石園':[{key:'village', label:'🚐 ヴィレッジ経費', disp:'ヴィレッジ', bumon:'ヴィレッジ', mfSub:''}],
@@ -3192,7 +3199,7 @@ function renderCashbook(){
      `</tr>`;
    return;
   }
-  const acctOpts=`<option value="">選択…</option>`+CB_USED.map(a=>`<option value="${a.code}" ${String(r.acct)===String(a.code)?'selected':''}>${a.code} ${a.name}</option>`).join('');
+  const acctOpts=`<option value="">選択…</option>`+CB_USED.map(a=>`<option value="${a.code}" ${String(r.acct)===String(a.code)?'selected':''}>${a.code} ${cbAcctName(a.code)}</option>`).join(''); /* SF-ACCT99-20260908 : 表示名も園別 */
   const taxOpts=CB_TAXES.map(tx=>`<option ${r.tax===tx?'selected':''}>${tx}</option>`).join('');
   /* SF-TANTOU-KEEP-20260831 : 取込時の受領者がSTAFF未登録の名前でも、選択済みの候補として残す（沼山等） */
   const byOpts=`<option value="">担当…</option>`+STAFF.map(s=>`<option ${r.by===s?'selected':''}>${s}</option>`).join('')+((r.by&&!STAFF.includes(r.by))?`<option selected>${String(r.by).replace(/&/g,'&amp;').replace(/</g,'&lt;')}</option>`:'');
@@ -3381,7 +3388,7 @@ function cbExportCsv(eventOnly){
    const tekiyo=`${noLabel}${r.shop||''}${r.shop&&r.item?'　':''}${r.item||''}`;
    const mo=(r.mon!=null&&r.mon!=='')?r.mon:mm;
    const kubun=r.src?(CB_SRC_LABEL[r.src]||'収入'):(r.event?'イベント費':'通常');
-   rows.push([noLabel, r.day?`${yy}/${mo}/${r.day}`:'', kubun, acctCode, a?a.name:'', bumon, r.tax||'', tekiyo, inn||'', out||'', (eventOnly?'':bal), r.by||'']);
+   rows.push([noLabel, r.day?`${yy}/${mo}/${r.day}`:'', kubun, acctCode, a?cbAcctName(acctCode):'', bumon, r.tax||'', tekiyo, inn||'', out||'', (eventOnly?'':bal), r.by||'']); /* SF-ACCT99-20260908 */
  });
  if(eventOnly){
    const evSum=cb.rows.filter(r=>r.event).reduce((s,r)=>s+(r.kind==='out'?(Number(r.amt)||0):0),0);
@@ -3437,7 +3444,7 @@ function cbCollectMfRows(){
      // 経費（出金）
      if(r.kind==='out'){
        const a=CB_ACCT_BY[+r.acct];
-       add(mo,r.day,a?a.name:'',r.tax||(a&&a.tax)||'',`${r.receiptNo?r.receiptNo+' ':''}${r.shop||''}${r.shop&&r.item?'　':''}${r.item||''}`,0,Number(r.amt)||0);return;
+       add(mo,r.day,a?cbAcctName(r.acct):'',r.tax||(a&&a.tax)||'',`${r.receiptNo?r.receiptNo+' ':''}${r.shop||''}${r.shop&&r.item?'　':''}${r.item||''}`,0,Number(r.amt)||0);return; /* SF-ACCT99-20260908 */
      }
    });
  });
@@ -3461,7 +3468,7 @@ function cbCollectMfRowsExtra(){
    const mo=(r.mon!=null&&r.mon!=='')?r.mon:mm;
    if(r.isCash&&r.kind==='in'&&!r.isClose){add(mo,r.day,'普通預金',(r.tax||'対象外'),'現金入金（補充）',Number(r.amt)||0,0);return;}
    if(r.isClose){if(r.carry)return;add(mo,r.day,'普通預金','対象外','預金振替',0,Number(r.amt)||0,9);return;}
-   if(r.kind==='out'){const a=CB_ACCT_BY[+r.acct];add(mo,r.day,a?a.name:'',r.tax||(a&&a.tax)||'',`${r.receiptNo?r.receiptNo+' ':''}${r.shop||''}${r.shop&&r.item?'　':''}${r.item||''}`,0,Number(r.amt)||0);return;}
+   if(r.kind==='out'){const a=CB_ACCT_BY[+r.acct];add(mo,r.day,a?cbAcctName(r.acct):'',r.tax||(a&&a.tax)||'',`${r.receiptNo?r.receiptNo+' ':''}${r.shop||''}${r.shop&&r.item?'　':''}${r.item||''}`,0,Number(r.amt)||0);return;} /* SF-ACCT99-20260908 */
  });
  items.sort((a,b)=>(a.order-b.order)||(a.dnum-b.dnum));
  return items;
@@ -3513,6 +3520,9 @@ function cbExportMF(modeOverride){
  set('K4','繰越金');set('N4',0);
  // 名称→コードの対応（勘定科目コードを直接入れる。数式を使わないので▲が一切出ない）
  const MF_CODE_BY_NAME={};MF_ACCTS.forEach(([code,name])=>{MF_CODE_BY_NAME[name]=code;});
+ /* SF-ACCT99-20260908 : 園別の科目名（資生館の「保育商品仕入高」等）でもコードを引けるように追加登録。
+    これが無いと名前→コードの逆引きに失敗し、該当行がスキップされて出力から消える。 */
+ Object.entries(CB_ACCT_NAME_BY_PARK[park]||{}).forEach(([c,n])=>{MF_CODE_BY_NAME[n]=+c;});
  // データ行（5行目〜）：通常出納帳＋イベント出納帳を合算した明細を日付順に出力。残高は通し計算。
  let row=5;
  let runBal=0;
@@ -3547,7 +3557,7 @@ function cbExportMF(modeOverride){
  let mr=6;
  MF_MASTER_CODES.forEach(code=>{
    const a=MF_ACCT_BY_CODE[code];if(!a)return;
-   set('Q'+mr,a[0]);set('R'+mr,a[1]);if(a[2])set('V'+mr,a[2]);mr++; // mrは最大 6+8=14 → Q36 に十分収まる
+   set('Q'+mr,a[0]);set('R'+mr,(CB_ACCT_NAME_BY_PARK[park]&&CB_ACCT_NAME_BY_PARK[park][a[0]])||a[1]);if(a[2])set('V'+mr,a[2]);mr++; // mrは最大 6+8=14 → Q36 に十分収まる /* SF-ACCT99-20260908 : マスター表も園別名 */
  });
  // シート範囲
  const maxRow=Math.max(lastDataRow,mr,46);
@@ -3574,7 +3584,7 @@ function cbSplitData(cb){
    }
    if(r.kind==='out'){ // 支出（経費）
      const a=CB_ACCT_BY[+r.acct];
-     expenses.push({date, acct:a?a.name:'', tax:r.tax||'', receiptNo:r.receiptNo||'', shop:r.shop||'', item:r.item||'', amt:Number(r.amt)||0, by:r.by||'', event:!!r.event}); /* SF-RECEIPTNO-20260901 */
+     expenses.push({date, acct:a?cbAcctName(r.acct):'', tax:r.tax||'', receiptNo:r.receiptNo||'', shop:r.shop||'', item:r.item||'', amt:Number(r.amt)||0, by:r.by||'', event:!!r.event}); /* SF-RECEIPTNO-20260901 / SF-ACCT99-20260908 */
    }
  });
  // 新規入園（振込売上）※追加経費帳簿では売上なし
