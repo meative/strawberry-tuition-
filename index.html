@@ -856,7 +856,8 @@ function addonIsTaxable(a){
 function addonsFor(p){return addons.filter(a=>a.name===p.name&&+a.ry===yy&&+a.rm===mm).map(a=>{
  const raw=(a.price||0)*(a.qty||1);
  const isRefund=a.kind==='返金';
- return {item:(isRefund?'返金:':'')+(a.goods||'項目'),amt:isRefund?-Math.abs(raw):raw,addonTaxable:addonIsTaxable(a)};});}
+ /* SF-ADDONNOTE-20260909 : 内容（備考）があれば「項目名（内容）」で併記。空なら従来どおり。金額には無関係 */
+ return {item:(isRefund?'返金:':'')+(a.goods||'項目')+(a.note?`（${a.note}）`:''),amt:isRefund?-Math.abs(raw):raw,addonTaxable:addonIsTaxable(a)};});}
 // 給食実費（幼稚舎・末締め、翌々月請求）：対象年月の請求には「前々月」の利用を集計して乗せる（例：8月利用分は10月の月次計算に反映）
 function prevMonth(y,m){return m===1?{y:y-1,m:12}:{y:y,m:m-1};}
 function mealsFor(p){
@@ -1525,7 +1526,7 @@ function renderNew(){
    h+=`<div style="background:var(--panel2);padding:16px 18px;border-top:1px solid var(--line)">`+
      `<div style="font-size:13px;color:var(--berry);font-weight:600;margin-bottom:10px">${n.name||'（園児名未入力）'} さんの初回オプション（制服・マット・おむつ等）</div>`+
      // ワンクリック追加：ボタンを押すだけで「項目＋単価」が入った行が増える（選択と金額入力の手間をなくす）
-     (()=>{const pick=(n.park==='資生館保育園')?goodsList.filter(g=>Array.isArray(g.facs)&&g.facs.includes('資生館保育園')):goodsList;
+     (()=>{const pick=(n.park==='資生館保育園')?goodsList.filter(g=>Array.isArray(g.facs)&&g.facs.includes('資生館保育園')):goodsList.filter(g=>!(Array.isArray(g.facs)&&g.facs.length>0)||g.facs.includes(n.park)); /* SF-GOODSID-20260909 : チップも園専用品を出し分け */
        const chip='border:1px solid var(--line);border-radius:14px;background:var(--paper);color:var(--ink);cursor:pointer;font-size:12px;padding:5px 12px;font-family:inherit';
        return `<div style="margin-bottom:10px;display:flex;gap:6px;flex-wrap:wrap;align-items:center">`+
          `<span style="font-size:11px;color:var(--mut);margin-right:2px">クリックで追加：</span>`+
@@ -1538,7 +1539,15 @@ function renderNew(){
      `<div style="overflow-x:auto"><table style="width:100%;font-size:13px;min-width:520px"><thead><tr style="color:var(--mut);text-align:left"><th style="padding:4px 8px">項目</th><th style="padding:4px 8px">サイズ</th><th style="padding:4px 8px;text-align:right">単価</th><th style="padding:4px 8px;text-align:right">数量</th><th style="padding:4px 8px;text-align:right">小計</th><th></th></tr></thead><tbody>`;
    (n.initOpts||[]).forEach((o,oi)=>{
     const sub=(Number(o.price)||0)*(Number(o.qty)||0);
-    const goodsOptions=`<option value="">（選択）</option>`+(n.park==='資生館保育園'?goodsList.filter(g=>Array.isArray(g.facs)&&g.facs.includes('資生館保育園')):goodsList).map(g=>`<option value="${g.name}" ${o.goods===g.name&&!o.custom?'selected':''}>${g.cat}：${g.name}（¥${g.price.toLocaleString()}）</option>`).join('')+`<option value="__custom" ${o.custom?'selected':''}>その他（自由入力）</option>`;
+    /* SF-GOODSID-20260909 : 同名商品（キャップ U-03 ¥3,850／U-05 ¥2,500）の誤ヒット対策。
+       従来は選択済み判定が名前一致で、同名2件の両方に selected が付き表示だけ資生館専用側にズレていた。
+       行の商品は「名前＋単価」で id 特定（_gsel）し、selected はその1件だけに付ける。
+       園専用品（facsが非空）は当該園でのみ候補に出す（facs空の汎用品は従来どおり全園）。資生館の絞り込みは従来どおり。
+       入力済みの非表示候補（他園に残るU-05等）は選択肢に足して表示を保つ（データは変更しない）。 */
+    const _gsel=(o.custom||!o.goods)?null:(M.goods.find(g=>g.name===o.goods&&Number(g.price)===Number(o.price))||findGoods(o.goods,n.park));
+    const _glist=(n.park==='資生館保育園')?goodsList.filter(g=>Array.isArray(g.facs)&&g.facs.includes('資生館保育園')):goodsList.filter(g=>!(Array.isArray(g.facs)&&g.facs.length>0)||g.facs.includes(n.park));
+    const _gopts=_glist.slice(); if(_gsel&&_gopts.indexOf(_gsel)<0)_gopts.push(_gsel);
+    const goodsOptions=`<option value="">（選択）</option>`+_gopts.map(g=>`<option value="${g.name}" data-gid="${g.id}" ${(!o.custom&&_gsel===g)?'selected':''}>${g.cat}：${g.name}（¥${g.price.toLocaleString()}）</option>`).join('')+`<option value="__custom" ${o.custom?'selected':''}>その他（自由入力）</option>`;
     // 選んだ商品のサイズ配列を取得（自由入力時は空）
     const g=o.custom?null:findGoods(o.goods,n.park);
     const sizes=(g&&g.sizes)?g.sizes:[];
@@ -1615,7 +1624,9 @@ function renderNew(){
      if(of==='sel'){const v=e.target.value;
        if(v==='__custom'){o.custom=true;o.goods='';o.price=0;o.size='';}
        else if(v===''){o.goods='';o.price=0;o.size='';}
-       else{const g=findGoods(v,roster[i].park);o.custom=false;o.goods=v;
+       else{/* SF-GOODSID-20260909 : 選んだoptionのidで商品を特定（名前で逆引きしない）。id が取れない環境のみ従来のfindGoodsで代替 */
+         const _so=e.target.selectedOptions&&e.target.selectedOptions[0];const _gid=_so&&_so.dataset?_so.dataset.gid:null;
+         const g=(_gid&&M.goods.find(x=>String(x.id)===String(_gid)))||findGoods(v,roster[i].park);o.custom=false;o.goods=v;
          if(g){o.price=g.price;const sz=(g.sizes&&g.sizes.length>0)?g.sizes[0]:'';o.size=sz;}
        }
        render();
@@ -1674,6 +1685,9 @@ function renderAddon(){
       `</select></div>`;
    }
   }
+  /* SF-ADDONNOTE-20260909 : 内容（備考）欄。何に対するお金かを書ける自由入力（申込・返金の両方）。
+     addonsFor で「項目名（内容）」として月次計算の事由・案内文・xlsxに併記される。金額計算には無関係。 */
+  itemCell+=`<input class="inp" data-add="${i}" data-f="note" value="${(a.note||'').replace(/"/g,'&quot;')}" placeholder="内容（何のお金か・任意）" style="margin-top:4px;font-size:12px">`;
   // サイズセル
   let sizeCell;
   if(isRefund){sizeCell='<span style="color:var(--mut)">—</span>';}
@@ -1718,7 +1732,8 @@ function renderAddon(){
    }
    if(f==='kind'){if(v==='返金'){addons[i].goods='';addons[i].size='';addons[i].custom=false;}}
    render();};el.onchange=handler;
-   if(el.dataset.f==='customgoods')el.oninput=e=>{addons[+e.target.dataset.add].goods=e.target.value;saveState();};});
+   if(el.dataset.f==='customgoods')el.oninput=e=>{addons[+e.target.dataset.add].goods=e.target.value;saveState();};
+   if(el.dataset.f==='note')el.oninput=e=>{addons[+e.target.dataset.add].note=e.target.value;saveState();};}); /* SF-ADDONNOTE-20260909 : 入力中も保存（customgoodsと同じ経路） */
  document.querySelectorAll('[data-adddel]').forEach(el=>{el.onclick=e=>{const i=+e.currentTarget.dataset.adddel;
    const a=addons[i];const nm=(a.name?a.name+'さんの':'')+(a.goods||'この項目')+(a.kind==='返金'?'（返金）':'');
    confirmDialog(`追加申込みから「${nm}」を削除します。\nこの操作は取り消せません。本当に削除しますか？`,()=>{addons.splice(i,1);render();});};});
@@ -3000,7 +3015,7 @@ const CB_JIGYOSHA_DEFAULT='ハイアイランド株式会社';
 /* SF-ACCT99-20260908 : 勘定科目名の園別上書き表。資生館（株式会社Number9）のMF登録名はコード99が
    「保育商品仕入高」のため、名称が一致せず取込チェックが外れていた。表に無い園・コードは
    CB_ACCTS の既定名にフォールバック。税区分・費目・金額計算には一切影響しない（名称のみ）。 */
-const CB_ACCT_NAME_BY_PARK={'資生館保育園':{99:'保育商品仕入高'}};
+const CB_ACCT_NAME_BY_PARK={'資生館保育園':{99:'保育商品仕入高',128:'保育園収入'}}; /* SF-ACCT128-20260909 : 資生館のMF登録名はコード128が「保育園収入」 */
 function cbAcctName(code){const ov=CB_ACCT_NAME_BY_PARK[park];if(ov&&ov[+code]!=null)return ov[+code];const a=CB_ACCT_BY[+code];return a?a.name:'';}
 // 追加の経費出納帳（園の中のサブ帳簿）。key=保存キー, label=サブ切替の表示, disp=画面の部門表示, bumon=マネーフォワードの部門, mfSub=MF補助科目(小分類)
 const CB_EXTRA={
@@ -3193,7 +3208,7 @@ function renderCashbook(){
    h+=`<tr style="background:var(--leafsoft)">`+
      `<td style="text-align:center;font-weight:700;color:var(--leaf);font-size:11px">振込</td>`+
      `<td style="font-size:12px">${yy}/${(r.mon!=null?r.mon:mm)}/${r.day||''}</td>`+
-     `<td style="color:var(--leaf);font-size:12px">128 保育園収入高</td>`+
+     `<td style="color:var(--leaf);font-size:12px">128 ${cbAcctName(128)}</td>`+
      `<td style="color:var(--mut);font-size:11px">${r.tax||'非課税売上'}</td>`+
      `<td></td>`+/* SF-RECEIPTNO-20260901 : 領収書No（自動行は空） */
      `<td></td>`+
@@ -3222,7 +3237,7 @@ function renderCashbook(){
     (fixed
       ? `<td style="color:var(--mut)">1 現金</td>`
       : timely
-      ? `<td style="color:var(--leaf);font-size:12px">128 保育園収入高</td>`
+      ? `<td style="color:var(--leaf);font-size:12px">128 ${cbAcctName(128)}</td>`
       : `<td><select data-cb="${i}" data-f="acct" ${dis} class="inp" style="width:100%;padding:3px 5px;font-size:12px">${acctOpts}</select></td>`)+
     (fixed
       ? `<td></td>`
@@ -3248,7 +3263,7 @@ function renderCashbook(){
  h+='</tbody></table></div>';
  // 未使用科目（ロック表示）
  h+=`<div class="noprint" style="padding:14px 22px;border-top:1px solid var(--line)"><div style="font-size:12px;color:var(--mut);margin-bottom:6px">使っていない勘定科目（選択不可・ロック）</div>`+
-   `<div style="display:flex;flex-wrap:wrap;gap:6px">`+CB_ACCTS.filter(a=>!a.used).map(a=>`<span style="font-size:11px;color:#aaa;background:#f0f0f0;border:1px solid #e3e3e3;border-radius:4px;padding:2px 8px">🔒 ${a.code} ${a.name}</span>`).join('')+`</div></div>`;
+   `<div style="display:flex;flex-wrap:wrap;gap:6px">`+CB_ACCTS.filter(a=>!a.used).map(a=>`<span style="font-size:11px;color:#aaa;background:#f0f0f0;border:1px solid #e3e3e3;border-radius:4px;padding:2px 8px">🔒 ${a.code} ${cbAcctName(a.code)}</span>`).join('')+`</div></div>`;
  document.getElementById('body').innerHTML=h;
  // ハンドラ
  document.getElementById('cbOpening')&&(document.getElementById('cbOpening').onchange=e=>{cbGet().opening=moneyNormalize(e.target.value);render();});
@@ -3457,8 +3472,8 @@ function cbCollectMfRows(){
  });
  // 売上（通常側のみ）：新規入園（振込）・タイムリー（現金）
  const cbN=cbStoreGet(cashbook);
- shokaiAutoRowsFor(false).forEach(r=>{const mo=(r.mon!=null&&r.mon!=='')?r.mon:mm;add(mo,r.day,'保育園収入高','非課税売上',`【振込】${r.item||''}`,Number(r.amt)||0,0);});
- (timelyData[park]&&timelyData[park][ymKey()]||[]).forEach(r=>{add((r.mon||mm),r.day,'保育園収入高','非課税売上',`【現金】${r.item||''}`,Number(r.amt)||0,0);});
+ shokaiAutoRowsFor(false).forEach(r=>{const mo=(r.mon!=null&&r.mon!=='')?r.mon:mm;add(mo,r.day,cbAcctName(128),'非課税売上',`【振込】${r.item||''}`,Number(r.amt)||0,0);}); /* SF-ACCT128-20260909 */
+ (timelyData[park]&&timelyData[park][ymKey()]||[]).forEach(r=>{add((r.mon||mm),r.day,cbAcctName(128),'非課税売上',`【現金】${r.item||''}`,Number(r.amt)||0,0);}); /* SF-ACCT128-20260909 */
  // 日付順（order→dnum）で安定ソート
  items.sort((a,b)=>(a.order-b.order)||(a.dnum-b.dnum));
  return items;
@@ -4113,7 +4128,7 @@ function exportXlsx(){
  visible().filter(r=>(r.status==='在園中'||calc(r).isNew)&&!taienStopped(r)&&!nyuenNotYet(r)).forEach(r=>{const c=calc(r);const base=c.getsu+c.kyozai+c.sib+c.half+(c.early||0);const e0=c.evs[0];const chg=changesFor(r);l.push([r.lid,r.cls,r.name,'月謝（'+r.waku+'）',base,e0?e0.item:'',e0?e0.amt:'',c.total,chg.length?'変動':'']);});add('ルクミー出力',l,[4,6,7]);
  const hq=[['施設','在園数','請求合計','うち月謝系','うち制服代','うち行事/その他']];let gt=0,gc=0;['月寒園','白石園','サッポロファクトリー園','幼稚舎','資生館保育園'].forEach(p=>{let cnt=0,tot=0,base=0,uni=0,ev=0;allPupils().filter(r=>r.park===p).forEach(r=>{const c=calc(r);if((r.status==='在園中'||c.isNew)&&!c.taienStopped&&!c.nyuenNotYet){cnt++;tot+=c.total;base+=c.getsu+c.kyozai+c.sib+c.half+(c.early||0)+c.fee;c.evs.forEach(e=>{if(isUniform(e.item))uni+=e.amt;else ev+=e.amt;});}});gt+=tot;gc+=cnt;hq.push([p,cnt,tot,base,uni,ev]);});hq.push(['全施設合計',gc,gt,'','','']);add('本部用集計',hq,[2,3,4,5]);
  const nw=[['状態','所属園','園児名','フリガナ','枠区分','クラス','口座名義','入園年月日']];roster.filter(r=>r.isNew).sort((a,b)=>(a.regSeq||0)-(b.regSeq||0)).forEach(n=>nw.push([n.confirmed?'確定済':'未確定',n.park,n.name,n.kana||'',n.waku,n.cls,n.koza,n.nyuen]));add('新規入園',nw);
- const ad=[['園児名','商品/項目','サイズ','数量','単価','小計','反映年','反映月']];addons.forEach(a=>ad.push([a.name,a.goods,a.size,a.qty,a.price,(a.price||0)*(a.qty||0),a.ry,a.rm]));add('追加申込み',ad,[4,5]);
+ const ad=[['園児名','商品/項目','サイズ','数量','単価','小計','反映年','反映月']];addons.forEach(a=>ad.push([a.name,(a.goods||'')+(a.note?`（${a.note}）`:''),a.size,a.qty,a.price,(a.price||0)*(a.qty||0),a.ry,a.rm])); /* SF-ADDONNOTE-20260909 */add('追加申込み',ad,[4,5]);
  const ml=[['日付','園児名','昼食','パン','金額']];meals.forEach(r=>ml.push([r.date,r.name,r.lunch?'○':'',r.bread?'○':'',(r.lunch?M.mealfee.lunch:0)+(r.bread?M.mealfee.bread:0)]));add('給食記録',ml,[4]);
  const sc=[['年','月','項目','対象','個別園児','金額','状態']];sched.forEach(s=>sc.push([s.year,s.month,s.item,s.cls,s.pupil||'',s.fix||0,s.state]));add('年間スケジュール',sc,[5]);
  const FACS=['月寒園','白石園','サッポロファクトリー園','幼稚舎','資生館保育園'];
