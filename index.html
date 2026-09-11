@@ -896,7 +896,13 @@ function optionsFor(p){
  return {items,amt};
 }
 function taienYM(p){ if(!p||!p.taien)return null; const s=String(p.taien); const y=+s.slice(0,4), m=+s.slice(5,7); return (y&&m)?(y*100+m):null; }
-function taienStopped(p){ const z=taienYM(p); return z!=null && (yy*100+mm)>z; }   // 対象月＞退園月＝請求・引落の対象外
+/* SF-RETURNEE-20260911 : 復園。taien / nyuen は上書きも削除もせず、returnDate（復園日）＋returnee で表現する。
+   対象月＞退園月でも、対象月≧復園月なら在園扱い。これで
+   「昨年度＝在園（従来どおり）／資生館在籍期間＝退園済み0円／復園月以降＝在園」と履歴が全部残り、
+   過去月の月次計算（現在の台帳から再計算）を書き換えない。nyuen が元のままなので
+   SF-NYUENFIRST の入園月ガードも復園月には当たらない（初回案内なし・復園月から引落）。 */
+function returnYM(p){ if(!p||!p.returnee||!p.returnDate)return null; const s=String(p.returnDate); const y=+s.slice(0,4), m=+s.slice(5,7); return (y&&m)?(y*100+m):null; }
+function taienStopped(p){ const z=taienYM(p); if(z==null||(yy*100+mm)<=z)return false; const r=returnYM(p); if(r!=null&&(yy*100+mm)>=r)return false; return true; }   // 対象月＞退園月＝対象外（復園月以降は在園扱い）
 function taienLastMonth(p){ const z=taienYM(p); return z!=null && (yy*100+mm)===z; } // 対象月＝退園月＝最終請求月
 /* SF-NYUENGUARD-20260908 : 入園前ガード。退園側(taienYM/taienStopped)と対称の仕組み。
    入園年月日(p.nyuen, YYYY-MM-DD)より前の月は請求・表示の対象外にする。未設定は従来どおり（null=対象）。
@@ -914,9 +920,12 @@ function calc(p,asNyuenMonth){
  // モードなので、入園前・入園月のガードを素通しにする（さもないと初回案内の初月合計が0になってしまう）。
  if(!asNyuenMonth && nyuenNotYet(p)) return {type:facType(p.park),getsu:0,kyozai:0,sib:0,half:0,early:0,evs:[],evSum:0,sub:0,fee:0,total:0,flag:true,changed:false,reason:'入園前（請求対象外）',isNew:false,nyuenNotYet:true};
  // SF-NYUENFIRST-20260909 : 入園月＝初回案内で請求済み。月次計算（引落）は翌月から
- if(!asNyuenMonth && nyuenFirstMonth(p)) return {type:facType(p.park),getsu:0,kyozai:0,sib:0,half:0,early:0,evs:[],evSum:0,sub:0,fee:0,total:0,flag:true,changed:false,reason:'入園月（初回案内で請求済み）',isNew:false,nyuenFirst:true};
+ // SF-RETURNEE-20260911 : 復園（returnee）は初回案内を出さないため、入園月ガードを素通しして入園月から引落に載せる
+ if(!asNyuenMonth && !p.returnee && nyuenFirstMonth(p)) return {type:facType(p.park),getsu:0,kyozai:0,sib:0,half:0,early:0,evs:[],evSum:0,sub:0,fee:0,total:0,flag:true,changed:false,reason:'入園月（初回案内で請求済み）',isNew:false,nyuenFirst:true};
  const c=_calcCore(p,asNyuenMonth);
  if(taienLastMonth(p)){ c.flag=true; c.reason=(c.reason?c.reason+' / ':'')+'今月で退園（最終請求月）'; c.taienLast=true; }
+ // SF-RETURNEE-20260911 : 復園月はフラグ事由「復園」を出す（A案=returnDateの月／B案フォールバック=nyuenの月）
+ if(p.returnee){ const _rym=returnYM(p)!=null?returnYM(p):nyuenYM(p); if(_rym!=null&&_rym===(yy*100+mm)){ c.flag=true; c.reason=(c.reason?c.reason+' / ':'')+'復園'; c.returnee=true; } }
  return c;
 }
 function _calcCore(p,asNyuenMonth){
@@ -1403,7 +1412,7 @@ function renderRoster(){const rows=visible();
    `<td>${ed?`<select data-sib="${i}" class="inp" style="width:auto;padding:4px 8px;font-size:12px;color:${r.sib==='あり'?'var(--berry)':'var(--mut)'}"><option ${r.sib!=='あり'?'selected':''}>なし</option><option ${r.sib==='あり'?'selected':''}>あり</option></select>`:(r.sib||'なし')}</td>`+
    `<td>${ed?`<select data-pay="${i}" class="inp" style="width:auto;padding:4px 8px;font-size:12px;font-weight:700;color:${payMethod(r)==='振込'?'#fff':'var(--mut)'};background:${payMethod(r)==='振込'?'var(--berry)':'var(--paper)'};border-color:${payMethod(r)==='振込'?'var(--berry)':'var(--line)'}"><option ${payMethod(r)!=='振込'?'selected':''}>引落</option><option ${payMethod(r)==='振込'?'selected':''}>振込</option></select>`:`<span class="paytag" style="display:inline-block;padding:3px 10px;border-radius:10px;font-size:11px;font-weight:700;${payMethod(r)==='振込'?'background:var(--berry);color:#fff':'background:var(--paper);color:var(--mut);border:1px solid var(--line)'}">${payMethod(r)}</span>`}</td>`+
    (showOpt?`<td>${optCell}</td>`:'')+
-   `<td style="white-space:nowrap">${ed?`<input type="date" data-arr2="roster" data-i="${i}" data-f="taien" value="${r.taien||''}" class="inp" style="width:auto;padding:4px 6px;font-size:11px" title="退園予定日（この月の翌月から請求を止めます）">`:(r.taien||'—')}${!r.taien?'':taienStopped(r)?'<br><span style="font-size:10px;font-weight:700;color:#c0392b">⛔ 退園済み</span>':taienLastMonth(r)?'<br><span style="font-size:10px;font-weight:700;color:#b8860b">⚠ 今月で退園</span>':'<br><span style="font-size:10px;color:var(--mut)">退園予定</span>'}</td>`+
+   `<td style="white-space:nowrap">${ed?`<input type="date" data-arr2="roster" data-i="${i}" data-f="taien" value="${r.taien||''}" class="inp" style="width:auto;padding:4px 6px;font-size:11px" title="退園予定日（この月の翌月から請求を止めます）">`:(r.taien||'—')}${!r.taien?'':(returnYM(r)!=null&&(yy*100+mm)>=returnYM(r))?`<br><span style="font-size:10px;font-weight:700;color:var(--leaf)" title="復園日：${r.returnDate}（退園日・入園年月日は履歴として保持）">↩ 復園（${r.returnDate}）</span>`:taienStopped(r)?('<br><span style="font-size:10px;font-weight:700;color:#c0392b">⛔ 退園済み</span>'+(ed?`<br><button data-return="${i}" style="margin-top:2px;font-size:10px;padding:2px 8px;border:1px solid var(--leaf);color:var(--leaf);background:var(--paper);border-radius:8px;cursor:pointer" title="この子を復園にする（SF-RETURNEE-20260911）">↩ 復園</button>`:'')):taienLastMonth(r)?'<br><span style="font-size:10px;font-weight:700;color:#b8860b">⚠ 今月で退園</span>':'<br><span style="font-size:10px;color:var(--mut)">退園予定</span>'}</td>`+
    `<td>${ed?`<select data-link="${i}" class="inp" style="width:auto;padding:4px 8px;font-size:12px;color:var(--berry)"><option value="">未設定</option><option value="tsukisamu" ${r.linkPark==='tsukisamu'?'selected':''}>月寒</option><option value="shiraishi" ${r.linkPark==='shiraishi'?'selected':''}>白石</option><option value="factory" ${r.linkPark==='factory'?'selected':''}>サッポロファクトリー</option><option value="shiseikan" ${r.linkPark==='shiseikan'?'selected':''}>資生館</option></select>`:(r.linkPark||'—')}</td>`+/* SF-AMPMPARK-20260901 : 朝と夕方で通う園が違う子がいる（例：朝は白石で早朝、バスで幼稚園、夕方は月寒で延長）。
     空欄なら連携園と同じ扱いなので、既存の登録は何も変わらない。 */
    `<td>${ed?`<select data-linkam="${i}" class="inp" style="width:auto;padding:4px 8px;font-size:12px;color:var(--berry)"><option value="">連携園と同じ</option><option value="tsukisamu" ${r.linkParkAm==='tsukisamu'?'selected':''}>月寒</option><option value="shiraishi" ${r.linkParkAm==='shiraishi'?'selected':''}>白石</option><option value="factory" ${r.linkParkAm==='factory'?'selected':''}>サッポロファクトリー</option><option value="shiseikan" ${r.linkParkAm==='shiseikan'?'selected':''}>資生館</option></select>`:(r.linkParkAm||'—')}</td>`+
@@ -1437,6 +1446,30 @@ function renderRoster(){const rows=visible();
  document.querySelectorAll('[data-pupildel]').forEach(el=>{el.onclick=e=>{const i=+e.currentTarget.dataset.pupildel;
    const nm=roster[i].name||'この園児';
    confirmDialog(`「${nm}」さんを園児台帳から削除します。\nこの操作は取り消せません。本当に削除しますか？`,()=>{roster.splice(i,1);render();});};});
+ /* SF-RETURNEE-20260911 : 退園済みレコードの復園（A案）。taien / nyuen は書き換えず
+    returnDate＋returnee＋status='在園中' を付けるだけ。過去月（在園期間・退園期間）の
+    月次計算は現在の台帳から再計算されるため、履歴を残すことで過去月が変わらない。 */
+ document.querySelectorAll('[data-return]').forEach(el=>{el.onclick=e=>{const i=+e.currentTarget.dataset.return;const r=roster[i];
+   const isB=facType(r.park)==='B';
+   const hasOv=(r.jugyoOverride!==undefined&&r.jugyoOverride!==null&&r.jugyoOverride!=='');
+   const wakuList=(facType(r.park)==='C'?['地域枠','企業提携枠','旧企業提携枠','旧地域枠','地域無償化','非課税世帯','従業員(保育士)','従業員(アドバイザー)','従業員(ハイアイランド)','従業員(Number9)','従業員(他園)']:isB?['早割','一般',`一般（旧料金 ¥${(M.youchisha.jugyo_old!=null?M.youchisha.jugyo_old:45000).toLocaleString()}）`,'従業員(保育士)','従業員(Number9)','従業員(ハイアイランド)','従業員(アドバイザー)']:Object.keys(M.prices).concat(['非課税世帯']));
+   const wakuOpts=wakuList.map(w=>{const oldOpt=String(w).indexOf('一般（旧料金')===0;const sel=oldOpt?(r.waku==='一般'&&hasOv):(r.waku===w&&!(w==='一般'&&hasOv&&isB));return `<option ${sel?'selected':''}>${w}</option>`;}).join('');
+   const extraHtml=`<div style="text-align:left;background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:14px 16px;font-size:13px;line-height:2">`
+     +`<div>復園日：<input type="date" id="rtnDate" class="inp" style="width:auto;padding:4px 8px"> <span style="color:var(--mut);font-size:11px">この月から在園扱い（引落再開）</span></div>`
+     +`<div>枠区分：<select id="rtnWaku" class="inp" style="width:auto;padding:4px 8px">${wakuOpts}</select></div>`
+     +`<div style="font-size:11px;color:var(--berry)">※ 枠区分・旧料金を変更すると過去月の月次計算にも影響します（退園日・入園年月日は変更しません）</div>`
+     +`</div>`;
+   confirmDialog(`「${r.name}」さんを復園にします。\n退園日（${r.taien}）と入園年月日は履歴として残り、復園日の月から在園扱いに戻ります。\n初回案内は発行されず、復園月から引落に載ります。`,()=>{
+     const d=(document.getElementById('rtnDate')||{}).value||'';
+     if(!d){ infoDialog('復園日を入力してください。','復園できません'); return; }
+     const wv=(document.getElementById('rtnWaku')||{}).value||'';
+     r.returnee=true; r.returnDate=d; r.status='在園中';
+     if(wv){ if(String(wv).indexOf('一般（旧料金')===0){ r.waku='一般'; r.jugyoOverride=(M.youchisha.jugyo_old!=null?M.youchisha.jugyo_old:45000); } else if(wv!==r.waku){ r.waku=wv; } }
+     logChange(r.name,'returnee',`復園（${d}）`,null,d);
+     render();
+   },'復園','復園する');
+   try{ document.getElementById('confirmExtra').innerHTML=extraHtml; }catch(err){}
+ };});
  const note = (park==='全施設')?'全施設表示中。オプション（マットレス・バス・おむつ・制服レンタル）は各施設を選ぶと編集できます。園児の追加は「新規入園」タブから行ってください。'
   :'青字セルとオプションのチェックを編集すると、月次計算・ルクミー出力・本部集計が自動再計算されます。園児の追加は「新規入園」タブから。削除は各行の「削除」ボタンから行えます。';
  setCard('園児台帳',`${rows.length}件 ／ ${park}`,note,'none');
@@ -1516,7 +1549,7 @@ function renderNew(){
    // ヘッダー帯：状態＋初月合計
    `<div style="display:flex;justify-content:space-between;align-items:center;padding:12px 18px;border-bottom:1px solid var(--line);background:${isConf?'color-mix(in srgb,var(--leaf) 8%,transparent)':'var(--panel2)'}">`+
      `<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">`+
-       `${isConf?'<span class="ptag pt-月寒園" style="font-size:11px">確定済</span>':'<span style="font-size:11px;color:var(--mut);border:1px solid var(--line);border-radius:10px;padding:3px 10px">未確定</span>'}`+
+       `${isConf?'<span class="ptag pt-月寒園" style="font-size:11px">確定済</span>':'<span style="font-size:11px;color:var(--mut);border:1px solid var(--line);border-radius:10px;padding:3px 10px">未確定</span>'}${n.returnee?'<span style="font-size:11px;font-weight:700;color:var(--leaf);border:1px solid var(--leaf);border-radius:10px;padding:3px 10px;margin-left:6px">↩ 復園</span>':''}`+
        `<span style="font-size:15px;font-weight:600;color:var(--ink)">${n.name||'（園児名を入力してください）'}</span>`+
        `${park==='全施設'?`<span style="font-size:11px;color:var(--berry);border:1px solid var(--berry);border-radius:10px;padding:2px 9px;background:var(--berrysoft)">${n.park||'（所属園未設定）'}</span>`:''}`+
      `</div>`+
@@ -1534,6 +1567,9 @@ function renderNew(){
      fld('クラス（生年月日から自動）',`<select class="inp" data-newi="${i}" data-f="cls" style="${n.birth?'background:#fdf6e9':''}">${M.classes.map(cl=>`<option ${n.cls===cl?'selected':''}>${cl}</option>`).join('')}</select>`)+
      fld('口座名義',`<input class="inp" data-newi="${i}" data-f="koza" value="${(n.koza||'').replace(/"/g,'&quot;')}" placeholder="例：山田 花子">`)+
      fld('入園年月日',`<input class="inp" type="date" data-newi="${i}" data-f="nyuen" value="${n.nyuen||''}">`)+
+     /* SF-RETURNEE-20260911 : B案フォールバック。同じ園に退園済みレコードが無い復園の子だけここで作る
+        （同園同名があるなら台帳の「↩ 復園」ボタンを使う）。チェックの子は初回案内・初回売上の対象外、入園月から引落 */
+     fld('復園・系列園からの転園',`<label style="display:flex;align-items:center;gap:8px;font-size:12.5px;padding:6px 0;cursor:pointer"><input type="checkbox" data-newret="${i}" ${n.returnee?'checked':''} style="width:18px;height:18px;accent-color:var(--leaf)"> 初回案内なし／入園月から引落</label>`)+
    `</div>`+
    // 操作ボタン
    `<div style="padding:0 18px 16px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">`+
@@ -1614,6 +1650,8 @@ function renderNew(){
   // 入力中も保存する（saveState は300msのデバウンス付き）。保存しないと、
   // 入力中に他端末の更新を受けたとき「編集中でない」と見なされ静かに巻き戻る
   el.oninput=e=>{const i=+e.target.dataset.newi,f=e.target.dataset.f;roster[i][f]=e.target.value;saveState();};});
+ /* SF-RETURNEE-20260911 : 復園チェック */
+ document.querySelectorAll('[data-newret]').forEach(el=>{el.onchange=e=>{const i=+e.target.dataset.newret;roster[i].returnee=e.target.checked;render();};});
  // オプションパネルの開閉
  document.querySelectorAll('[data-newopt]').forEach(el=>{el.onclick=e=>{const i=+e.currentTarget.dataset.newopt;
    window.__newOptOpen=(window.__newOptOpen===i)?undefined:i;render();};});
@@ -2324,7 +2362,7 @@ function renderSched(){
 }
 function renderPDF(){
  // 案内対象：新規入園（roster内のisNew）の園児。当園で絞り込み、登録順
- const newCandAll=roster.filter(n=>n.isNew&&n.name).filter(n=>park==='全施設'||n.park===park);
+ const newCandAll=roster.filter(n=>n.isNew&&n.name&&!n.returnee).filter(n=>park==='全施設'||n.park===park);/* SF-RETURNEE-20260911 : 復園は初回案内なし */
  const orderedCand=newCandAll.slice().sort((a,b)=>(a.regSeq||0)-(b.regSeq||0));
  if(window.__pdfPick===undefined||window.__pdfPick>=orderedCand.length)window.__pdfPick=0;
  const p=orderedCand[window.__pdfPick]||orderedCand[0];
@@ -2878,7 +2916,7 @@ function initSaleAmount(p){ // 初回売上＝初回案内PDFのご請求金額�
 }
 function renderInitSale(){
  // 対象＝新規入園（isNew）の園児。選択中の施設で絞り込み、登録順。確定後も残る
- const cand=roster.filter(r=>r.isNew&&r.name).filter(r=>park==='全施設'||r.park===park)
+ const cand=roster.filter(r=>r.isNew&&r.name&&!r.returnee).filter(r=>park==='全施設'||r.park===park)/* SF-RETURNEE-20260911 : 復園は初回売上の対象外 */
    .sort((a,b)=>(a.regSeq||0)-(b.regSeq||0));
  const today=todayYMD();
  // 集計
@@ -3092,7 +3130,7 @@ function cbGet(){ // 現在の園・対象月の出納帳データ（モード�
 // （現金出納帳に実体保存せず、表示・出力時に動的合成。月謝管理＝園児台帳の新規園児と常に同期）
 function shokaiAutoRows(){
  if(cbMode==='event')return []; // イベント出納帳には売上の自動反映なし
- const cand=roster.filter(r=>r.isNew&&r.name).filter(r=>park==='全施設'||r.park===park);
+ const cand=roster.filter(r=>r.isNew&&r.name&&!r.returnee).filter(r=>park==='全施設'||r.park===park)/* SF-RETURNEE-20260911 : 復園は初回売上の対象外 */;
  const out=[];
  cand.forEach(p=>{
    const log=initSaleLog[p.name];
@@ -3526,7 +3564,7 @@ function cbCollectMfRowsExtra(){
 }
 // 新規入園の振込売上行（モード非依存版。MF合算で使用）
 function shokaiAutoRowsFor(){
- const cand=roster.filter(r=>r.isNew&&r.name).filter(r=>park==='全施設'||r.park===park);
+ const cand=roster.filter(r=>r.isNew&&r.name&&!r.returnee).filter(r=>park==='全施設'||r.park===park)/* SF-RETURNEE-20260911 : 復園は初回売上の対象外 */;
  const out=[];const k=ymKey();
  cand.forEach(p=>{
    const log=initSaleLog[p.name];if(!log||!log.paid||!log.paidDate)return;
