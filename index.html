@@ -1128,7 +1128,8 @@ async function syncBoardRoster(){
    /* SF-AMPMPARK-20260901 : 早朝／夕方の園も名簿に載せる。予約ボードがこれを見て、
       その区分のチップに常時出すかどうかを決める。空なら linkPark と同じ扱い。
       載るのは園のコードだけで、個人情報は増えない。 */
-   const e={name:nm,linkPark:p.linkPark,linkParkAm:(p.linkParkAm||''),linkParkPm:(p.linkParkPm||''),birthY:null,birthM:null};
+   /* SF-MONTHLYOPT-ROSTER-20260911 : 早朝¥5,000／延長¥5,000の月極チェックを名簿に載せる（真偽値のみ・個人情報は増やさない） */
+   const e={name:nm,linkPark:p.linkPark,linkParkAm:(p.linkParkAm||''),linkParkPm:(p.linkParkPm||''),monthlyAm:!!p.optSoucho,monthlyPm:!!p.optEncho,birthY:null,birthM:null};
    if(p.birth){ const bm=String(p.birth).match(/^(\d{4})[-\/](\d{1,2})/); if(bm){ e.birthY=+bm[1]; e.birthM=+bm[2]; } }
    withLink.push(e);
   } else noLink.push(nm); });
@@ -1136,7 +1137,7 @@ async function syncBoardRoster(){
   const curPupils=(cur.exists&&Array.isArray(cur.data().pupils))?cur.data().pupils:[];
   const map=new Map();
   withLink.forEach(p=>map.set(p.name,p)); /* SF-ROSTER-BIRTH-20260829 : birthY/birthM も保持 */
-  curPupils.forEach(cp=>{ const nm=String((cp&&cp.name)||'').trim(); if(nm&&!map.has(nm)){ map.set(nm,{name:nm,linkPark:(cp.linkPark||''),linkParkAm:(cp.linkParkAm||''),linkParkPm:(cp.linkParkPm||''),birthY:(cp.birthY!=null?cp.birthY:null),birthM:(cp.birthM!=null?cp.birthM:null)});/* SF-AMPMPARK-20260901 */ } }); /* SF-ROSTER-BIRTH-20260829 */
+  curPupils.forEach(cp=>{ const nm=String((cp&&cp.name)||'').trim(); if(nm&&!map.has(nm)){ map.set(nm,{name:nm,linkPark:(cp.linkPark||''),linkParkAm:(cp.linkParkAm||''),linkParkPm:(cp.linkParkPm||''),monthlyAm:!!cp.monthlyAm,monthlyPm:!!cp.monthlyPm/* SF-MONTHLYOPT-ROSTER-20260911 */,birthY:(cp.birthY!=null?cp.birthY:null),birthM:(cp.birthM!=null?cp.birthM:null)});/* SF-AMPMPARK-20260901 */ } }); /* SF-ROSTER-BIRTH-20260829 */
   const finalPupils=[...map.values()];
   const curNames=new Set(curPupils.map(p=>String((p&&p.name)||'').trim()));
   const added=finalPupils.filter(p=>!curNames.has(p.name)).map(p=>p.name+'（'+(NM[p.linkPark]||'未設定')+'）');
@@ -1153,6 +1154,8 @@ async function syncBoardRoster(){
    +_row('うち生年月あり',withBirth+'名（実年齢で表示）','var(--leaf)')
    /* SF-AMPMPARK-20260901 : 朝夕で園が違う子がいるかを確認画面に出す */
    +(function(){var n=finalPupils.filter(function(p){return p&&((p.linkParkAm&&p.linkParkAm!==p.linkPark)||(p.linkParkPm&&p.linkParkPm!==p.linkPark));}).length;return n?_row('朝夕で園が違う',n+'名','var(--berry)'):'';})()
+   /* SF-MONTHLYOPT-ROSTER-20260911 : 月極オプションの件数を確認画面に出す */
+   +(function(){var am=finalPupils.filter(function(p){return p&&p.monthlyAm;}).length,pm=finalPupils.filter(function(p){return p&&p.monthlyPm;}).length;return _row('月極オプション','早朝月極 '+am+'名／延長月極 '+pm+'名');})()
    +(noBirth?_row('生年月なし',noBirth+'名（3歳〜のまま）','var(--mut)'):'')
    +_row('新しく追加',added.length?added.length+'名':'なし（すでに最新）')
    +'</div>';
