@@ -3279,6 +3279,18 @@ const CB_JIGYOSHA_DEFAULT='ハイアイランド株式会社';
    CB_ACCTS の既定名にフォールバック。税区分・費目・金額計算には一切影響しない（名称のみ）。 */
 const CB_ACCT_NAME_BY_PARK={'資生館保育園':{99:'保育商品仕入高',128:'保育園収入'}}; /* SF-ACCT128-20260909 : 資生館のMF登録名はコード128が「保育園収入」 */
 function cbAcctName(code){const ov=CB_ACCT_NAME_BY_PARK[park];if(ov&&ov[+code]!=null)return ov[+code];const a=CB_ACCT_BY[+code];return a?a.name:'';}
+/* SF-HITAX-20261002 : ハイアイランド4園（月寒・白石・サッポロファクトリー・幼稚舎）の仕入は、
+   非課税売上（保育料）に対応する仕入のため、MFでは「非課税対応仕入 〇%」で仕訳する。
+   保存データ（行の tax の内部値）は書き換えず、MF出力・CSV・プレビュー（経費一覧・
+   経費/イベントExcel含む）と画面プルダウンの表示ラベルの時点で名称だけ置き換える
+   （CB_ACCT_NAME_BY_PARK と同じ発想）。こうすると締め済みの過去月にもそのまま効き、
+   画面で手入力してあっても常にルールが優先される。
+   資生館（株式会社Number9）は仕訳が異なるため従来の「課税仕入 〇%」のまま。
+   対象外仕入・対象外・非課税売上・不明等の値は変更しない。
+   ヴィレッジ経費（白石）・ドライバー経費（幼稚舎）は park がその園のまま動くので同じ置換が掛かる。 */
+const CB_HITAX_MAP={'課税仕入 10%':'非課税対応仕入 10%','課税仕入 (軽)8%':'非課税対応仕入 (軽)8%','課税仕入 8%':'非課税対応仕入 8%'};
+const CB_TAX_NAME_BY_PARK={'月寒園':CB_HITAX_MAP,'白石園':CB_HITAX_MAP,'サッポロファクトリー園':CB_HITAX_MAP,'幼稚舎':CB_HITAX_MAP};
+function cbTaxName(tax){const t=tax==null?'':String(tax);const ov=CB_TAX_NAME_BY_PARK[park];return (ov&&ov[t])||t;}
 /* SF-OAKTREE-TATEKAE-20261002 : 資生館のオークツリー（English Home Oak Tree）は、英語教室の費用を
    ハイアイランドの代わりに立替払いしているため、仕訳は委託費ではなく「3 立替金」で処理する。
    保存データの勘定科目は書き換えず、MF出力・CSV・プレビュー（経費一覧・経費/イベントExcel含む）の
@@ -3497,7 +3509,7 @@ function renderCashbook(){
    return;
   }
   const acctOpts=`<option value="">選択…</option>`+CB_USED.map(a=>`<option value="${a.code}" ${String(r.acct)===String(a.code)?'selected':''}>${a.code} ${cbAcctName(a.code)}</option>`).join(''); /* SF-ACCT99-20260908 : 表示名も園別 */
-  const taxOpts=CB_TAXES.map(tx=>`<option ${r.tax===tx?'selected':''}>${tx}</option>`).join('');
+  const taxOpts=CB_TAXES.map(tx=>`<option value="${tx}" ${r.tax===tx?'selected':''}>${cbTaxName(tx)}</option>`).join(''); /* SF-HITAX-20261002 : 表示ラベルだけ園別名称。value（保存される内部値）は従来のまま */
   /* SF-TANTOU-KEEP-20260831 : 取込時の受領者がSTAFF未登録の名前でも、選択済みの候補として残す（沼山等） */
   const byOpts=`<option value="">担当…</option>`+STAFF.map(s=>`<option ${r.by===s?'selected':''}>${s}</option>`).join('')+((r.by&&!STAFF.includes(r.by))?`<option selected>${String(r.by).replace(/&/g,'&amp;').replace(/</g,'&lt;')}</option>`:'');
   const dis=locked?'disabled':''; // 締め済みは全項目を編集不可
@@ -3686,7 +3698,7 @@ function cbExportCsv(eventOnly){
    const tekiyo=`${noLabel}${r.shop||''}${r.shop&&r.item?'　':''}${r.item||''}${tk?tk.suffix:''}`;
    const mo=(r.mon!=null&&r.mon!=='')?r.mon:mm;
    const kubun=r.src?(CB_SRC_LABEL[r.src]||'収入'):(r.event?'イベント費':'通常');
-   rows.push([noLabel, r.day?`${yy}/${mo}/${r.day}`:'', kubun, acctCode, a?cbAcctName(acctCode):'', bumon, tk?((a&&a.tax)||''):(r.tax||''), tekiyo, inn||'', out||'', (eventOnly?'':bal), r.by||'']); /* SF-ACCT99-20260908 */
+   rows.push([noLabel, r.day?`${yy}/${mo}/${r.day}`:'', kubun, acctCode, a?cbAcctName(acctCode):'', bumon, cbTaxName(tk?((a&&a.tax)||''):(r.tax||'')), tekiyo, inn||'', out||'', (eventOnly?'':bal), r.by||'']); /* SF-ACCT99-20260908 / SF-HITAX-20261002 : CSVの税区分も園別名称 */
  });
  if(eventOnly){
    const evSum=cb.rows.filter(r=>r.event).reduce((s,r)=>s+(r.kind==='out'?(Number(r.amt)||0):0),0);
@@ -3712,7 +3724,7 @@ function cbCollectMfRows(){
  const dnum=(mo,day)=>day?((+mo)*100+(+day)):0; // 日なし（繰越・本部振替）は先頭へ
  const ds=(mo,day)=>day?`${yy}/${mo}/${day}`:`${yy}/${mm}/1`;
  const add=(mo,day,acctName,tax,tekiyo,inn,out,order)=>{
-   items.push({date:ds(mo,day),acctName,tax,tekiyo,inn:inn||0,out:out||0,dnum:dnum(mo,day),order:order||0});
+   items.push({date:ds(mo,day),acctName,tax:cbTaxName(tax),tekiyo,inn:inn||0,out:out||0,dnum:dnum(mo,day),order:order||0}); /* SF-HITAX-20261002 : MF行の税区分は園別名称で出す */
  };
  // 通常・イベントの両帳簿を回す（cbModeに依存せず直接取得）
  [cbStoreGet(cashbook), cbStoreGet(cashbookEvent)].forEach((cb,idx)=>{
@@ -3762,7 +3774,7 @@ function cbCollectMfRowsExtra(){
  const items=[];
  const dnum=(mo,day)=>day?((+mo)*100+(+day)):0;
  const ds=(mo,day)=>day?`${yy}/${mo}/${day}`:`${yy}/${mm}/1`;
- const add=(mo,day,acctName,tax,tekiyo,inn,out,order)=>items.push({date:ds(mo,day),acctName,tax,tekiyo,inn:inn||0,out:out||0,dnum:dnum(mo,day),order:order||0});
+ const add=(mo,day,acctName,tax,tekiyo,inn,out,order)=>items.push({date:ds(mo,day),acctName,tax:cbTaxName(tax),tekiyo,inn:inn||0,out:out||0,dnum:dnum(mo,day),order:order||0}); /* SF-HITAX-20261002 : サブ帳簿（ヴィレッジ・ドライバー）も同じ置換 */
  const cb=cbGet();
  if((Number(cb.opening)||0)>0)add(cb.openingMon||mm,cb.openingDay||1,'普通預金','対象外','本部から振替',Number(cb.opening)||0,0,-1);
  (cb.rows||[]).forEach(r=>{
@@ -3887,7 +3899,7 @@ function cbSplitData(cb){
      const tk=cbTatekaeRule(r); /* SF-OAKTREE-TATEKAE-20261002 : プレビュー・経費/イベントExcelも立替ルール優先 */
      const acct=tk?tk.acct:+r.acct;
      const a=CB_ACCT_BY[acct];
-     expenses.push({date, acct:a?cbAcctName(acct):'', tax:tk?((a&&a.tax)||''):(r.tax||''), receiptNo:r.receiptNo||'', shop:r.shop||'', item:(r.item||'')+(tk?tk.suffix:''), amt:Number(r.amt)||0, by:r.by||'', event:!!r.event}); /* SF-RECEIPTNO-20260901 / SF-ACCT99-20260908 */
+     expenses.push({date, acct:a?cbAcctName(acct):'', tax:cbTaxName(tk?((a&&a.tax)||''):(r.tax||'')), receiptNo:r.receiptNo||'', shop:r.shop||'', item:(r.item||'')+(tk?tk.suffix:''), amt:Number(r.amt)||0, by:r.by||'', event:!!r.event}); /* SF-RECEIPTNO-20260901 / SF-ACCT99-20260908 / SF-HITAX-20261002 : プレビュー・経費Excelの税区分も園別名称 */
    }
  });
  // 新規入園（振込売上）※追加経費帳簿では売上なし
