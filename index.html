@@ -3291,6 +3291,18 @@ function cbAcctName(code){const ov=CB_ACCT_NAME_BY_PARK[park];if(ov&&ov[+code]!=
 const CB_HITAX_MAP={'課税仕入 10%':'非課税対応仕入 10%','課税仕入 (軽)8%':'非課税対応仕入 (軽)8%','課税仕入 8%':'非課税対応仕入 8%'};
 const CB_TAX_NAME_BY_PARK={'月寒園':CB_HITAX_MAP,'白石園':CB_HITAX_MAP,'サッポロファクトリー園':CB_HITAX_MAP,'幼稚舎':CB_HITAX_MAP};
 function cbTaxName(tax){const t=tax==null?'':String(tax);const ov=CB_TAX_NAME_BY_PARK[park];return (ov&&ov[t])||t;}
+/* SF-HQCASH-20261002 : 本部とやり取りする行（本部から振替／イベント予算 振替＝入金、
+   預金振替・イベント予算 預金振替＝isClose の締め出金）の相手科目を「普通預金」から
+   「現金（補助科目：本社）」へ。実際には本社の現金とやり取りしているため。
+   保存データは書き換えず、MF出力・CSV・プレビュー（総合/MF用）の時点で置き換える
+   （締め済み過去月の再出力にも有効）。現金入金（補充）とイベント費 前月繰越は
+   従来どおり普通預金のまま（指示があれば同じ仕組みで変えられる）。
+   園ごとに科目名・コード・補助科目を上書き可能（Number9 の MF に「現金／本社」が無い場合に
+   資生館だけ CB_HQ_ACCT_BY_PARK で差し替える用。例：{'資生館保育園':{code:4,acctName:'普通預金',sub:''}}）。
+   MF Excel の D列コードは code をそのまま使うので、名称がマスター表に無くても出力は欠けない。 */
+const CB_HQ_ACCT_DEFAULT={code:1, acctName:'現金', sub:'本社'};
+const CB_HQ_ACCT_BY_PARK={};
+function cbHqAcct(){return CB_HQ_ACCT_BY_PARK[park]||CB_HQ_ACCT_DEFAULT;}
 /* SF-OAKTREE-TATEKAE-20261002 : 資生館のオークツリー（English Home Oak Tree）は、英語教室の費用を
    ハイアイランドの代わりに立替払いしているため、仕訳は委託費ではなく「3 立替金」で処理する。
    保存データの勘定科目は書き換えず、MF出力・CSV・プレビュー（経費一覧・経費/イベントExcel含む）の
@@ -3687,18 +3699,19 @@ function cbExportCsv(eventOnly){
  const rows=[['No.','日付','区分','相手勘定科目コード','相手勘定科目','相手部門','相手税区分','摘要','入金','出金','残高','担当']];
  if(!eventOnly){
    rows.push(['','','','','','','','繰越金','','',0,'']);
-   rows.push(['',`${yy}/${cb.openingMon||mm}/${cb.openingDay||1}`,'通常',1,'現金',bumon,'','本部から振替',cb.opening||0,'',cb.opening||0,cb.openingBy||'']);
+   rows.push(['',`${yy}/${cb.openingMon||mm}/${cb.openingDay||1}`,'通常',cbHqAcct().code,cbHqAcct().acctName,bumon,'','本部から振替',cb.opening||0,'',cb.opening||0,cb.openingBy||'']); /* SF-HQCASH-20261002 : 園別設定（既定 1 現金）に追従 */
  }
  cbAllRows(cb).forEach((r,i)=>{const inn=r.kind==='in'?(Number(r.amt)||0):0,out=r.kind==='out'?(Number(r.amt)||0):0;bal=bal+inn-out;
    if(eventOnly&&!r.event)return; // イベント費のみ出力
    const tk=r.src?null:cbTatekaeRule(r); /* SF-OAKTREE-TATEKAE-20261002 : CSVも立替ルール優先（科目・税区分・摘要末尾） */
    const a=r.src?{name:'保育園収入高'}:CB_ACCT_BY[tk?tk.acct:+r.acct];
-   const acctCode=r.src?128:(tk?tk.acct:(r.acct||''));
+   const hqRow=!r.src&&!!r.isClose; /* SF-HQCASH-20261002 : 締め行は園別の本部科目（既定 1 現金。保存値 acct:1 と同じなので既定では出力不変） */
+   const acctCode=hqRow?cbHqAcct().code:(r.src?128:(tk?tk.acct:(r.acct||'')));
    const noLabel=r.src==='timely'?'現金':(r.src==='shokai'?'振込':(i+1)); // タイムリー現金売上=現金／新規入園=振込／出金=連番
    const tekiyo=`${noLabel}${r.shop||''}${r.shop&&r.item?'　':''}${r.item||''}${tk?tk.suffix:''}`;
    const mo=(r.mon!=null&&r.mon!=='')?r.mon:mm;
    const kubun=r.src?(CB_SRC_LABEL[r.src]||'収入'):(r.event?'イベント費':'通常');
-   rows.push([noLabel, r.day?`${yy}/${mo}/${r.day}`:'', kubun, acctCode, a?cbAcctName(acctCode):'', bumon, cbTaxName(tk?((a&&a.tax)||''):(r.tax||'')), tekiyo, inn||'', out||'', (eventOnly?'':bal), r.by||'']); /* SF-ACCT99-20260908 / SF-HITAX-20261002 : CSVの税区分も園別名称 */
+   rows.push([noLabel, r.day?`${yy}/${mo}/${r.day}`:'', kubun, acctCode, hqRow?cbHqAcct().acctName:(a?cbAcctName(acctCode):''), bumon, cbTaxName(tk?((a&&a.tax)||''):(r.tax||'')), tekiyo, inn||'', out||'', (eventOnly?'':bal), r.by||'']); /* SF-ACCT99-20260908 / SF-HITAX-20261002 : CSVの税区分も園別名称 / SF-HQCASH-20261002 */
  });
  if(eventOnly){
    const evSum=cb.rows.filter(r=>r.event).reduce((s,r)=>s+(r.kind==='out'?(Number(r.amt)||0):0),0);
@@ -3723,8 +3736,8 @@ function cbCollectMfRows(){
  const items=[];
  const dnum=(mo,day)=>day?((+mo)*100+(+day)):0; // 日なし（繰越・本部振替）は先頭へ
  const ds=(mo,day)=>day?`${yy}/${mo}/${day}`:`${yy}/${mm}/1`;
- const add=(mo,day,acctName,tax,tekiyo,inn,out,order)=>{
-   items.push({date:ds(mo,day),acctName,tax:cbTaxName(tax),tekiyo,inn:inn||0,out:out||0,dnum:dnum(mo,day),order:order||0}); /* SF-HITAX-20261002 : MF行の税区分は園別名称で出す */
+ const add=(mo,day,acctName,tax,tekiyo,inn,out,order,hqRow)=>{
+   items.push({date:ds(mo,day),acctName,tax:cbTaxName(tax),tekiyo,inn:inn||0,out:out||0,dnum:dnum(mo,day),order:order||0,sub:hqRow?cbHqAcct().sub:'',hq:!!hqRow,code:hqRow?cbHqAcct().code:null}); /* SF-HITAX-20261002 : MF行の税区分は園別名称で出す / SF-HQCASH-20261002 : 本部行は補助科目・コードも運ぶ */
  };
  // 通常・イベントの両帳簿を回す（cbModeに依存せず直接取得）
  [cbStoreGet(cashbook), cbStoreGet(cashbookEvent)].forEach((cb,idx)=>{
@@ -3738,7 +3751,7 @@ function cbCollectMfRows(){
    }
    // 本部より振替（イベントはイベント予算）。order=0で日付先頭に置く
    if((Number(cb.opening)||0)>0){
-     add(cb.openingMon||mm,cb.openingDay||1,'普通預金','対象外',isEv?'イベント予算 振替':'本部から振替',Number(cb.opening)||0,0,-1);
+     add(cb.openingMon||mm,cb.openingDay||1,cbHqAcct().acctName,'対象外',isEv?'イベント予算 振替':'本部から振替',Number(cb.opening)||0,0,-1,true); /* SF-HQCASH-20261002 : 本部から振替は 現金（本社） */
    }
    (cb.rows||[]).forEach(r=>{
      const mo=(r.mon!=null&&r.mon!=='')?r.mon:mm;
@@ -3749,7 +3762,7 @@ function cbCollectMfRows(){
      // 締めの預金振替（出金）。繰越（carry, amt=0）は帳簿に出さない
      if(r.isClose){
        if(r.carry)return; // 翌月繰越：現金箱から出ていないので行を出さない
-       add(mo,r.day,'普通預金','対象外',isEv?'イベント予算 預金振替':'預金振替',0,Number(r.amt)||0,9);return;
+       add(mo,r.day,cbHqAcct().acctName,'対象外',isEv?'イベント予算 預金振替':'預金振替',0,Number(r.amt)||0,9,true);return; /* SF-HQCASH-20261002 : 締めの預金振替も 現金（本社） */
      }
      // 経費（出金）
      if(r.kind==='out'){
@@ -3774,13 +3787,13 @@ function cbCollectMfRowsExtra(){
  const items=[];
  const dnum=(mo,day)=>day?((+mo)*100+(+day)):0;
  const ds=(mo,day)=>day?`${yy}/${mo}/${day}`:`${yy}/${mm}/1`;
- const add=(mo,day,acctName,tax,tekiyo,inn,out,order)=>items.push({date:ds(mo,day),acctName,tax:cbTaxName(tax),tekiyo,inn:inn||0,out:out||0,dnum:dnum(mo,day),order:order||0}); /* SF-HITAX-20261002 : サブ帳簿（ヴィレッジ・ドライバー）も同じ置換 */
+ const add=(mo,day,acctName,tax,tekiyo,inn,out,order,hqRow)=>items.push({date:ds(mo,day),acctName,tax:cbTaxName(tax),tekiyo,inn:inn||0,out:out||0,dnum:dnum(mo,day),order:order||0,sub:hqRow?cbHqAcct().sub:'',hq:!!hqRow,code:hqRow?cbHqAcct().code:null}); /* SF-HITAX-20261002 : サブ帳簿（ヴィレッジ・ドライバー）も同じ置換 / SF-HQCASH-20261002 */
  const cb=cbGet();
- if((Number(cb.opening)||0)>0)add(cb.openingMon||mm,cb.openingDay||1,'普通預金','対象外','本部から振替',Number(cb.opening)||0,0,-1);
+ if((Number(cb.opening)||0)>0)add(cb.openingMon||mm,cb.openingDay||1,cbHqAcct().acctName,'対象外','本部から振替',Number(cb.opening)||0,0,-1,true); /* SF-HQCASH-20261002 */
  (cb.rows||[]).forEach(r=>{
    const mo=(r.mon!=null&&r.mon!=='')?r.mon:mm;
    if(r.isCash&&r.kind==='in'&&!r.isClose){add(mo,r.day,'普通預金',(r.tax||'対象外'),'現金入金（補充）',Number(r.amt)||0,0);return;}
-   if(r.isClose){if(r.carry)return;add(mo,r.day,'普通預金','対象外','預金振替',0,Number(r.amt)||0,9);return;}
+   if(r.isClose){if(r.carry)return;add(mo,r.day,cbHqAcct().acctName,'対象外','預金振替',0,Number(r.amt)||0,9,true);return;} /* SF-HQCASH-20261002 */
    if(r.kind==='out'){const tk=cbTatekaeRule(r);const acct=tk?tk.acct:+r.acct;const a=CB_ACCT_BY[acct];add(mo,r.day,a?cbAcctName(acct):'',tk?((a&&a.tax)||''):(r.tax||(a&&a.tax)||''),`${r.receiptNo?r.receiptNo+' ':''}${r.shop||''}${r.shop&&r.item?'　':''}${r.item||''}${tk?tk.suffix:''}`,0,Number(r.amt)||0);return;} /* SF-ACCT99-20260908 / SF-OAKTREE-TATEKAE-20261002 */
  });
  items.sort((a,b)=>(a.order-b.order)||(a.dnum-b.dnum));
@@ -3841,7 +3854,7 @@ function cbExportMF(modeOverride){
  let runBal=0;
  const put=(it)=>{
    if(!(it.inn||0)&&!(it.out||0))return; // 入金も出金も0の行はMFが弾くので出力しない（残高は増減0なので通し計算に影響なし）
-   const code=MF_CODE_BY_NAME[it.acctName]; // 相手勘定科目コード（公式テンプレはD列にコードを入力）
+   const code=(it.hq&&it.code!=null)?it.code:MF_CODE_BY_NAME[it.acctName]; // 相手勘定科目コード（公式テンプレはD列にコードを入力）/* SF-HQCASH-20261002 : 本部行は園別設定のコードを直接使う */
    if(code==null){console.warn('MF出力: 科目コード未登録のため行をスキップしました:',it.acctName,it);return;} // 引けない行は出さない（runBal更新前なので残高も汚さない）
    runBal=runBal+(it.inn||0)-(it.out||0);
    if(it.date){ // 公式テンプレは日付を B=月・C=日 の2列に分ける（年は出力しない：MFが会計年度で判断。B列は1〜12規則のため年を絶対に入れない）
@@ -3851,8 +3864,11 @@ function cbExportMF(modeOverride){
    set('D'+row,code,'n'); // D列＝相手勘定科目コード（数値, t:'n'）※公式テンプレに合わせコードを入力
    if(it.acctName)set('E'+row,it.acctName); // E列＝科目名称（公式ではVLOOKUP表示。ここでは名称を直接出力）
    // 先頭の本部振替（本部から振替/イベント予算 振替）は部門空。それ以外は部門を入れる
-   const isOpening=it.acctName==='普通預金'&&(it.tekiyo==='本部から振替'||it.tekiyo==='イベント予算 振替');
-   if(!isOpening){set('G'+row,bumon);if(_mfSub)set('F'+row,_mfSub);} // 追加経費帳簿は相手補助科目(F列=小分類)に帳簿名を入れる
+   /* SF-HQCASH-20261002 : 科目名が現金に変わったので、判定は科目名ではなく摘要（＋hqフラグ）で行う */
+   const isOpening=(it.hq||it.acctName==='普通預金')&&(it.tekiyo==='本部から振替'||it.tekiyo==='イベント予算 振替');
+   if(!isOpening){set('G'+row,bumon);}
+   if(it.sub)set('F'+row,it.sub); // SF-HQCASH-20261002 : 本部行の相手補助科目（本社）。相手科目=現金 の補助なので帳簿のmfSubより優先
+   else if(!isOpening&&_mfSub)set('F'+row,_mfSub); // 追加経費帳簿は相手補助科目(F列=小分類)に帳簿名を入れる
    if(it.tax)set('I'+row,it.tax);
    if(it.tekiyo)set('K'+row,it.tekiyo);
    if(it.inn)set('L'+row,it.inn);
@@ -4062,7 +4078,7 @@ function cbShowPreview(){
    const uCashSum=uni.filter(it=>String(it.tekiyo).indexOf('【現金】')>=0).reduce((s,it)=>s+(it.inn||0),0);
    const uFuriSum=uni.filter(it=>String(it.tekiyo).indexOf('【振込】')>=0).reduce((s,it)=>s+(it.inn||0),0);
    const uHojuSum=uni.filter(it=>it.acctName==='普通預金'&&it.order!==-1&&it.inn>0).reduce((s,it)=>s+(it.inn||0),0); // 現金補充
-   const uExpSum=uni.filter(it=>!(it.acctName==='普通預金'&&it.out>0)).reduce((s,it)=>s+(it.out||0),0); // 経費（締めの預金振替は除く）
+   const uExpSum=uni.filter(it=>!((it.hq||it.acctName==='普通預金')&&it.out>0)).reduce((s,it)=>s+(it.out||0),0); // 経費（締めの預金振替は除く）/* SF-HQCASH-20261002 : 締めの科目が現金になっても hq フラグで除外 */
    const inTotal=openSum+uHojuSum+uCashSum+uFuriSum;
    const exd=cbExtraDef();
    const mfTitle=exd?`${exd.disp} 経費（マネーフォワード出力用・この帳簿だけ）`:'総合（マネーフォワード出力用・通常＋イベント合算）';
