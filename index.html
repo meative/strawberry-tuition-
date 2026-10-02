@@ -3307,7 +3307,7 @@ const CB_HQ_ACCT_DEFAULT={code:1, acctName:'現金', sub:'本社'};
 const CB_HQ_ACCT_BY_PARK={'資生館保育園':{code:1, acctName:'現金', sub:'本社'}};
 function cbHqAcct(){return CB_HQ_ACCT_BY_PARK[park]||CB_HQ_ACCT_DEFAULT;}
 /* SF-HQCASH-V2-20261002 : 帳簿自体の補助科目（MF Excel ヘッダ M2）。この園の「現金」の補助科目名。
-   資生館（Number9）は別体系のため未登録＝空欄のまま。確認でき次第ここに1行足せば出る。
+   未登録の園は空欄になる。資生館は SF-HQCASH-SHISEIKAN-20261002 で暫定登録済み（下の行内コメント参照）。
    ヴィレッジ・ドライバーのサブ帳簿は park が親園のままなので親園と同じ値になる。 */
 const CB_BOOK_SUB_BY_PARK={'月寒園':'月寒保育園','白石園':'白石保育園','サッポロファクトリー園':'ファクトリー保育園','幼稚舎':'幼稚園',
  '資生館保育園':'資生館保育園' /* SF-HQCASH-SHISEIKAN-20261002 : 暫定。Number9側のMFの補助科目名が確認できたら差し替える */};
