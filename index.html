@@ -3301,12 +3301,16 @@ function cbTaxName(tax){const t=tax==null?'':String(tax);const ov=CB_TAX_NAME_BY
    資生館だけ CB_HQ_ACCT_BY_PARK で差し替える用。例：{'資生館保育園':{code:4,acctName:'普通預金',sub:''}}）。
    MF Excel の D列コードは code をそのまま使うので、名称がマスター表に無くても出力は欠けない。 */
 const CB_HQ_ACCT_DEFAULT={code:1, acctName:'現金', sub:'本社'};
-const CB_HQ_ACCT_BY_PARK={};
+/* SF-HQCASH-SHISEIKAN-20261002 : 資生館（Number9）は暫定で他園と同じ 現金（コード1）／本社。
+   Number9 側のコード体系が未確認のためコード1は仮置き。確認後はこの行の code / acctName / sub を
+   差し替えるだけでよい（既定値と同値でも、暫定であることを明示するため敢えて登録している）。 */
+const CB_HQ_ACCT_BY_PARK={'資生館保育園':{code:1, acctName:'現金', sub:'本社'}};
 function cbHqAcct(){return CB_HQ_ACCT_BY_PARK[park]||CB_HQ_ACCT_DEFAULT;}
 /* SF-HQCASH-V2-20261002 : 帳簿自体の補助科目（MF Excel ヘッダ M2）。この園の「現金」の補助科目名。
    資生館（Number9）は別体系のため未登録＝空欄のまま。確認でき次第ここに1行足せば出る。
    ヴィレッジ・ドライバーのサブ帳簿は park が親園のままなので親園と同じ値になる。 */
-const CB_BOOK_SUB_BY_PARK={'月寒園':'月寒保育園','白石園':'白石保育園','サッポロファクトリー園':'ファクトリー保育園','幼稚舎':'幼稚園'};
+const CB_BOOK_SUB_BY_PARK={'月寒園':'月寒保育園','白石園':'白石保育園','サッポロファクトリー園':'ファクトリー保育園','幼稚舎':'幼稚園',
+ '資生館保育園':'資生館保育園' /* SF-HQCASH-SHISEIKAN-20261002 : 暫定。Number9側のMFの補助科目名が確認できたら差し替える */};
 /* SF-OAKTREE-TATEKAE-20261002 : 資生館のオークツリー（English Home Oak Tree）は、英語教室の費用を
    ハイアイランドの代わりに立替払いしているため、仕訳は委託費ではなく「3 立替金」で処理する。
    保存データの勘定科目は書き換えず、MF出力・CSV・プレビュー（経費一覧・経費/イベントExcel含む）の
