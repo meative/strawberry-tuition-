@@ -3084,6 +3084,19 @@ const CB_JIGYOSHA_DEFAULT='ハイアイランド株式会社';
    CB_ACCTS の既定名にフォールバック。税区分・費目・金額計算には一切影響しない（名称のみ）。 */
 const CB_ACCT_NAME_BY_PARK={'資生館保育園':{99:'保育商品仕入高',128:'保育園収入'}}; /* SF-ACCT128-20260909 : 資生館のMF登録名はコード128が「保育園収入」 */
 function cbAcctName(code){const ov=CB_ACCT_NAME_BY_PARK[park];if(ov&&ov[+code]!=null)return ov[+code];const a=CB_ACCT_BY[+code];return a?a.name:'';}
+/* SF-OAKTREE-TATEKAE-20261002 : 資生館のオークツリー（English Home Oak Tree）は、英語教室の費用を
+   ハイアイランドの代わりに立替払いしているため、仕訳は委託費ではなく「3 立替金」で処理する。
+   保存データの勘定科目は書き換えず、MF出力・CSV・プレビュー（経費一覧・経費/イベントExcel含む）の
+   時点でこのルールを適用する。こうすると締め済みの過去月（8月分）にもそのまま効き、
+   画面で手で科目を変えて保存してあっても常にルールが優先される。
+   店舗名は表記ゆれ対策で部分一致（店舗名マスターの登録名「オークツリー」を含む）。
+   税区分はルール先の科目の CB_ACCTS 設定（3 立替金＝対象外仕入）に従う。他園のオークツリー行は対象外。 */
+const CB_TATEKAE_RULES=[{park:'資生館保育園', shopMatch:'オークツリー', acct:3, suffix:'（ハイアイランド立替）'}];
+function cbTatekaeRule(r){ // 出金行がルールに当たればそのルールを返す（締め行・現金補充行は対象外）
+ if(!r||r.kind!=='out'||r.isClose||r.isCash)return null;
+ const shop=String(r.shop||'');
+ return CB_TATEKAE_RULES.find(t=>t.park===park&&t.shopMatch&&shop.indexOf(t.shopMatch)>=0)||null;
+}
 // 追加の経費出納帳（園の中のサブ帳簿）。key=保存キー, label=サブ切替の表示, disp=画面の部門表示, bumon=マネーフォワードの部門, mfSub=MF補助科目(小分類)
 const CB_EXTRA={
  '白石園':[{key:'village', label:'🚐 ヴィレッジ経費', disp:'ヴィレッジ', bumon:'ヴィレッジ', mfSub:''}],
@@ -3471,13 +3484,14 @@ function cbExportCsv(eventOnly){
  }
  cbAllRows(cb).forEach((r,i)=>{const inn=r.kind==='in'?(Number(r.amt)||0):0,out=r.kind==='out'?(Number(r.amt)||0):0;bal=bal+inn-out;
    if(eventOnly&&!r.event)return; // イベント費のみ出力
-   const a=r.src?{name:'保育園収入高'}:CB_ACCT_BY[+r.acct];
-   const acctCode=r.src?128:(r.acct||'');
+   const tk=r.src?null:cbTatekaeRule(r); /* SF-OAKTREE-TATEKAE-20261002 : CSVも立替ルール優先（科目・税区分・摘要末尾） */
+   const a=r.src?{name:'保育園収入高'}:CB_ACCT_BY[tk?tk.acct:+r.acct];
+   const acctCode=r.src?128:(tk?tk.acct:(r.acct||''));
    const noLabel=r.src==='timely'?'現金':(r.src==='shokai'?'振込':(i+1)); // タイムリー現金売上=現金／新規入園=振込／出金=連番
-   const tekiyo=`${noLabel}${r.shop||''}${r.shop&&r.item?'　':''}${r.item||''}`;
+   const tekiyo=`${noLabel}${r.shop||''}${r.shop&&r.item?'　':''}${r.item||''}${tk?tk.suffix:''}`;
    const mo=(r.mon!=null&&r.mon!=='')?r.mon:mm;
    const kubun=r.src?(CB_SRC_LABEL[r.src]||'収入'):(r.event?'イベント費':'通常');
-   rows.push([noLabel, r.day?`${yy}/${mo}/${r.day}`:'', kubun, acctCode, a?cbAcctName(acctCode):'', bumon, r.tax||'', tekiyo, inn||'', out||'', (eventOnly?'':bal), r.by||'']); /* SF-ACCT99-20260908 */
+   rows.push([noLabel, r.day?`${yy}/${mo}/${r.day}`:'', kubun, acctCode, a?cbAcctName(acctCode):'', bumon, tk?((a&&a.tax)||''):(r.tax||''), tekiyo, inn||'', out||'', (eventOnly?'':bal), r.by||'']); /* SF-ACCT99-20260908 */
  });
  if(eventOnly){
    const evSum=cb.rows.filter(r=>r.event).reduce((s,r)=>s+(r.kind==='out'?(Number(r.amt)||0):0),0);
@@ -3532,8 +3546,11 @@ function cbCollectMfRows(){
      }
      // 経費（出金）
      if(r.kind==='out'){
-       const a=CB_ACCT_BY[+r.acct];
-       add(mo,r.day,a?cbAcctName(r.acct):'',r.tax||(a&&a.tax)||'',`${r.receiptNo?r.receiptNo+' ':''}${r.shop||''}${r.shop&&r.item?'　':''}${r.item||''}`,0,Number(r.amt)||0);return; /* SF-ACCT99-20260908 */
+       const tk=cbTatekaeRule(r); /* SF-OAKTREE-TATEKAE-20261002 : 立替ルールは科目・税区分とも常に優先 */
+       const acct=tk?tk.acct:+r.acct;
+       const a=CB_ACCT_BY[acct];
+       const tax=tk?((a&&a.tax)||''):(r.tax||(a&&a.tax)||'');
+       add(mo,r.day,a?cbAcctName(acct):'',tax,`${r.receiptNo?r.receiptNo+' ':''}${r.shop||''}${r.shop&&r.item?'　':''}${r.item||''}${tk?tk.suffix:''}`,0,Number(r.amt)||0);return; /* SF-ACCT99-20260908 */
      }
    });
  });
@@ -3557,7 +3574,7 @@ function cbCollectMfRowsExtra(){
    const mo=(r.mon!=null&&r.mon!=='')?r.mon:mm;
    if(r.isCash&&r.kind==='in'&&!r.isClose){add(mo,r.day,'普通預金',(r.tax||'対象外'),'現金入金（補充）',Number(r.amt)||0,0);return;}
    if(r.isClose){if(r.carry)return;add(mo,r.day,'普通預金','対象外','預金振替',0,Number(r.amt)||0,9);return;}
-   if(r.kind==='out'){const a=CB_ACCT_BY[+r.acct];add(mo,r.day,a?cbAcctName(r.acct):'',r.tax||(a&&a.tax)||'',`${r.receiptNo?r.receiptNo+' ':''}${r.shop||''}${r.shop&&r.item?'　':''}${r.item||''}`,0,Number(r.amt)||0);return;} /* SF-ACCT99-20260908 */
+   if(r.kind==='out'){const tk=cbTatekaeRule(r);const acct=tk?tk.acct:+r.acct;const a=CB_ACCT_BY[acct];add(mo,r.day,a?cbAcctName(acct):'',tk?((a&&a.tax)||''):(r.tax||(a&&a.tax)||''),`${r.receiptNo?r.receiptNo+' ':''}${r.shop||''}${r.shop&&r.item?'　':''}${r.item||''}${tk?tk.suffix:''}`,0,Number(r.amt)||0);return;} /* SF-ACCT99-20260908 / SF-OAKTREE-TATEKAE-20261002 */
  });
  items.sort((a,b)=>(a.order-b.order)||(a.dnum-b.dnum));
  return items;
@@ -3641,7 +3658,7 @@ function cbExportMF(modeOverride){
  // 右側マスター表（VLOOKUP参照先）Q6〜R36：コード・名称。公式テンプレの入力規則リスト範囲に収める。
  // 実際に出力で使われ得る科目のみを優先順で詰める（used:false の未使用科目はマスター表から省略）。
  set('Q4','科目\nコード');set('R4','勘定科目名称');set('V4','カテゴリ');
- const MF_MASTER_CODES=[99,106,108,114,118,128,4,1]; // 仕入高/旅費交通費/委託費/通信費/消耗品費/保育園収入高/普通預金/現金
+ const MF_MASTER_CODES=[99,106,108,3,114,118,128,4,1]; // 仕入高/旅費交通費/委託費/立替金/通信費/消耗品費/保育園収入高/普通預金/現金 /* SF-OAKTREE-TATEKAE-20261002 : 立替金が出力に現れるためマスター表に追加 */
  const MF_ACCT_BY_CODE={};MF_ACCTS.forEach(a=>{MF_ACCT_BY_CODE[a[0]]=a;});
  let mr=6;
  MF_MASTER_CODES.forEach(code=>{
@@ -3672,8 +3689,10 @@ function cbSplitData(cb){
      return;
    }
    if(r.kind==='out'){ // 支出（経費）
-     const a=CB_ACCT_BY[+r.acct];
-     expenses.push({date, acct:a?cbAcctName(r.acct):'', tax:r.tax||'', receiptNo:r.receiptNo||'', shop:r.shop||'', item:r.item||'', amt:Number(r.amt)||0, by:r.by||'', event:!!r.event}); /* SF-RECEIPTNO-20260901 / SF-ACCT99-20260908 */
+     const tk=cbTatekaeRule(r); /* SF-OAKTREE-TATEKAE-20261002 : プレビュー・経費/イベントExcelも立替ルール優先 */
+     const acct=tk?tk.acct:+r.acct;
+     const a=CB_ACCT_BY[acct];
+     expenses.push({date, acct:a?cbAcctName(acct):'', tax:tk?((a&&a.tax)||''):(r.tax||''), receiptNo:r.receiptNo||'', shop:r.shop||'', item:(r.item||'')+(tk?tk.suffix:''), amt:Number(r.amt)||0, by:r.by||'', event:!!r.event}); /* SF-RECEIPTNO-20260901 / SF-ACCT99-20260908 */
    }
  });
  // 新規入園（振込売上）※追加経費帳簿では売上なし
