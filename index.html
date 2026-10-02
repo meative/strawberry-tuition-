@@ -3303,6 +3303,10 @@ function cbTaxName(tax){const t=tax==null?'':String(tax);const ov=CB_TAX_NAME_BY
 const CB_HQ_ACCT_DEFAULT={code:1, acctName:'現金', sub:'本社'};
 const CB_HQ_ACCT_BY_PARK={};
 function cbHqAcct(){return CB_HQ_ACCT_BY_PARK[park]||CB_HQ_ACCT_DEFAULT;}
+/* SF-HQCASH-V2-20261002 : 帳簿自体の補助科目（MF Excel ヘッダ M2）。この園の「現金」の補助科目名。
+   資生館（Number9）は別体系のため未登録＝空欄のまま。確認でき次第ここに1行足せば出る。
+   ヴィレッジ・ドライバーのサブ帳簿は park が親園のままなので親園と同じ値になる。 */
+const CB_BOOK_SUB_BY_PARK={'月寒園':'月寒保育園','白石園':'白石保育園','サッポロファクトリー園':'ファクトリー保育園','幼稚舎':'幼稚園'};
 /* SF-OAKTREE-TATEKAE-20261002 : 資生館のオークツリー（English Home Oak Tree）は、英語教室の費用を
    ハイアイランドの代わりに立替払いしているため、仕訳は委託費ではなく「3 立替金」で処理する。
    保存データの勘定科目は書き換えず、MF出力・CSV・プレビュー（経費一覧・経費/イベントExcel含む）の
@@ -3705,7 +3709,7 @@ function cbExportCsv(eventOnly){
    if(eventOnly&&!r.event)return; // イベント費のみ出力
    const tk=r.src?null:cbTatekaeRule(r); /* SF-OAKTREE-TATEKAE-20261002 : CSVも立替ルール優先（科目・税区分・摘要末尾） */
    const a=r.src?{name:'保育園収入高'}:CB_ACCT_BY[tk?tk.acct:+r.acct];
-   const hqRow=!r.src&&!!r.isClose; /* SF-HQCASH-20261002 : 締め行は園別の本部科目（既定 1 現金。保存値 acct:1 と同じなので既定では出力不変） */
+   const hqRow=!r.src&&(!!r.isClose||(r.isCash&&r.kind==='in')); /* SF-HQCASH-20261002 / SF-HQCASH-V2-20261002 : 締め行・補充行は園別の本部科目（既定 1 現金。保存値 acct:1 と同じなので既定では出力不変） */
    const acctCode=hqRow?cbHqAcct().code:(r.src?128:(tk?tk.acct:(r.acct||'')));
    const noLabel=r.src==='timely'?'現金':(r.src==='shokai'?'振込':(i+1)); // タイムリー現金売上=現金／新規入園=振込／出金=連番
    const tekiyo=`${noLabel}${r.shop||''}${r.shop&&r.item?'　':''}${r.item||''}${tk?tk.suffix:''}`;
@@ -3757,7 +3761,7 @@ function cbCollectMfRows(){
      const mo=(r.mon!=null&&r.mon!=='')?r.mon:mm;
      // 現金入金（補充）
      if(r.isCash&&r.kind==='in'&&!r.isClose){
-       add(mo,r.day,'普通預金',(r.tax||'対象外'),isEv?'イベント費 現金補充':'現金入金（補充）',Number(r.amt)||0,0);return;
+       add(mo,r.day,cbHqAcct().acctName,(r.tax||'対象外'),isEv?'イベント費 現金補充':'現金入金（補充）',Number(r.amt)||0,0,0,true);return; /* SF-HQCASH-V2-20261002 : 補充も 現金（本社） */
      }
      // 締めの預金振替（出金）。繰越（carry, amt=0）は帳簿に出さない
      if(r.isClose){
@@ -3792,7 +3796,7 @@ function cbCollectMfRowsExtra(){
  if((Number(cb.opening)||0)>0)add(cb.openingMon||mm,cb.openingDay||1,cbHqAcct().acctName,'対象外','本部から振替',Number(cb.opening)||0,0,-1,true); /* SF-HQCASH-20261002 */
  (cb.rows||[]).forEach(r=>{
    const mo=(r.mon!=null&&r.mon!=='')?r.mon:mm;
-   if(r.isCash&&r.kind==='in'&&!r.isClose){add(mo,r.day,'普通預金',(r.tax||'対象外'),'現金入金（補充）',Number(r.amt)||0,0);return;}
+   if(r.isCash&&r.kind==='in'&&!r.isClose){add(mo,r.day,cbHqAcct().acctName,(r.tax||'対象外'),'現金入金（補充）',Number(r.amt)||0,0,0,true);return;} /* SF-HQCASH-V2-20261002 */
    if(r.isClose){if(r.carry)return;add(mo,r.day,cbHqAcct().acctName,'対象外','預金振替',0,Number(r.amt)||0,9,true);return;} /* SF-HQCASH-20261002 */
    if(r.kind==='out'){const tk=cbTatekaeRule(r);const acct=tk?tk.acct:+r.acct;const a=CB_ACCT_BY[acct];add(mo,r.day,a?cbAcctName(acct):'',tk?((a&&a.tax)||''):(r.tax||(a&&a.tax)||''),`${r.receiptNo?r.receiptNo+' ':''}${r.shop||''}${r.shop&&r.item?'　':''}${r.item||''}${tk?tk.suffix:''}`,0,Number(r.amt)||0);return;} /* SF-ACCT99-20260908 / SF-OAKTREE-TATEKAE-20261002 */
  });
@@ -3839,6 +3843,7 @@ function cbExportMF(modeOverride){
  // 見出し部
  set('B1','現金出納帳');set('F1','事業者名／事業者番号');set('K1',CB_JIGYOSHA[park]||CB_JIGYOSHA_DEFAULT);set('L1','部門');set('M1',bumon);
  set('B2','Ver e4.0');set('C2','現金出納帳');set('L2','補助科目');
+ if(CB_BOOK_SUB_BY_PARK[park])set('M2',CB_BOOK_SUB_BY_PARK[park]); /* SF-HQCASH-V2-20261002 : 帳簿の補助科目（園別。未登録＝資生館は空欄） */
  // 取引ヘッダ（3行目）
  set('B3','日付');set('D3','相手勘定科目');set('F3','相手補助科目');set('G3','相手部門');set('H3','相手取引先');
  set('I3','相手税区分');set('J3','相手インボイス');set('K3','摘要');set('L3','入金');set('M3','出金');set('N3','残高');
@@ -4077,7 +4082,7 @@ function cbShowPreview(){
    const openSum=uni.filter(it=>it.order===-1).reduce((s,it)=>s+(it.inn||0),0); // 本部からの振替（通常＋イベント、先頭）
    const uCashSum=uni.filter(it=>String(it.tekiyo).indexOf('【現金】')>=0).reduce((s,it)=>s+(it.inn||0),0);
    const uFuriSum=uni.filter(it=>String(it.tekiyo).indexOf('【振込】')>=0).reduce((s,it)=>s+(it.inn||0),0);
-   const uHojuSum=uni.filter(it=>it.acctName==='普通預金'&&it.order!==-1&&it.inn>0).reduce((s,it)=>s+(it.inn||0),0); // 現金補充
+   const uHojuSum=uni.filter(it=>(it.hq||it.acctName==='普通預金')&&it.order!==-1&&it.inn>0).reduce((s,it)=>s+(it.inn||0),0); // 現金補充 /* SF-HQCASH-V2-20261002 : 補充の科目が現金になっても拾う */
    const uExpSum=uni.filter(it=>!((it.hq||it.acctName==='普通預金')&&it.out>0)).reduce((s,it)=>s+(it.out||0),0); // 経費（締めの預金振替は除く）/* SF-HQCASH-20261002 : 締めの科目が現金になっても hq フラグで除外 */
    const inTotal=openSum+uHojuSum+uCashSum+uFuriSum;
    const exd=cbExtraDef();
