@@ -3757,10 +3757,11 @@ function cbStoreGet(store){
 // 売上（新規入園振込・タイムリー現金）は通常側のみ。月謝は別管理のため含めない。
 function cbCollectMfRows(){
  if(cbExtraDef())return cbCollectMfRowsExtra(); // 追加経費帳簿：その帳簿だけを集計（月謝・イベント・売上なし）
- /* SF-EVMF-20261009 : イベント出納帳の画面（cbMode==='event'）からの MF 出力・総合プレビューは
-    イベント帳簿の行だけを集める。従来は画面に関係なく通常帳簿と合算していたため、イベントの
-    Excelを出すつもりの画面に通常側の「本部から振替」が混入して見えた（2026-10 月寒・運動会）。
-    通常画面からの出力は従来どおり合算（通常＋イベント＋売上）で変えない。 */
+ /* SF-EVMF-20261009 / SF-EVMF-V2-20261009 : MF出力・総合プレビューは画面の帳簿と完全に1対1。
+    イベント画面（cbMode==='event'）＝イベント帳簿の行だけ、通常画面＝通常帳簿＋売上だけ。
+    イベントの小口は行事をまたいで数か月使う独立した小口のため、通常の月次MFに混ぜると
+    毎月の取込で重複・部分取込が起きる（V1では通常側を合算のまま残していたが V2 で分離）。
+    なお本部用集計・月売上表は cashbook / cashbookEvent を直接・別列で読むのでこの関数の影響を受けない。 */
  const evOnly=(cbMode==='event');
  const bumon=CB_BUMON[park]||park;
  const items=[];
@@ -3772,7 +3773,7 @@ function cbCollectMfRows(){
  // 通常・イベントの両帳簿を回す（cbModeに依存せず直接取得）
  [cbStoreGet(cashbook), cbStoreGet(cashbookEvent)].forEach((cb,idx)=>{
    const isEv=idx===1;
-   if(evOnly&&!isEv)return; /* SF-EVMF-20261009 : イベントモードは通常帳簿を読まない */
+   if(evOnly!==isEv)return; /* SF-EVMF-V2-20261009 : 画面の帳簿だけを読む（通常⇔イベントを完全分離） */
    // イベント側：前月から繰り越したイベント残金（手元に残っている現金）を先頭の繰越金として計上
    if(isEv){
      const carryIn=cbEventCarryIn();
@@ -3930,7 +3931,7 @@ function cbExportMF(modeOverride){
  const wb=XLSX.utils.book_new();
  XLSX.utils.book_append_sheet(wb,ws,'現金出納帳');
  XLSX.writeFile(wb,`MF_現金出納帳_${yy}年${mm}月_${_fileDept}.xlsx`);
- infoDialog(`マネーフォワード用Excelを書き出しました。\n\n${_ex?`「${_ex.disp}」の経費だけを、`:(_evOnly?'イベント出納帳の行だけを、':'現金出納帳とイベント出納帳を1つに合算し、')}本物テンプレートと同じレイアウト（B列開始・Ver表記・勘定科目コード・残高つき）で出力しています。${_ex&&_mfSub?`\n部門「${bumon}」・補助科目（小分類）「${_mfSub}」で出力しています。`:''}\nそのままマネーフォワードの「現金出納帳」インポートに使えます。\n\nファイル：MF_現金出納帳_${yy}年${mm}月_${_fileDept}.xlsx`,'Excel出力完了');
+ infoDialog(`マネーフォワード用Excelを書き出しました。\n\n${_ex?`「${_ex.disp}」の経費だけを、`:(_evOnly?'イベント出納帳の行だけを、':'通常の現金出納帳の行と売上だけ（イベント出納帳は別ファイル）を、')}本物テンプレートと同じレイアウト（B列開始・Ver表記・勘定科目コード・残高つき）で出力しています。${_ex&&_mfSub?`\n部門「${bumon}」・補助科目（小分類）「${_mfSub}」で出力しています。`:''}\nそのままマネーフォワードの「現金出納帳」インポートに使えます。\n\nファイル：MF_現金出納帳_${yy}年${mm}月_${_fileDept}.xlsx`,'Excel出力完了');
  }finally{ cbMode=_saveMode; } // 一時的に切り替えた帳簿モードを必ず元に戻す
 }
 // 当月の出納帳を「売上」と「支出」に分けて取り出す（タイムリーはプレビュー読込分も合算）
@@ -4117,21 +4118,21 @@ function cbShowPreview(){
    const inTotal=openSum+uHojuSum+uCashSum+uFuriSum;
    const exd=cbExtraDef();
    const evOnly=(!exd&&cbMode==='event'); /* SF-EVMF-20261009 : イベント画面の総合タブはイベント帳簿だけ */
-   const mfTitle=exd?`${exd.disp} 経費（マネーフォワード出力用・この帳簿だけ）`:(evOnly?'イベント（マネーフォワード出力用・イベント出納帳だけ）':'総合（マネーフォワード出力用・通常＋イベント合算）');
+   const mfTitle=exd?`${exd.disp} 経費（マネーフォワード出力用・この帳簿だけ）`:(evOnly?'イベント（マネーフォワード出力用・イベント出納帳だけ）':'総合（マネーフォワード出力用・通常の出納帳＋売上）'); /* SF-EVMF-V2-20261009 */
    const mfDesc=exd
      ?(exd.mfSub
        ?`<b>「${exd.disp}」の経費だけ</b>を、マネーフォワードの「現金出納帳」インポート様式（B列開始・勘定科目コード・残高つき）で出力します。部門は「${exd.bumon}」、補助科目（小分類）は「${exd.mfSub}」です（＝MFでは${exd.bumon}に入りつつ、補助科目「${exd.mfSub}」で分けて集計）。${park}の通常の現金出納帳とは別ファイルです。明細は日付順です。`
        :`<b>「${exd.disp}」の経費だけ</b>を、マネーフォワードの「現金出納帳」インポート様式（B列開始・勘定科目コード・残高つき）で出力します。部門は「${exd.bumon}」で、${park}とは<b>別部門</b>です。<b>${park}のマネーフォワードには合算しません</b>。明細は日付順です。`)
      :(evOnly
        ?`<b>イベント出納帳の行だけ</b>（イベント予算の振替・繰越・イベント経費・締め）を、マネーフォワードの「現金出納帳」インポート様式（B列開始・勘定科目コード・残高つき）でxlsx出力します。通常の現金出納帳の行（本部から振替・経費・売上）は含みません。明細は日付順です。`
-       :`<b>現金出納帳とイベント出納帳を1つに合算</b>し、売上（タイムリー現金・新規入園振込）と経費（通常＋イベント）をまとめて、マネーフォワードの「現金出納帳」インポート様式（B列開始・勘定科目コード・残高つき）でxlsx出力します。明細は日付順です。`);
+       :`<b>通常の現金出納帳の行だけ</b>（本部から振替・経費・補充・締め）と売上（タイムリー現金・新規入園振込）を、マネーフォワードの「現金出納帳」インポート様式（B列開始・勘定科目コード・残高つき）でxlsx出力します。<b>イベント出納帳は含みません</b>（イベントタブから別ファイルで出力）。明細は日付順です。`); /* SF-EVMF-V2-20261009 */
    const mfNote=exd
      ?(exd.mfSub
        ?`※ これは「${exd.disp}」専用のExcelです。マネーフォワードでは部門「${exd.bumon}」＋補助科目「${exd.mfSub}」で取り込まれ、${park}本体とは分けて集計できます。`
        :`※ これは「${exd.disp}」専用のExcelです（部門「${exd.bumon}」）。${park}のマネーフォワードには含めません（別会計として取り込んでください）。`)
      :(evOnly
-       ?`※ これはイベント出納帳だけのExcelです。通常の現金出納帳の画面から出す合算Excelにも同じイベント行が入っているため、<b>両方をマネーフォワードへ取り込むとイベント行が二重になります</b>。どちらか一方だけを取り込んでください。`
-       :`※ マネーフォワードへインポートするのは、この総合タブのExcelです。下の表が、出力されるExcelの中身です（イベント出納帳の画面から出すと、イベント帳簿だけの別ファイルになります）。`);
+       ?`※ これはイベント出納帳だけのExcelです。通常の現金出納帳のExcelにはイベント行は入りません。<b>通常とイベントは別ファイルです。それぞれマネーフォワードへ取り込んでください</b>。`
+       :`※ マネーフォワードへインポートするのは、この総合タブのExcelです。下の表が、出力されるExcelの中身です。<b>通常とイベントは別ファイルです</b>。イベント費があった月は、イベントタブからも出力してそれぞれ取り込んでください。`); /* SF-EVMF-V2-20261009 */
    h+=`<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap"><span style="font-weight:700;color:var(--leaf);font-size:14px">${mfTitle}</span><div style="flex:1"></div>`+
      `<button class="btn btn-ghost" style="padding:7px 16px;font-size:13px;border-color:var(--leaf);color:var(--leaf)" onclick="cbExportMF()">📊 マネーフォワード用Excelを出力</button>`+
      (exd?'':cbExtraList().map(b=>`<button class="btn btn-ghost" style="padding:7px 16px;font-size:13px;border-color:#9a6b2f;color:#9a6b2f;background:#fff8f0" onclick="cbExportMF('extra:${b.key}')" title="${b.disp}経費を、別部門・別ファイルでマネーフォワード出力">${b.label}のMFを出力（部門：${b.bumon}）</button>`).join(''))+
@@ -4139,7 +4140,7 @@ function cbShowPreview(){
      `<div style="background:#faf6f1;border:1px solid #e6dcd0;border-radius:10px;padding:16px 18px">`+
        `<p style="font-size:13px;color:#555;margin:0 0 12px">${mfDesc}</p>`+
        `<div style="display:flex;gap:24px;flex-wrap:wrap;font-size:13px">`+
-         `<div><div style="color:#777;font-size:11px">${exd?'本部から振替（受入）':(evOnly?'イベント予算＋繰越':'本部振替＋繰越<br>（通常＋イベント）')}</div><div style="font-weight:700">¥${openSum.toLocaleString()}</div></div>`+
+         `<div><div style="color:#777;font-size:11px">${exd?'本部から振替（受入）':(evOnly?'イベント予算＋繰越':'本部から振替')}</div><div style="font-weight:700">¥${openSum.toLocaleString()}</div></div>`+ /* SF-EVMF-V2-20261009 : 通常は通常帳簿のみの額 */
          ((exd||evOnly)?'':`<div><div style="color:#777;font-size:11px">売上（現金）</div><div style="font-weight:700;color:var(--leaf)">¥${uCashSum.toLocaleString()}</div></div>`+
          `<div><div style="color:#777;font-size:11px">売上（振込）</div><div style="font-weight:700;color:var(--leaf)">¥${uFuriSum.toLocaleString()}</div></div>`)+
          `<div><div style="color:#777;font-size:11px">入金計</div><div style="font-weight:700">¥${inTotal.toLocaleString()}</div></div>`+
