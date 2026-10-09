@@ -925,8 +925,12 @@ function calc(p,asNyuenMonth){
     入園前ガードより先に判定する（請求月は入園月より前のため）。金額はマスターから。 */
  if(!asNyuenMonth && shinkyuThisMonth(p)){
   const S=(M.youchisha&&M.youchisha.shinkyu_chiruga)||{};
-  const uni=Number(S.uniform)||0, nyu=Number(S.nyugaku)||0, tesu=Number(S.tesu)||0;
-  return {type:facType(p.park),getsu:0,kyozai:0,sib:0,half:0,early:0,evs:[{item:'制服代',amt:uni},{item:'入学金',amt:nyu}],evSum:uni+nyu,sub:uni+nyu,fee:tesu,total:uni+nyu+tesu,flag:true,changed:false,reason:'チルガからの進級（制服代・入学金）',isNew:false,shinkyu:true};
+  /* SF-SHINKYU-SIBFREE-20261009 : ご兄弟が在籍している進級児は入学金を免除（¥30,000→¥0）。
+     行は消さず¥0で残す（月次の明細・案内文で「免除」が見えるように）。月次計算・口座振替CSV・
+     ルクミー・本部集計はすべてこの calc() を通るので、ここ1箇所で全経路に効く。 */
+  const uni=Number(S.uniform)||0, nyu=(p.shinkyuSibFree?0:Number(S.nyugaku))||0, tesu=Number(S.tesu)||0;
+  const nyuLabel=p.shinkyuSibFree?'入学金（ご兄弟在籍のため免除）':'入学金';
+  return {type:facType(p.park),getsu:0,kyozai:0,sib:0,half:0,early:0,evs:[{item:'制服代',amt:uni},{item:nyuLabel,amt:nyu}],evSum:uni+nyu,sub:uni+nyu,fee:tesu,total:uni+nyu+tesu,flag:true,changed:false,reason:'チルガからの進級（制服代・入学金）'+(p.shinkyuSibFree?'・入学金免除':''),isNew:false,shinkyu:true};
  }
  // SF-NYUENGUARD-20260908 : 入園月より前の月はすべて0（退園側と対称）
  // SF-NYUENFIRST-20260909 : asNyuenMonth=true（新規入園の初月合計・初回案内PDF・初回売上）は「入園月として計算する」
@@ -1534,7 +1538,7 @@ function renderShinkyu(){
      `<span style="font-size:15px;font-weight:600;color:var(--ink)">${esc(n.name)||'（園児名を入力してください）'}</span>`+
      `<span style="font-size:11px;color:var(--mut)">出身：${esc(n.fromPark)||'—'}</span>`+
     `</div>`+
-    `<div style="text-align:right"><div style="font-size:11px;color:var(--mut)">請求月（${esc(n.shinkyuYM)||'—'}）の引落額</div><div style="font-size:20px;font-weight:700;color:var(--berry)">¥${goukei.toLocaleString()}</div></div>`+
+    `<div style="text-align:right"><div style="font-size:11px;color:var(--mut)">請求月（${esc(n.shinkyuYM)||'—'}）の引落額${n.shinkyuSibFree?'・入学金免除':''}</div><div style="font-size:20px;font-weight:700;color:var(--berry)">¥${(uni+(n.shinkyuSibFree?0:nyu)+tesu).toLocaleString()}</div></div>`+ /* SF-SHINKYU-SIBFREE-20261009 */
    `</div>`+
    `<div style="padding:18px;display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px 16px">`+
     fld('園児名',`<input class="inp" data-ski="${i}" data-f="name" value="${esc(n.name)}" placeholder="例：山田 太郎">`)+
@@ -1546,6 +1550,7 @@ function renderShinkyu(){
     fld('入園年月日（既定 2027-04-01）',`<input class="inp" type="date" data-ski="${i}" data-f="nyuen" value="${esc(n.nyuen)}">`)+
     fld('請求月（既定 2026-11）',`<input class="inp" type="month" data-ski="${i}" data-f="shinkyuYM" value="${esc(n.shinkyuYM)}">`)+
     fld('クラス（2027/4時点・固定）',`<div class="inp" style="background:var(--panel2);color:var(--mut)">LEAF</div>`)+
+    fld('入学金免除（ご兄弟在籍）',`<label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--ink);padding:9px 2px;cursor:pointer"><input type="checkbox" data-skfree="${i}" ${n.shinkyuSibFree?'checked':''}> 免除する（¥${nyu.toLocaleString()} → ¥0）</label>`)+ /* SF-SHINKYU-SIBFREE-20261009 */
    `</div>`+
    `<div style="padding:0 18px 16px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">`+
     (isConf
@@ -1644,10 +1649,10 @@ function renderShinkyu(){
      `<div class="sec2"><span class="num">02</span><span class="lbl">ご請求内訳</span><span class="line"></span></div>`+
      `<table class="billtable">`+
       `<tr><td>制服代</td><td>¥ ${uni.toLocaleString()}</td></tr>`+
-      `<tr><td>入学金</td><td>¥ ${nyu.toLocaleString()}</td></tr>`+
+      `<tr><td>入学金${p.shinkyuSibFree?'（ご兄弟在籍のため免除）':''}</td><td>¥ ${(p.shinkyuSibFree?0:nyu).toLocaleString()}</td></tr>`+
       `<tr><td>手数料</td><td>¥ ${tesu.toLocaleString()}</td></tr>`+
      `</table>`+
-     `<div class="billtotal"><span class="lbl">ご請求金額合計</span><span class="amt">¥ ${goukei.toLocaleString()}</span></div>`+
+     `<div class="billtotal"><span class="lbl">ご請求金額合計</span><span class="amt">¥ ${(uni+(p.shinkyuSibFree?0:nyu)+tesu).toLocaleString()}</span></div>`+ /* SF-SHINKYU-SIBFREE-20261009 */
      `<div class="sec2"><span class="num">03</span><span class="lbl">お引き落としについて</span><span class="line"></span></div>`+
      `<div class="duebox">`+
       `<div class="lbl">Withdrawal Date　お引き落とし日</div>`+
@@ -1663,9 +1668,11 @@ function renderShinkyu(){
  // 入力バインド（新規入園タブの data-newi と同じ流儀：onchange で再描画、oninput で即保存）
  document.querySelectorAll('[data-ski]').forEach(el=>{el.onchange=e=>{const i=+e.target.dataset.ski,f=e.target.dataset.f;roster[i][f]=e.target.value;if(f==='shinkyuYM')window.__skDebit=null;render();};
   el.oninput=e=>{const i=+e.target.dataset.ski,f=e.target.dataset.f;roster[i][f]=e.target.value;saveState();};});
+ /* SF-SHINKYU-SIBFREE-20261009 : 免除チェック。値は roster に保存（保存・クラウド同期・園別sliceは roster 丸ごとで自動） */
+ document.querySelectorAll('[data-skfree]').forEach(el=>{el.onchange=e=>{roster[+e.target.dataset.skfree].shinkyuSibFree=e.target.checked;saveState();render();};});
  document.querySelectorAll('[data-skconfirm]').forEach(el=>{el.onclick=e=>{const i=+e.currentTarget.dataset.skconfirm;
   const n=roster[i];if(!n.name)return;
-  confirmDialog(`「${n.name}」さんの進級を確定します。\n確定すると請求月（${n.shinkyuYM}）の月次計算・口座振替CSV・ルクミー出力・本部集計に ¥${goukei.toLocaleString()} が載り、園児台帳にも表示されます。`,()=>{
+  confirmDialog(`「${n.name}」さんの進級を確定します。\n確定すると請求月（${n.shinkyuYM}）の月次計算・口座振替CSV・ルクミー出力・本部集計に ¥${(uni+(n.shinkyuSibFree?0:nyu)+tesu).toLocaleString()} が載り、園児台帳にも表示されます。${n.shinkyuSibFree?'\n（ご兄弟在籍のため入学金は免除です）':''}`,()=>{ /* SF-SHINKYU-SIBFREE-20261009 */
    roster[i].confirmed=true;render();
   },'チルガからの進級の確定','確定する');};});
  document.querySelectorAll('[data-skdel]').forEach(el=>{el.onclick=e=>{const i=+e.currentTarget.dataset.skdel;
@@ -1673,7 +1680,7 @@ function renderShinkyu(){
   confirmDialog(`進級の登録から「${nm}」を削除します。\nこの操作は取り消せません。本当に削除しますか？`,()=>{roster.splice(i,1);render();});};});
  const skAdd=document.getElementById('skAdd');if(skAdd)skAdd.onclick=()=>{
   const newId=Math.max(0,...roster.map(r=>r.id||0))+1;
-  roster.push({id:newId,status:'在園中',park:'幼稚舎',name:'',kana:'',waku:'一般',cls:'LEAF',koza:'',furikaeNo:'',fromPark:'月寒園',nyuen:'2027-04-01',shinkyu:true,shinkyuYM:'2026-11',sib:'なし',lid:'',birth:'',confirmed:false,shinkyuSeq:Date.now()});
+  roster.push({id:newId,status:'在園中',park:'幼稚舎',name:'',kana:'',waku:'一般',cls:'LEAF',koza:'',furikaeNo:'',fromPark:'月寒園',nyuen:'2027-04-01',shinkyu:true,shinkyuYM:'2026-11',sib:'なし',lid:'',birth:'',confirmed:false,shinkyuSeq:Date.now(),shinkyuSibFree:false}); /* SF-SHINKYU-SIBFREE-20261009 */
   render();};
  const skPick=document.getElementById('skPick');if(skPick)skPick.onchange=e=>{window.__skPick=+e.target.value;window.__skDebit=null;render();};
  const ski=document.getElementById('skIssue');if(ski)ski.onchange=e=>{window.__skIssue=e.target.value;render();};
@@ -3739,6 +3746,11 @@ function cbStoreGet(store){
 // 売上（新規入園振込・タイムリー現金）は通常側のみ。月謝は別管理のため含めない。
 function cbCollectMfRows(){
  if(cbExtraDef())return cbCollectMfRowsExtra(); // 追加経費帳簿：その帳簿だけを集計（月謝・イベント・売上なし）
+ /* SF-EVMF-20261009 : イベント出納帳の画面（cbMode==='event'）からの MF 出力・総合プレビューは
+    イベント帳簿の行だけを集める。従来は画面に関係なく通常帳簿と合算していたため、イベントの
+    Excelを出すつもりの画面に通常側の「本部から振替」が混入して見えた（2026-10 月寒・運動会）。
+    通常画面からの出力は従来どおり合算（通常＋イベント＋売上）で変えない。 */
+ const evOnly=(cbMode==='event');
  const bumon=CB_BUMON[park]||park;
  const items=[];
  const dnum=(mo,day)=>day?((+mo)*100+(+day)):0; // 日なし（繰越・本部振替）は先頭へ
@@ -3749,6 +3761,7 @@ function cbCollectMfRows(){
  // 通常・イベントの両帳簿を回す（cbModeに依存せず直接取得）
  [cbStoreGet(cashbook), cbStoreGet(cashbookEvent)].forEach((cb,idx)=>{
    const isEv=idx===1;
+   if(evOnly&&!isEv)return; /* SF-EVMF-20261009 : イベントモードは通常帳簿を読まない */
    // イベント側：前月から繰り越したイベント残金（手元に残っている現金）を先頭の繰越金として計上
    if(isEv){
      const carryIn=cbEventCarryIn();
@@ -3781,10 +3794,11 @@ function cbCollectMfRows(){
      }
    });
  });
- // 売上（通常側のみ）：新規入園（振込）・タイムリー（現金）
- const cbN=cbStoreGet(cashbook);
+ // 売上（通常側のみ）：新規入園（振込）・タイムリー（現金）。イベントモードでは載せない（SF-EVMF-20261009）
+ if(!evOnly){
  shokaiAutoRowsFor(false).forEach(r=>{const mo=(r.mon!=null&&r.mon!=='')?r.mon:mm;add(mo,r.day,cbAcctName(128),'非課税売上',`【振込】${r.item||''}`,Number(r.amt)||0,0);}); /* SF-ACCT128-20260909 */
  (timelyData[park]&&timelyData[park][ymKey()]||[]).forEach(r=>{add((r.mon||mm),r.day,cbAcctName(128),'非課税売上',`【現金】${r.item||''}`,Number(r.amt)||0,0);}); /* SF-ACCT128-20260909 */
+ }
  // 日付順（order→dnum）で安定ソート
  items.sort((a,b)=>(a.order-b.order)||(a.dnum-b.dnum));
  return items;
@@ -3826,7 +3840,9 @@ function cbExportMF(modeOverride){
  if(!libReady('xlsx')){ withLib('xlsx',()=>cbExportMF(modeOverride)); return; }
  const _saveMode=cbMode; if(modeOverride)cbMode=modeOverride; // 指定帳簿で出力（白石園の画面からヴィレッジ等を別ファイルで個別出力する用）
  try{
- const cb=cbGet();const _ex=cbExtraDef();const bumon=_ex?_ex.bumon:(CB_BUMON[park]||park);const _mfSub=_ex?(_ex.mfSub||''):'';const _fileDept=_ex?(_ex.bumon+(_ex.mfSub?'_'+_ex.mfSub:'')):bumon;
+ const cb=cbGet();const _ex=cbExtraDef();const bumon=_ex?_ex.bumon:(CB_BUMON[park]||park);const _mfSub=_ex?(_ex.mfSub||''):'';
+ const _evOnly=(!_ex&&cbMode==='event'); /* SF-EVMF-20261009 : イベント画面からはイベント帳簿だけの別ファイル */
+ const _fileDept=_ex?(_ex.bumon+(_ex.mfSub?'_'+_ex.mfSub:'')):(_evOnly?bumon+'_イベント':bumon);
  if(modeOverride&&!cbCollectMfRows().length){ infoDialog('この帳簿には今月（'+yy+'年'+mm+'月）のデータがありません。','出力できません'); return; }
  // MF勘定科目マスター（コード・名称・カテゴリ）— テンプレートの右側マスターと同一
  const MF_ACCTS=[[99,'当期商品仕入高','その他'],[100,'役員報酬',''],[101,'給与手当','仕入関係'],[102,'賞与',''],
@@ -3903,7 +3919,7 @@ function cbExportMF(modeOverride){
  const wb=XLSX.utils.book_new();
  XLSX.utils.book_append_sheet(wb,ws,'現金出納帳');
  XLSX.writeFile(wb,`MF_現金出納帳_${yy}年${mm}月_${_fileDept}.xlsx`);
- infoDialog(`マネーフォワード用Excelを書き出しました。\n\n${_ex?`「${_ex.disp}」の経費だけを、`:'現金出納帳とイベント出納帳を1つに合算し、'}本物テンプレートと同じレイアウト（B列開始・Ver表記・勘定科目コード・残高つき）で出力しています。${_ex&&_mfSub?`\n部門「${bumon}」・補助科目（小分類）「${_mfSub}」で出力しています。`:''}\nそのままマネーフォワードの「現金出納帳」インポートに使えます。\n\nファイル：MF_現金出納帳_${yy}年${mm}月_${_fileDept}.xlsx`,'Excel出力完了');
+ infoDialog(`マネーフォワード用Excelを書き出しました。\n\n${_ex?`「${_ex.disp}」の経費だけを、`:(_evOnly?'イベント出納帳の行だけを、':'現金出納帳とイベント出納帳を1つに合算し、')}本物テンプレートと同じレイアウト（B列開始・Ver表記・勘定科目コード・残高つき）で出力しています。${_ex&&_mfSub?`\n部門「${bumon}」・補助科目（小分類）「${_mfSub}」で出力しています。`:''}\nそのままマネーフォワードの「現金出納帳」インポートに使えます。\n\nファイル：MF_現金出納帳_${yy}年${mm}月_${_fileDept}.xlsx`,'Excel出力完了');
  }finally{ cbMode=_saveMode; } // 一時的に切り替えた帳簿モードを必ず元に戻す
 }
 // 当月の出納帳を「売上」と「支出」に分けて取り出す（タイムリーはプレビュー読込分も合算）
@@ -4089,17 +4105,22 @@ function cbShowPreview(){
    const uExpSum=uni.filter(it=>!((it.hq||it.acctName==='普通預金')&&it.out>0)).reduce((s,it)=>s+(it.out||0),0); // 経費（締めの預金振替は除く）/* SF-HQCASH-20261002 : 締めの科目が現金になっても hq フラグで除外 */
    const inTotal=openSum+uHojuSum+uCashSum+uFuriSum;
    const exd=cbExtraDef();
-   const mfTitle=exd?`${exd.disp} 経費（マネーフォワード出力用・この帳簿だけ）`:'総合（マネーフォワード出力用・通常＋イベント合算）';
+   const evOnly=(!exd&&cbMode==='event'); /* SF-EVMF-20261009 : イベント画面の総合タブはイベント帳簿だけ */
+   const mfTitle=exd?`${exd.disp} 経費（マネーフォワード出力用・この帳簿だけ）`:(evOnly?'イベント（マネーフォワード出力用・イベント出納帳だけ）':'総合（マネーフォワード出力用・通常＋イベント合算）');
    const mfDesc=exd
      ?(exd.mfSub
        ?`<b>「${exd.disp}」の経費だけ</b>を、マネーフォワードの「現金出納帳」インポート様式（B列開始・勘定科目コード・残高つき）で出力します。部門は「${exd.bumon}」、補助科目（小分類）は「${exd.mfSub}」です（＝MFでは${exd.bumon}に入りつつ、補助科目「${exd.mfSub}」で分けて集計）。${park}の通常の現金出納帳とは別ファイルです。明細は日付順です。`
        :`<b>「${exd.disp}」の経費だけ</b>を、マネーフォワードの「現金出納帳」インポート様式（B列開始・勘定科目コード・残高つき）で出力します。部門は「${exd.bumon}」で、${park}とは<b>別部門</b>です。<b>${park}のマネーフォワードには合算しません</b>。明細は日付順です。`)
-     :`<b>現金出納帳とイベント出納帳を1つに合算</b>し、売上（タイムリー現金・新規入園振込）と経費（通常＋イベント）をまとめて、マネーフォワードの「現金出納帳」インポート様式（B列開始・勘定科目コード・残高つき）でxlsx出力します。明細は日付順です。`;
+     :(evOnly
+       ?`<b>イベント出納帳の行だけ</b>（イベント予算の振替・繰越・イベント経費・締め）を、マネーフォワードの「現金出納帳」インポート様式（B列開始・勘定科目コード・残高つき）でxlsx出力します。通常の現金出納帳の行（本部から振替・経費・売上）は含みません。明細は日付順です。`
+       :`<b>現金出納帳とイベント出納帳を1つに合算</b>し、売上（タイムリー現金・新規入園振込）と経費（通常＋イベント）をまとめて、マネーフォワードの「現金出納帳」インポート様式（B列開始・勘定科目コード・残高つき）でxlsx出力します。明細は日付順です。`);
    const mfNote=exd
      ?(exd.mfSub
        ?`※ これは「${exd.disp}」専用のExcelです。マネーフォワードでは部門「${exd.bumon}」＋補助科目「${exd.mfSub}」で取り込まれ、${park}本体とは分けて集計できます。`
        :`※ これは「${exd.disp}」専用のExcelです（部門「${exd.bumon}」）。${park}のマネーフォワードには含めません（別会計として取り込んでください）。`)
-     :`※ マネーフォワードへインポートするのは、この総合タブのExcelです。下の表が、出力されるExcelの中身です（現金出納帳・イベント出納帳どちらのタブから出しても同じ合算ファイルになります）。`;
+     :(evOnly
+       ?`※ これはイベント出納帳だけのExcelです。通常の現金出納帳の画面から出す合算Excelにも同じイベント行が入っているため、<b>両方をマネーフォワードへ取り込むとイベント行が二重になります</b>。どちらか一方だけを取り込んでください。`
+       :`※ マネーフォワードへインポートするのは、この総合タブのExcelです。下の表が、出力されるExcelの中身です（イベント出納帳の画面から出すと、イベント帳簿だけの別ファイルになります）。`);
    h+=`<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap"><span style="font-weight:700;color:var(--leaf);font-size:14px">${mfTitle}</span><div style="flex:1"></div>`+
      `<button class="btn btn-ghost" style="padding:7px 16px;font-size:13px;border-color:var(--leaf);color:var(--leaf)" onclick="cbExportMF()">📊 マネーフォワード用Excelを出力</button>`+
      (exd?'':cbExtraList().map(b=>`<button class="btn btn-ghost" style="padding:7px 16px;font-size:13px;border-color:#9a6b2f;color:#9a6b2f;background:#fff8f0" onclick="cbExportMF('extra:${b.key}')" title="${b.disp}経費を、別部門・別ファイルでマネーフォワード出力">${b.label}のMFを出力（部門：${b.bumon}）</button>`).join(''))+
@@ -4107,8 +4128,8 @@ function cbShowPreview(){
      `<div style="background:#faf6f1;border:1px solid #e6dcd0;border-radius:10px;padding:16px 18px">`+
        `<p style="font-size:13px;color:#555;margin:0 0 12px">${mfDesc}</p>`+
        `<div style="display:flex;gap:24px;flex-wrap:wrap;font-size:13px">`+
-         `<div><div style="color:#777;font-size:11px">${exd?'本部から振替（受入）':'本部振替＋繰越<br>（通常＋イベント）'}</div><div style="font-weight:700">¥${openSum.toLocaleString()}</div></div>`+
-         (exd?'':`<div><div style="color:#777;font-size:11px">売上（現金）</div><div style="font-weight:700;color:var(--leaf)">¥${uCashSum.toLocaleString()}</div></div>`+
+         `<div><div style="color:#777;font-size:11px">${exd?'本部から振替（受入）':(evOnly?'イベント予算＋繰越':'本部振替＋繰越<br>（通常＋イベント）')}</div><div style="font-weight:700">¥${openSum.toLocaleString()}</div></div>`+
+         ((exd||evOnly)?'':`<div><div style="color:#777;font-size:11px">売上（現金）</div><div style="font-weight:700;color:var(--leaf)">¥${uCashSum.toLocaleString()}</div></div>`+
          `<div><div style="color:#777;font-size:11px">売上（振込）</div><div style="font-weight:700;color:var(--leaf)">¥${uFuriSum.toLocaleString()}</div></div>`)+
          `<div><div style="color:#777;font-size:11px">入金計</div><div style="font-weight:700">¥${inTotal.toLocaleString()}</div></div>`+
          `<div><div style="color:#777;font-size:11px">出金計（経費）</div><div style="font-weight:700;color:var(--berry)">¥${uExpSum.toLocaleString()}</div></div>`+
