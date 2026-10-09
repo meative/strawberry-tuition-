@@ -914,6 +914,11 @@ function nyuenYM(p){ if(!p||!p.nyuen)return null; const s=String(p.nyuen); const
    通常月謝はルクミー（チルガ）側。入園月翌月以降は通常の幼稚舎園児として月謝が始まる。 */
 function shinkyuYMnum(p){ if(!p||!p.shinkyu||!p.shinkyuYM)return null; const s=String(p.shinkyuYM); const y=+s.slice(0,4), m=+s.slice(5,7); return (y&&m)?(y*100+m):null; }
 function shinkyuThisMonth(p){ const z=shinkyuYMnum(p); return z!=null && (yy*100+mm)===z; }
+/* SF-SHINKYU-FREESEL-20261009 : 入学金免除の理由（''=免除なし／'sibling'=ご兄弟在籍／'staff'=従業員の福利厚生）。
+   旧データ互換：shinkyuSibFree===true は「ご兄弟在籍」として読む。画面で変更したときは
+   shinkyuFreeReason と shinkyuSibFree の両方を書く（旧コードの端末でも兄弟免除が効き続けるように）。 */
+const SHINKYU_FREE_LABELS={sibling:'ご兄弟在籍のため免除', staff:'従業員の福利厚生のため免除'};
+function shinkyuFreeReason(p){ const r=p&&p.shinkyuFreeReason; if(r==='sibling'||r==='staff')return r; return (p&&p.shinkyuSibFree===true)?'sibling':''; }
 function nyuenNotYet(p){ if(shinkyuThisMonth(p))return false; /* SF-SHINKYU-CHIRUGA-20261002 : 請求月は入園前でも対象（月次・ルクミー・集計・台帳タグの全フィルタがここを通る） */ const z=nyuenYM(p); return z!=null && (yy*100+mm)<z; }   // 対象月＜入園月＝入園前（請求・表示の対象外）
 /* SF-NYUENFIRST-20260909 : 入園月の月謝は初回案内（振込）で請求済みのため、月次計算（引落）は翌月から。
    対象月＝入園月なら請求・引落・集計の対象外にする（初回売上の記録の有無に関わらず一律）。 */
@@ -925,12 +930,14 @@ function calc(p,asNyuenMonth){
     入園前ガードより先に判定する（請求月は入園月より前のため）。金額はマスターから。 */
  if(!asNyuenMonth && shinkyuThisMonth(p)){
   const S=(M.youchisha&&M.youchisha.shinkyu_chiruga)||{};
-  /* SF-SHINKYU-SIBFREE-20261009 : ご兄弟が在籍している進級児は入学金を免除（¥30,000→¥0）。
+  /* SF-SHINKYU-SIBFREE-20261009 / SF-SHINKYU-FREESEL-20261009 : 入学金免除（¥30,000→¥0）。
+     理由はご兄弟在籍・従業員の福利厚生の2種（shinkyuFreeReason、旧 shinkyuSibFree 互換）。
      行は消さず¥0で残す（月次の明細・案内文で「免除」が見えるように）。月次計算・口座振替CSV・
      ルクミー・本部集計はすべてこの calc() を通るので、ここ1箇所で全経路に効く。 */
-  const uni=Number(S.uniform)||0, nyu=(p.shinkyuSibFree?0:Number(S.nyugaku))||0, tesu=Number(S.tesu)||0;
-  const nyuLabel=p.shinkyuSibFree?'入学金（ご兄弟在籍のため免除）':'入学金';
-  return {type:facType(p.park),getsu:0,kyozai:0,sib:0,half:0,early:0,evs:[{item:'制服代',amt:uni},{item:nyuLabel,amt:nyu}],evSum:uni+nyu,sub:uni+nyu,fee:tesu,total:uni+nyu+tesu,flag:true,changed:false,reason:'チルガからの進級（制服代・入学金）'+(p.shinkyuSibFree?'・入学金免除':''),isNew:false,shinkyu:true};
+  const _fr=shinkyuFreeReason(p);
+  const uni=Number(S.uniform)||0, nyu=(_fr?0:Number(S.nyugaku))||0, tesu=Number(S.tesu)||0;
+  const nyuLabel=_fr?('入学金（'+SHINKYU_FREE_LABELS[_fr]+'）'):'入学金';
+  return {type:facType(p.park),getsu:0,kyozai:0,sib:0,half:0,early:0,evs:[{item:'制服代',amt:uni},{item:nyuLabel,amt:nyu}],evSum:uni+nyu,sub:uni+nyu,fee:tesu,total:uni+nyu+tesu,flag:true,changed:false,reason:'チルガからの進級（制服代・入学金）'+(_fr?'・入学金免除':''),isNew:false,shinkyu:true};
  }
  // SF-NYUENGUARD-20260908 : 入園月より前の月はすべて0（退園側と対称）
  // SF-NYUENFIRST-20260909 : asNyuenMonth=true（新規入園の初月合計・初回案内PDF・初回売上）は「入園月として計算する」
@@ -1529,7 +1536,7 @@ function renderShinkyu(){
  let h='<div style="display:flex;flex-direction:column;gap:16px">';
  h+=`<div style="font-size:12.5px;color:var(--mut);background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px 14px;line-height:1.8">チルガ3園から翌年4月に幼稚舎へ進級する園児の、<b style="color:var(--ink)">制服代 ¥${uni.toLocaleString()}・入学金 ¥${nyu.toLocaleString()}・手数料 ¥${tesu.toLocaleString()}（合計 ¥${goukei.toLocaleString()}）</b>を、請求月（既定 2026年11月）の幼稚舎の月次計算・口座振替CSV・ルクミー出力・本部集計に載せます。通常の月謝はルクミー（チルガ）側のまま。引落口座は保護者名義、請求元が幼稚舎です。入園月翌月…ではなく<b style="color:var(--ink)">入園月（既定 2027年4月）から通常の幼稚舎月謝</b>が始まります（初回案内・初回売上の対象にはなりません）。</div>`;
  if(!list.length)h+=`<div style="text-align:center;color:var(--mut);padding:32px;border:1px dashed var(--line);border-radius:14px">まだ進級園児の登録がありません。<br>下の「＋ 進級園児を追加」から登録してください。</div>`;
- list.forEach(({r,i})=>{const n=r;const isConf=!!n.confirmed;
+ list.forEach(({r,i})=>{const n=r;const isConf=!!n.confirmed;const fr=shinkyuFreeReason(n); /* SF-SHINKYU-FREESEL-20261009 */
   h+=`<div style="border:1px solid var(--line);border-radius:14px;overflow:hidden;background:${isConf?'color-mix(in srgb,var(--leaf) 5%,var(--panel))':'var(--panel)'}">`+
    `<div style="display:flex;justify-content:space-between;align-items:center;padding:12px 18px;border-bottom:1px solid var(--line);background:${isConf?'color-mix(in srgb,var(--leaf) 8%,transparent)':'var(--panel2)'}">`+
     `<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">`+
@@ -1538,7 +1545,7 @@ function renderShinkyu(){
      `<span style="font-size:15px;font-weight:600;color:var(--ink)">${esc(n.name)||'（園児名を入力してください）'}</span>`+
      `<span style="font-size:11px;color:var(--mut)">出身：${esc(n.fromPark)||'—'}</span>`+
     `</div>`+
-    `<div style="text-align:right"><div style="font-size:11px;color:var(--mut)">請求月（${esc(n.shinkyuYM)||'—'}）の引落額${n.shinkyuSibFree?'・入学金免除':''}</div><div style="font-size:20px;font-weight:700;color:var(--berry)">¥${(uni+(n.shinkyuSibFree?0:nyu)+tesu).toLocaleString()}</div></div>`+ /* SF-SHINKYU-SIBFREE-20261009 */
+    `<div style="text-align:right"><div style="font-size:11px;color:var(--mut)">請求月（${esc(n.shinkyuYM)||'—'}）の引落額${fr?'・入学金免除':''}</div><div style="font-size:20px;font-weight:700;color:var(--berry)">¥${(uni+(fr?0:nyu)+tesu).toLocaleString()}</div></div>`+ /* SF-SHINKYU-SIBFREE-20261009 / SF-SHINKYU-FREESEL-20261009 */
    `</div>`+
    `<div style="padding:18px;display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px 16px">`+
     fld('園児名',`<input class="inp" data-ski="${i}" data-f="name" value="${esc(n.name)}" placeholder="例：山田 太郎">`)+
@@ -1550,7 +1557,7 @@ function renderShinkyu(){
     fld('入園年月日（既定 2027-04-01）',`<input class="inp" type="date" data-ski="${i}" data-f="nyuen" value="${esc(n.nyuen)}">`)+
     fld('請求月（既定 2026-11）',`<input class="inp" type="month" data-ski="${i}" data-f="shinkyuYM" value="${esc(n.shinkyuYM)}">`)+
     fld('クラス（2027/4時点・固定）',`<div class="inp" style="background:var(--panel2);color:var(--mut)">LEAF</div>`)+
-    fld('入学金免除（ご兄弟在籍）',`<label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--ink);padding:9px 2px;cursor:pointer"><input type="checkbox" data-skfree="${i}" ${n.shinkyuSibFree?'checked':''}> 免除する（¥${nyu.toLocaleString()} → ¥0）</label>`)+ /* SF-SHINKYU-SIBFREE-20261009 */
+    fld('入学金免除',`<select class="inp" data-skfree="${i}"><option value="" ${fr===''?'selected':''}>なし（¥${nyu.toLocaleString()}）</option><option value="sibling" ${fr==='sibling'?'selected':''}>ご兄弟在籍（¥0）</option><option value="staff" ${fr==='staff'?'selected':''}>従業員の福利厚生（¥0）</option></select>`)+ /* SF-SHINKYU-SIBFREE-20261009 / SF-SHINKYU-FREESEL-20261009 : 3択 */
    `</div>`+
    `<div style="padding:0 18px 16px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">`+
     (isConf
@@ -1567,6 +1574,7 @@ function renderShinkyu(){
  const selx=cand[window.__skPick];
  if(selx){
   const p=selx.r;
+  const pfr=shinkyuFreeReason(p); /* SF-SHINKYU-FREESEL-20261009 */
   if(!window.__skIssue)window.__skIssue=todayYMD();
   const issue=window.__skIssue;
   const debitAuto=shinkyuDebitDefault(p.shinkyuYM);
@@ -1649,10 +1657,10 @@ function renderShinkyu(){
      `<div class="sec2"><span class="num">02</span><span class="lbl">ご請求内訳</span><span class="line"></span></div>`+
      `<table class="billtable">`+
       `<tr><td>制服代</td><td>¥ ${uni.toLocaleString()}</td></tr>`+
-      `<tr><td>入学金${p.shinkyuSibFree?'（ご兄弟在籍のため免除）':''}</td><td>¥ ${(p.shinkyuSibFree?0:nyu).toLocaleString()}</td></tr>`+
+      `<tr><td>入学金${pfr?'（'+SHINKYU_FREE_LABELS[pfr]+'）':''}</td><td>¥ ${(pfr?0:nyu).toLocaleString()}</td></tr>`+ /* SF-SHINKYU-FREESEL-20261009 */
       `<tr><td>手数料</td><td>¥ ${tesu.toLocaleString()}</td></tr>`+
      `</table>`+
-     `<div class="billtotal"><span class="lbl">ご請求金額合計</span><span class="amt">¥ ${(uni+(p.shinkyuSibFree?0:nyu)+tesu).toLocaleString()}</span></div>`+ /* SF-SHINKYU-SIBFREE-20261009 */
+     `<div class="billtotal"><span class="lbl">ご請求金額合計</span><span class="amt">¥ ${(uni+(pfr?0:nyu)+tesu).toLocaleString()}</span></div>`+ /* SF-SHINKYU-SIBFREE-20261009 / SF-SHINKYU-FREESEL-20261009 */
      `<div class="sec2"><span class="num">03</span><span class="lbl">お引き落としについて</span><span class="line"></span></div>`+
      `<div class="duebox">`+
       `<div class="lbl">Withdrawal Date　お引き落とし日</div>`+
@@ -1668,11 +1676,14 @@ function renderShinkyu(){
  // 入力バインド（新規入園タブの data-newi と同じ流儀：onchange で再描画、oninput で即保存）
  document.querySelectorAll('[data-ski]').forEach(el=>{el.onchange=e=>{const i=+e.target.dataset.ski,f=e.target.dataset.f;roster[i][f]=e.target.value;if(f==='shinkyuYM')window.__skDebit=null;render();};
   el.oninput=e=>{const i=+e.target.dataset.ski,f=e.target.dataset.f;roster[i][f]=e.target.value;saveState();};});
- /* SF-SHINKYU-SIBFREE-20261009 : 免除チェック。値は roster に保存（保存・クラウド同期・園別sliceは roster 丸ごとで自動） */
- document.querySelectorAll('[data-skfree]').forEach(el=>{el.onchange=e=>{roster[+e.target.dataset.skfree].shinkyuSibFree=e.target.checked;saveState();render();};});
+ /* SF-SHINKYU-SIBFREE-20261009 / SF-SHINKYU-FREESEL-20261009 : 免除理由の選択。値は roster に保存
+    （保存・クラウド同期・園別sliceは roster 丸ごとで自動）。旧フラグ shinkyuSibFree も同時に書き、
+    旧コードの端末でも「ご兄弟在籍」の免除だけは効き続けるようにする。 */
+ document.querySelectorAll('[data-skfree]').forEach(el=>{el.onchange=e=>{const i2=+e.target.dataset.skfree;const v=e.target.value;roster[i2].shinkyuFreeReason=v;roster[i2].shinkyuSibFree=(v==='sibling');saveState();render();};});
  document.querySelectorAll('[data-skconfirm]').forEach(el=>{el.onclick=e=>{const i=+e.currentTarget.dataset.skconfirm;
   const n=roster[i];if(!n.name)return;
-  confirmDialog(`「${n.name}」さんの進級を確定します。\n確定すると請求月（${n.shinkyuYM}）の月次計算・口座振替CSV・ルクミー出力・本部集計に ¥${(uni+(n.shinkyuSibFree?0:nyu)+tesu).toLocaleString()} が載り、園児台帳にも表示されます。${n.shinkyuSibFree?'\n（ご兄弟在籍のため入学金は免除です）':''}`,()=>{ /* SF-SHINKYU-SIBFREE-20261009 */
+  const _fr=shinkyuFreeReason(n); /* SF-SHINKYU-FREESEL-20261009 */
+  confirmDialog(`「${n.name}」さんの進級を確定します。\n確定すると請求月（${n.shinkyuYM}）の月次計算・口座振替CSV・ルクミー出力・本部集計に ¥${(uni+(_fr?0:nyu)+tesu).toLocaleString()} が載り、園児台帳にも表示されます。${_fr?`\n（入学金は${SHINKYU_FREE_LABELS[_fr]}です）`:''}`,()=>{ /* SF-SHINKYU-SIBFREE-20261009 */
    roster[i].confirmed=true;render();
   },'チルガからの進級の確定','確定する');};});
  document.querySelectorAll('[data-skdel]').forEach(el=>{el.onclick=e=>{const i=+e.currentTarget.dataset.skdel;
@@ -1680,7 +1691,7 @@ function renderShinkyu(){
   confirmDialog(`進級の登録から「${nm}」を削除します。\nこの操作は取り消せません。本当に削除しますか？`,()=>{roster.splice(i,1);render();});};});
  const skAdd=document.getElementById('skAdd');if(skAdd)skAdd.onclick=()=>{
   const newId=Math.max(0,...roster.map(r=>r.id||0))+1;
-  roster.push({id:newId,status:'在園中',park:'幼稚舎',name:'',kana:'',waku:'一般',cls:'LEAF',koza:'',furikaeNo:'',fromPark:'月寒園',nyuen:'2027-04-01',shinkyu:true,shinkyuYM:'2026-11',sib:'なし',lid:'',birth:'',confirmed:false,shinkyuSeq:Date.now(),shinkyuSibFree:false}); /* SF-SHINKYU-SIBFREE-20261009 */
+  roster.push({id:newId,status:'在園中',park:'幼稚舎',name:'',kana:'',waku:'一般',cls:'LEAF',koza:'',furikaeNo:'',fromPark:'月寒園',nyuen:'2027-04-01',shinkyu:true,shinkyuYM:'2026-11',sib:'なし',lid:'',birth:'',confirmed:false,shinkyuSeq:Date.now(),shinkyuSibFree:false,shinkyuFreeReason:''}); /* SF-SHINKYU-SIBFREE-20261009 / SF-SHINKYU-FREESEL-20261009 */
   render();};
  const skPick=document.getElementById('skPick');if(skPick)skPick.onchange=e=>{window.__skPick=+e.target.value;window.__skDebit=null;render();};
  const ski=document.getElementById('skIssue');if(ski)ski.onchange=e=>{window.__skIssue=e.target.value;render();};
