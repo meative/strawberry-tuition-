@@ -1148,14 +1148,45 @@ function bindEdit(){document.querySelectorAll('[contenteditable]').forEach(el=>{
   render();};
  el.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();e.target.blur();}};});}
 
+/* SF-ROSTERSYNC-20261021 : 公開名簿（kindergarten_public/roster）の組み立てを1か所に集約。
+   syncBoardRoster（ボタン）と rosterPublishIfChanged（保存時の自動公開）の両方が使う。
+   ③ 退園日（taien）が今日以前の子は公開対象から外す。復園日（returnDate）が今日以前なら
+   在園扱いに戻す（SF-RETURNEE-20260911 と同じ読み方。判定エンジンの taienStopped は
+   請求対象月（yy/mm）基準なので、ここでは「今日」基準で別に判定する。エンジンは触らない）。 */
+function kinderPubDateNum(s){ const m=String(s||'').match(/^(\d{4})[-\/](\d{1,2})[-\/](\d{1,2})/); return m?(+m[1]*10000 + +m[2]*100 + +m[3]):null; }
+function kinderPubActive(p){
+ if(!p) return false;
+ const d=new Date(); const t=d.getFullYear()*10000+(d.getMonth()+1)*100+d.getDate();
+ const tz=kinderPubDateNum(p.taien);
+ if(tz!=null && tz<=t){ const rz=kinderPubDateNum(p.returnDate); if(!(rz!=null && rz<=t)) return false; }   // 退園済み（復園していない）
+ return true;
+}
+function kinderPubBuild(rosterArr){
+ const NM={tsukisamu:'月寒',shiraishi:'白石',factory:'サッポロファクトリー',shiseikan:'資生館'};
+ const withLink=[],noLink=[],retired=[];
+ (rosterArr||[]).forEach(p=>{ if(!p||!p.name)return; const nm=String(p.name).trim(); if(!nm)return;
+  if(!kinderPubActive(p)){ retired.push(nm); return; }   /* SF-ROSTERSYNC-20261021 ③ : 退園済みは公開しない */
+  if(p.linkPark&&NM[p.linkPark]){
+   /* SF-ROSTER-BIRTH-20260829 : 生年月（年・月のみ）。未認証で読めるミラーのため日にちは載せない。
+      SF-AMPMPARK-20260901 : 早朝／夕方の園（空なら連携園と同じ扱い）。
+      SF-MONTHLYOPT-ROSTER-20260911 : 月極チェック（真偽値のみ・個人情報は増やさない） */
+   const e={name:nm,linkPark:p.linkPark,linkParkAm:(p.linkParkAm||''),linkParkPm:(p.linkParkPm||''),monthlyAm:!!p.optSoucho,monthlyPm:!!p.optEncho,birthY:null,birthM:null};
+   if(p.birth){ const bm=String(p.birth).match(/^(\d{4})[-\/](\d{1,2})/); if(bm){ e.birthY=+bm[1]; e.birthM=+bm[2]; } }
+   withLink.push(e);
+  } else noLink.push(nm);
+ });
+ return {withLink:withLink,noLink:noLink,retired:retired,NM:NM};
+}
 // 予約ボード（延長保育）の幼稚舎名簿ミラーを、いまの幼稚舎在籍から再生成する。
 // 触るのは kindergarten_public/roster（表示用ミラー）のみ。予約データ・園児データには触れない。
-// 現ミラーの名前は消さずUNION（追加のみ）。人数0なら中止。本部/幼稚舎ログイン時のみボタン表示。
+// SF-ROSTERSYNC-20261021 ① : UNION（追加のみ）を廃止。現在の園児台帳に居ない名前・退園済みの
+// 名前は公開名簿から除外する（退園児がボタンを押しても永遠に消えなかった構造バグの修正）。
+// 消える名前は確認ダイアログに赤枠で列挙し、承認後にだけ書く。人数0なら中止（維持）。
+// 本部/幼稚舎ログイン時のみボタン表示。
 async function syncBoardRoster(){
  const btn=document.getElementById('btnSyncBoard');const msg=document.getElementById('syncBoardMsg');
  const setMsg=(t,c)=>{if(msg){msg.textContent=t;msg.style.color=c||'var(--mut)';}};
  if(!cloudDB){alert('クラウドに接続されていません。ログインし直してください。');return;}
- const NM={tsukisamu:'月寒',shiraishi:'白石',factory:'サッポロファクトリー',shiseikan:'資生館'};
  try{
   if(btn)btn.disabled=true; setMsg('読み込み中…');
   const snap=await cloudDB.collection('gardens').doc('youchisha').get();
@@ -1164,27 +1195,18 @@ async function syncBoardRoster(){
   if(typeof payload==='string'){ try{payload=JSON.parse(payload);}catch(e){ setMsg('名簿データの解析に失敗しました','var(--berry)'); return; } }
   const rosterArr=(payload&&Array.isArray(payload.roster))?payload.roster:null;
   if(!rosterArr){ setMsg('名簿を取得できませんでした','var(--berry)'); return; }
-  const withLink=[],noLink=[];
-  rosterArr.forEach(p=>{ if(!p||!p.name)return; const nm=String(p.name).trim(); if(!nm)return;
-  if(p.linkPark&&NM[p.linkPark]){
-   /* SF-ROSTER-BIRTH-20260829 : 生年月（年・月のみ）を名簿に載せ、予約ボードで実年齢を表示できるようにする。
-      kindergarten_public は未認証で読めるミラーのため、日にちは載せない（最小限の情報のみ）。 */
-   /* SF-AMPMPARK-20260901 : 早朝／夕方の園も名簿に載せる。予約ボードがこれを見て、
-      その区分のチップに常時出すかどうかを決める。空なら linkPark と同じ扱い。
-      載るのは園のコードだけで、個人情報は増えない。 */
-   /* SF-MONTHLYOPT-ROSTER-20260911 : 早朝¥5,000／延長¥5,000の月極チェックを名簿に載せる（真偽値のみ・個人情報は増やさない） */
-   const e={name:nm,linkPark:p.linkPark,linkParkAm:(p.linkParkAm||''),linkParkPm:(p.linkParkPm||''),monthlyAm:!!p.optSoucho,monthlyPm:!!p.optEncho,birthY:null,birthM:null};
-   if(p.birth){ const bm=String(p.birth).match(/^(\d{4})[-\/](\d{1,2})/); if(bm){ e.birthY=+bm[1]; e.birthM=+bm[2]; } }
-   withLink.push(e);
-  } else noLink.push(nm); });
+  const _b=kinderPubBuild(rosterArr);   /* SF-ROSTERSYNC-20261021 : 共通ビルダー（③の退園除外込み） */
+  const withLink=_b.withLink, noLink=_b.noLink, retired=_b.retired, NM=_b.NM;
   const cur=await cloudDB.collection('kindergarten_public').doc('roster').get();
   const curPupils=(cur.exists&&Array.isArray(cur.data().pupils))?cur.data().pupils:[];
-  const map=new Map();
-  withLink.forEach(p=>map.set(p.name,p)); /* SF-ROSTER-BIRTH-20260829 : birthY/birthM も保持 */
-  curPupils.forEach(cp=>{ const nm=String((cp&&cp.name)||'').trim(); if(nm&&!map.has(nm)){ map.set(nm,{name:nm,linkPark:(cp.linkPark||''),linkParkAm:(cp.linkParkAm||''),linkParkPm:(cp.linkParkPm||''),monthlyAm:!!cp.monthlyAm,monthlyPm:!!cp.monthlyPm/* SF-MONTHLYOPT-ROSTER-20260911 */,birthY:(cp.birthY!=null?cp.birthY:null),birthM:(cp.birthM!=null?cp.birthM:null)});/* SF-AMPMPARK-20260901 */ } }); /* SF-ROSTER-BIRTH-20260829 */
-  const finalPupils=[...map.values()];
+  /* SF-ROSTERSYNC-20261021 ① : 公開するのは「現在の園児台帳に居て、退園しておらず、連携園が
+     設定されている子」だけ。旧ミラーの名前は引き継がない（UNION 廃止）。 */
+  const finalPupils=withLink;
+  const finalNames=new Set(finalPupils.map(p=>p.name));
   const curNames=new Set(curPupils.map(p=>String((p&&p.name)||'').trim()));
   const added=finalPupils.filter(p=>!curNames.has(p.name)).map(p=>p.name+'（'+(NM[p.linkPark]||'未設定')+'）');
+  const removed=curPupils.map(p=>String((p&&p.name)||'').trim()).filter(nm=>nm&&!finalNames.has(nm));
+  const removedInfo=removed.map(nm=>nm+'（'+(retired.indexOf(nm)>=0?'退園済み':(noLink.indexOf(nm)>=0?'連携園が未設定':'台帳に不在'))+'）');
   if(finalPupils.length===0){ setMsg('人数が0のため中止しました（誤消去防止）','var(--berry)'); return; }
   /* SF-ROSTERUI-20260829 : ブラウザ標準の confirm ではなく、このアプリ共通の中央ダイアログで確認する。 */
   var _eh=function(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');};
@@ -1202,9 +1224,14 @@ async function syncBoardRoster(){
    +(function(){var am=finalPupils.filter(function(p){return p&&p.monthlyAm;}).length,pm=finalPupils.filter(function(p){return p&&p.monthlyPm;}).length;return _row('月極オプション','早朝月極 '+am+'名／延長月極 '+pm+'名');})()
    +(noBirth?_row('生年月なし',noBirth+'名（3歳〜のまま）','var(--mut)'):'')
    +_row('新しく追加',added.length?added.length+'名':'なし（すでに最新）')
+   +_row('公開から消える',removed.length?removed.length+'名':'なし','var(--berry)')   /* SF-ROSTERSYNC-20261021 ① */
    +'</div>';
   if(added.length){
    extraHtml+='<div style="text-align:left;margin-top:12px;padding:12px 14px;background:var(--leafsoft);border:1px solid var(--leaf);border-radius:14px;font-size:12.5px;line-height:1.9;max-height:180px;overflow:auto"><b style="color:var(--leaf)">新しく追加される園児</b><br>'+added.map(_eh).join('<br>')+'</div>';
+  }
+  /* SF-ROSTERSYNC-20261021 ① : 消える名前を赤枠で列挙してから承認してもらう（黙って消さない） */
+  if(removed.length){
+   extraHtml+='<div style="text-align:left;margin-top:12px;padding:12px 14px;background:var(--berrysoft);border:2px solid var(--berry);border-radius:14px;font-size:12.5px;line-height:1.9;max-height:180px;overflow:auto"><b style="color:var(--berry)">⚠ 予約ボードの一覧から消える園児：'+removed.length+'名</b><br>'+removedInfo.map(_eh).join('<br>')+'<div style="color:var(--mut);margin-top:6px">退園済み・台帳に居ない・連携園未設定の子は公開名簿から外れます（園児台帳のデータは消えません）。</div></div>';
   }
   if(noLink.length){
    extraHtml+='<div style="text-align:left;margin-top:12px;padding:12px 14px;background:var(--berrysoft);border:1px solid var(--berry);border-radius:14px;font-size:12.5px;line-height:1.9;max-height:180px;overflow:auto"><b style="color:var(--berry)">⚠ 連携園が未設定でボードに出せない子：'+noLink.length+'名</b><br>'+noLink.map(_eh).join('<br>')+'<div style="color:var(--mut);margin-top:6px">園児台帳の「連携園」を設定すると次回から載ります。</div></div>';
@@ -1218,22 +1245,48 @@ async function syncBoardRoster(){
      updatedBy:'tuition-app-button', updatedAt:firebase.firestore.FieldValue.serverTimestamp(),
      pupils:finalPupils, count:finalPupils.length
     });
-    setMsg('✅ 更新しました（'+finalPupils.length+'名'+(withBirth?'／生年月あり'+withBirth+'名':'')+'）。予約ボードを開いて再読込してください。','var(--leaf)');
+    try{ localStorage.setItem('sf_kinder_pub_sig', JSON.stringify(finalPupils)); }catch(e){}   /* SF-ROSTERSYNC-20261021 ② : 自動公開の署名も更新（直後の二重書き防止） */
+    setMsg('✅ 更新しました（'+finalPupils.length+'名'+(withBirth?'／生年月あり'+withBirth+'名':'')+(removed.length?'／'+removed.length+'名を除外':'')+'）。予約ボードは自動で反映されます。','var(--leaf)');
    }catch(e){ setMsg('エラー：'+((e&&e.message)?e.message:e),'var(--berry)'); }
    finally{ if(btn)btn.disabled=false; }
   };
-  confirmDialog('この内容で予約ボードの名簿を更新します。予約データには触れません。今出ている名前も消えません。',
+  /* SF-ROSTERSYNC-20261021 ① : 文言を実態に合わせる（UNION 時代の「今出ている名前も消えません」は廃止） */
+  confirmDialog('この内容で予約ボードの名簿を更新します。予約データには触れません。'
+   +(removed.length?'赤枠の'+removed.length+'名は予約ボードの一覧から消えます（園児台帳のデータは消えません）。':''),
    function(){ _doWrite(); }, '予約ボードの名簿を更新', '更新する');
   try{ document.getElementById('confirmExtra').innerHTML=extraHtml; }catch(e){}
-  return;
-  setMsg('更新中…');
-  await cloudDB.collection('kindergarten_public').doc('roster').set({
-   updatedBy:'tuition-app-button', updatedAt:firebase.firestore.FieldValue.serverTimestamp(),
-   pupils:finalPupils, count:finalPupils.length
-  });
-  setMsg('✅ 更新しました（'+finalPupils.length+'名'+(added.length?'／追加'+added.length+'名':'')+'）。予約ボードを開いて再読込してください。','var(--leaf)');
  }catch(e){ setMsg('エラー：'+((e&&e.message)?e.message:e),'var(--berry)'); }
  finally{ if(btn)btn.disabled=false; }
+}
+/* SF-ROSTERSYNC-20261021 ② : 保存時の自動公開（ボタンの押し忘れの根治）。
+   幼稚舎の園児台帳がクラウド保存されたあと（cloudPushNow 成功時）、公開対象の内容
+   （name / linkPark 系 / monthly 系 / birth。③の退園除外後）が前回公開時と変わっていれば
+   kindergarten_public/roster を自動で書き直す。対象は幼稚舎スライスを編集できるログインだけ
+   （幼稚舎アカウント、または本部が「幼稚舎」を選択中＝ CURRENT_GARDEN==='youchisha'。
+   全施設の閲覧中（AGG_READONLY）はそもそも保存自体が走らない）。
+   人数0なら書かない（誤消去防止・ボタンと同じ）。署名は localStorage（sf_kinder_pub_sig）に
+   控え、同一内容なら書かない（内容が変わった保存のときだけ1回書く）。 */
+let __kinderPubBusy=false;
+function rosterPublishIfChanged(){
+ try{
+  if(!cloudDB || CURRENT_GARDEN!=='youchisha' || AGG_READONLY) return;
+  if(__kinderPubBusy) return;
+  const _b=kinderPubBuild((roster||[]).filter(r=>r&&r.park==='幼稚舎'));
+  const pupils=_b.withLink;
+  if(!pupils.length){ console.warn('[SF-ROSTERSYNC-20261021] 公開対象0名のため自動公開を見送りました（誤消去防止）'); return; }
+  const sig=JSON.stringify(pupils);
+  let last=null; try{ last=localStorage.getItem('sf_kinder_pub_sig'); }catch(e){}
+  if(sig===last) return;
+  __kinderPubBusy=true;
+  cloudDB.collection('kindergarten_public').doc('roster').set({
+   updatedBy:'tuition-app-auto', updatedAt:firebase.firestore.FieldValue.serverTimestamp(),
+   pupils:pupils, count:pupils.length
+  }).then(()=>{
+   try{ localStorage.setItem('sf_kinder_pub_sig',sig); }catch(e){}
+   console.log('[SF-ROSTERSYNC-20261021] 予約ボードの名簿を自動公開しました（'+pupils.length+'名）');
+  }).catch(e=>{ console.warn('[SF-ROSTERSYNC-20261021] 自動公開に失敗（次回の保存時に再試行します）',e); })
+  .finally(()=>{ __kinderPubBusy=false; });
+ }catch(e){ console.warn('[SF-ROSTERSYNC-20261021] 自動公開でエラー',e); }
 }
 function renderSettings(){
  let h='<div class="setgrid">';
@@ -4973,7 +5026,9 @@ function cloudPushNow(){
  cloudRef().set({ payload:json, updatedBy:currentOperator||'(不明)', deviceId:MY_DEVICE,
    updatedAt:firebase.firestore.FieldValue.serverTimestamp(), clientTime:new Date().toISOString() })
   // 送信中に新しい編集が入っていたら dirty のままにする（次の push で送る）
-  .then(()=>{ if(__editSeq===seq) __cloudDirty=false; })
+  .then(()=>{ if(__editSeq===seq) __cloudDirty=false;
+   try{ rosterPublishIfChanged(); }catch(e){}   /* SF-ROSTERSYNC-20261021 ② : 幼稚舎の保存後に公開名簿を自動更新 */
+  })
   .catch(e=>{ console.error('クラウド保存失敗',e); cloudBarSet('error','保存失敗'); });
 }
 function cloudManualRefresh(){
