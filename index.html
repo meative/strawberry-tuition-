@@ -345,11 +345,14 @@ tr.changed:hover td{background:color-mix(in srgb,var(--gold) 22%,transparent)!im
  <div class="card-head"><h2><span class="dot"></span><span id="cardTitle"></span></h2><span class="meta" id="cardMeta"></span></div>
  <div id="body"></div>
  <div id="confirmOverlay" style="display:none;position:fixed;inset:0;background:rgba(20,12,16,.45);z-index:10010;align-items:center;justify-content:center;backdrop-filter:blur(2px)">
-  <div style="background:var(--panel);border:1px solid var(--line);border-radius:18px;max-width:380px;width:90%;padding:28px 26px 22px;box-shadow:0 12px 48px rgba(0,0,0,.25);text-align:center">
+  <!-- SF-DLGSCROLL-20261021 : 列挙が長いと画面からはみ出して確認ボタンが押せなかった（背面がスクロールしていた）。
+       ダイアログ本体を max-height:90vh＋overflow-y:auto にして中をスクロールさせ、ボタン行は sticky で下に固定。
+       開いている間の背面ロック（body overflow:hidden）は confirmDialog 付近の監視コードで行う。 -->
+  <div id="confirmBox" style="background:var(--panel);border:1px solid var(--line);border-radius:18px;max-width:380px;width:90%;padding:28px 26px 0;box-shadow:0 12px 48px rgba(0,0,0,.25);text-align:center;max-height:90vh;overflow-y:auto;overscroll-behavior:contain">
    <div id="confirmTitle" style="font-size:16px;font-weight:700;color:var(--ink);margin-bottom:12px">確認</div>
    <div id="confirmMsg" style="font-size:13.5px;color:var(--mut);line-height:1.8;margin-bottom:22px;white-space:pre-line"></div>
    <div id="confirmExtra" style="margin-bottom:22px"></div>
-   <div style="display:flex;gap:10px;justify-content:center">
+   <div style="display:flex;gap:10px;justify-content:center;position:sticky;bottom:0;background:var(--panel);padding:12px 0 22px">
     <button id="confirmCancel" style="padding:10px 24px;border:1px solid var(--line);background:var(--panel2);color:var(--ink);border-radius:24px;font-size:13.5px;cursor:pointer;font-family:inherit;font-weight:600">キャンセル</button>
     <button id="confirmOK" style="padding:10px 24px;border:none;background:var(--berry);color:#fff;border-radius:24px;font-size:13.5px;cursor:pointer;font-family:inherit;font-weight:600">削除する</button>
    </div>
@@ -510,6 +513,22 @@ let sched=JSON.parse(JSON.stringify(M.sched)); // 年間スケジュール（編
 let schedMemo=M.schedMemo||''; // 年間スケジュールのメモ欄
 let schedShared=[]; // 全社共通カレンダー（shared/global から読込。この園の own sched とは別に保持）
 let schedAmounts={}; // 全社行事の「園ごとの金額」 { 園名:{ 行事キー:金額 } }（園別ドキュメントに保存）
+/* SF-DLGSCROLL-20261021 : 確認ダイアログが開いている間は背面（body）のスクロールをロックする。
+   開閉は confirmDialog / infoDialog / selectDialog / cbManageShops など多数の箇所が
+   ov.style.display を直接書き換えるため、個別に挿すのではなく style 属性の変化を監視して一元化。
+   閉じたら必ず元に戻す（ロック前の overflow 値を保持して復元）。 */
+(function(){
+ const ov=document.getElementById('confirmOverlay');
+ if(!ov||!window.MutationObserver)return;
+ let prevOverflow=null;
+ const apply=()=>{
+  const open=ov.style.display!=='none'&&ov.style.display!=='';
+  if(open){ if(prevOverflow===null){prevOverflow=document.body.style.overflow||'';} document.body.style.overflow='hidden'; }
+  else if(prevOverflow!==null){ document.body.style.overflow=prevOverflow; prevOverflow=null; }
+ };
+ new MutationObserver(apply).observe(ov,{attributes:true,attributeFilter:['style']});
+ apply();
+})();
 // 共通の確認ダイアログ（削除・確定など）
 function confirmDialog(msg,onOK,title,okLabel){
  const ov=document.getElementById('confirmOverlay');
